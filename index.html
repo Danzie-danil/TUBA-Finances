@@ -1,0 +1,3697 @@
+<!DOCTYPE html>
+<!-- saved from url=(0040)file:///C:/Users/User/Desktop/index.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>💼 Daniel's Pro</title>
+    <link rel="manifest" href="blob:null/9bed574a-b263-4a59-84f9-bba94c6c8b04">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
+            padding-bottom: 70px;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: linear-gradient(145deg, #1a1a1a, #000000);
+            color: white;
+            padding: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-btn {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(145deg, #2e7d32, #1b5e20);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(46, 125, 50, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .header-btn:hover {
+            box-shadow: 0 6px 20px rgba(46, 125, 50, 0.6), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .header-btn:active {
+            transform: translateY(-50%) scale(0.95);
+            box-shadow: 0 2px 10px rgba(46, 125, 50, 0.4), inset 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-btn-left {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(145deg, #1976d2, #0d47a1);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .header-btn-left:hover {
+            box-shadow: 0 6px 20px rgba(25, 118, 210, 0.6), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .header-btn-left:active {
+            transform: translateY(-50%) scale(0.95);
+            box-shadow: 0 2px 10px rgba(25, 118, 210, 0.4), inset 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        .content {
+            padding: 16px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background: linear-gradient(145deg, #1a1a1a, #000000);
+            color: white;
+            padding: 16px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.3s ease;
+            cursor: pointer;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-bottom: 4px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: 700;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-subvalue {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 
+                        0 1px 3px rgba(0, 0, 0, 0.1),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            position: relative;
+        }
+
+        .card:hover {
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2), 
+                        0 1px 3px rgba(0, 0, 0, 0.1),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .card h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #1a1a1a;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+        }
+
+        .card-header-buttons {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .quick-nav-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .quick-nav-btn:hover {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .quick-nav-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2), inset 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .quick-nav-btn.products {
+            background: linear-gradient(145deg, #2e7d32, #1b5e20);
+        }
+
+        .quick-nav-btn.categories {
+            background: linear-gradient(145deg, #e65100, #bf360c);
+        }
+
+        .quick-nav-btn.back {
+            background: linear-gradient(145deg, #1976d2, #0d47a1);
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #333;
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8);
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            font-size: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1), inset 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        button, .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(145deg, #1a1a1a, #000000);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(145deg, #757575, #424242);
+        }
+
+        .btn-success {
+            background: linear-gradient(145deg, #2e7d32, #1b5e20);
+        }
+
+        .btn-danger {
+            background: linear-gradient(145deg, #d32f2f, #b71c1c);
+        }
+
+        .btn-small {
+            padding: 8px 12px;
+            font-size: 13px;
+            width: auto;
+        }
+
+        .item {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .item:hover {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .item-title {
+            font-weight: 700;
+            font-size: 15px;
+            color: #1a1a1a;
+        }
+
+        .item-subtitle {
+            font-size: 13px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            display: inline-block;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .badge-success {
+            background: linear-gradient(145deg, #66bb6a, #43a047);
+            color: white;
+        }
+
+        .badge-warning {
+            background: linear-gradient(145deg, #ffeb3b, #fbc02d);
+            color: #333;
+        }
+
+        .badge-danger {
+            background: linear-gradient(145deg, #ef5350, #c62828);
+            color: white;
+        }
+
+        .badge-paid {
+            background: linear-gradient(145deg, #66bb6a, #43a047);
+            color: white;
+        }
+
+        .badge-unpaid {
+            background: linear-gradient(145deg, #ef5350, #c62828);
+            color: white;
+        }
+
+        .badge-mpesa {
+            background: linear-gradient(145deg, #ef5350, #c62828);
+            color: white;
+        }
+
+        .badge-crdb {
+            background: linear-gradient(145deg, #66bb6a, #43a047);
+            color: white;
+        }
+
+        .badge-nmb {
+            background: linear-gradient(145deg, #ff9800, #e65100);
+            color: white;
+        }
+
+        .badge-yas {
+            background: linear-gradient(145deg, #42a5f5, #1976d2);
+            color: white;
+        }
+
+        .badge-airtel {
+            background: linear-gradient(145deg, #d32f2f, #b71c1c);
+            color: white;
+        }
+
+        .badge-halopesa {
+            background: linear-gradient(145deg, #ffeb3b, #fbc02d);
+            color: #333;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            overflow-x: auto;
+            box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+        }
+
+        .nav-item {
+            flex: 1;
+            min-width: 70px;
+            max-width: 90px;
+            padding: 10px 4px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: #666;
+            font-size: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            word-wrap: break-word;
+            overflow: hidden;
+        }
+
+        .nav-item span:last-child {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+        }
+
+        .nav-item.active {
+            background: linear-gradient(145deg, #1a1a1a, #000000);
+            color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-item:hover:not(.active) {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+        }
+
+        .info-box {
+            background: linear-gradient(145deg, #f5f5f5, #e0e0e0);
+            padding: 12px;
+            border-radius: 12px;
+            margin-top: 12px;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+
+        .flex-gap {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 16px;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 28px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 
+                        0 0 0 1px rgba(255, 255, 255, 0.5),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #1a1a1a;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 30px;
+            opacity: 0;
+            transition: opacity 0.3s, bottom 0.3s;
+            z-index: 9999;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .toast.show {
+            opacity: 1;
+            bottom: 100px;
+        }
+
+        .toast-success {
+            background: linear-gradient(145deg, #2e7d32, #1b5e20);
+        }
+
+        .toast-error {
+            background: linear-gradient(145deg, #d32f2f, #b71c1c);
+        }
+
+        .toast-info {
+            background: linear-gradient(145deg, #1976d2, #0d47a1);
+        }
+
+        .transaction-tabs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .transaction-tab {
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .transaction-tab:hover {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .transaction-tab:active {
+            transform: translateY(0);
+        }
+
+        .transaction-tab.mpesa {
+            background: linear-gradient(145deg, #d32f2f, #b71c1c);
+            opacity: 0.6;
+        }
+
+        .transaction-tab.mpesa.active {
+            opacity: 1;
+            box-shadow: 0 8px 25px rgba(211, 47, 47, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .transaction-tab.crdb {
+            background: linear-gradient(145deg, #2e7d32, #1b5e20);
+            opacity: 0.6;
+        }
+
+        .transaction-tab.crdb.active {
+            opacity: 1;
+            box-shadow: 0 8px 25px rgba(46, 125, 50, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .transaction-tab.nmb {
+            background: linear-gradient(145deg, #e65100, #bf360c);
+            opacity: 0.6;
+        }
+
+        .transaction-tab.nmb.active {
+            opacity: 1;
+            box-shadow: 0 8px 25px rgba(230, 81, 0, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .transaction-tab.yas {
+            background: linear-gradient(145deg, #0d47a1, #01579b);
+            opacity: 0.6;
+        }
+
+        .transaction-tab.yas.active {
+            opacity: 1;
+            box-shadow: 0 8px 25px rgba(13, 71, 161, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .transaction-tab.halopesa {
+            background: linear-gradient(145deg, #fdd835, #f9a825);
+            color: #000;
+            opacity: 0.6;
+        }
+
+        .transaction-tab.halopesa.active {
+            opacity: 1;
+            box-shadow: 0 8px 25px rgba(253, 216, 53, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .transaction-tab.airtel {
+            background: linear-gradient(145deg, #b71c1c, #7f0000);
+            opacity: 0.6;
+        }
+
+        .transaction-tab.airtel.active {
+            opacity: 1;
+            box-shadow: 0 8px 25px rgba(183, 28, 28, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .note-preview {
+            cursor: pointer;
+            max-height: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            line-height: 1.5;
+            background: linear-gradient(145deg, #ffffff, #f5f5f5);
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            padding: 16px;
+            border-radius: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+
+        .note-preview:hover {
+            box-shadow: 0 12px 30px rgba(102, 126, 234, 0.2), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            border-color: rgba(102, 126, 234, 0.4);
+        }
+
+        .note-preview:active {
+            transform: translateY(-2px) scale(1.01);
+        }
+
+        .collapse-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(145deg, #f8f8f8, #e8e8e8);
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            color: #555;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 12px 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .collapse-btn:hover {
+            background: linear-gradient(145deg, #ffffff, #f0f0f0);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .collapse-btn:active {
+            transform: translateY(0);
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .collapse-icon {
+            font-size: 12px;
+            transition: transform 0.3s;
+        }
+
+        .collapse-icon.expanded {
+            transform: rotate(180deg);
+        }
+
+        .highlight-pulse {
+            animation: highlightFade 1s ease-out;
+        }
+
+        @keyframes highlightFade {
+            0% {
+                background: rgba(102, 126, 234, 0.3);
+                box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
+            }
+            100% {
+                background: transparent;
+                box-shadow: none;
+            }
+        }
+
+        .search-box {
+            margin-bottom: 16px;
+        }
+
+        .search-box input {
+            background: white;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-row input, .filter-row select {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .alert-box {
+            background: linear-gradient(145deg, #fff3e0, #ffe0b2);
+            border-left: 4px solid #e65100;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 15px rgba(230, 81, 0, 0.2);
+        }
+
+        .alert-box-danger {
+            background: linear-gradient(145deg, #ffebee, #ffcdd2);
+            border-left: 4px solid #d32f2f;
+            box-shadow: 0 4px 15px rgba(211, 47, 47, 0.2);
+        }
+
+        .float-balance-container {
+            background: linear-gradient(145deg, #e3f2fd, #bbdefb);
+            padding: 16px;
+            border-radius: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 15px rgba(25, 118, 210, 0.2);
+            border: 2px solid rgba(25, 118, 210, 0.3);
+        }
+
+        .float-balance-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(25, 118, 210, 0.2);
+        }
+
+        .float-balance-row:last-child {
+            border-bottom: none;
+        }
+
+        .float-balance-label {
+            font-weight: 600;
+            color: #0d47a1;
+            font-size: 14px;
+        }
+
+        .float-balance-value {
+            font-weight: 700;
+            color: #1a1a1a;
+            font-size: 16px;
+        }
+
+        .float-balance-value.positive {
+            color: #2e7d32;
+        }
+
+        .float-balance-value.negative {
+            color: #d32f2f;
+        }
+
+        .editable-float {
+            padding: 8px 12px;
+            border: 2px solid rgba(25, 118, 210, 0.3);
+            border-radius: 8px;
+            background: white;
+            font-weight: 700;
+            color: #1976d2;
+            cursor: pointer;
+            display: inline-block;
+            min-width: 100px;
+            text-align: right;
+        }
+
+        .editable-float:hover {
+            border-color: #1976d2;
+            box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+        }
+
+        .progress-bar {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            height: 8px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #2e7d32, #66bb6a);
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .welcome-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeOut 0.5s ease-in-out 1.5s forwards;
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                visibility: hidden;
+            }
+        }
+
+        .welcome-logo {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: bounce 1s ease-in-out;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .welcome-title {
+            color: white;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            animation: slideUp 0.8s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .welcome-subtitle {
+            color: #aaa;
+            font-size: 14px;
+            animation: slideUp 0.8s ease-out 0.2s both;
+        }
+
+        .app-container {
+            opacity: 0;
+            animation: fadeIn 0.5s ease-in-out 2s forwards;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        .quick-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .quick-stat-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            border-radius: 8px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        @media (max-width: 640px) {
+            .stat-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .transaction-tabs {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .filter-row {
+                flex-direction: column;
+            }
+
+            .filter-row input, .filter-row select {
+                width: 100%;
+            }
+        }
+    </style>
+    <script src="./index_files/jspdf.umd.min.js.download"></script>
+    <script src="./index_files/xlsx.full.min.js.download"></script>
+    <script src="./index_files/chart.umd.min.js.download"></script>
+</head>
+
+<body>
+    <div class="welcome-screen">
+        <div class="welcome-logo">💼</div>
+        <div class="welcome-title">Daniel's Pro</div>
+        <div class="welcome-subtitle">Advanced Finance Manager</div>
+    </div>
+
+    <div class="app-container">
+        <div class="header">
+            <button class="header-btn-left" onclick="importData()" title="Import Data">📥</button>
+            <h1>💼 Daniel's Pro</h1>
+            <button class="header-btn" onclick="exportData()" title="Export Data">💾</button>
+        </div>
+
+        <div class="content" id="app">
+                <div class="stat-grid">
+                    <div class="stat-card" onclick="switchTab(&#39;sales&#39;)">
+                        <div class="stat-label">TODAY'S PROFIT</div>
+                        <div class="stat-value">💱 0.00 Tsh</div>
+                        <div class="stat-subvalue">0 sales today</div>
+                        
+                    </div>
+                    
+                    <div class="stat-card" onclick="switchTab(&#39;sales&#39;)">
+                        <div class="stat-label">YESTERDAY'S PROFIT</div>
+                        <div class="stat-value">💱 0.00 Tsh</div>
+                        <div class="stat-subvalue">
+                            ➡️ Same as yesterday
+                        </div>
+                    </div>
+
+                    <div class="stat-card" onclick="switchTab(&#39;analytics&#39;)">
+                        <div class="stat-label">MONTH PROFIT</div>
+                        <div class="stat-value">💱 0.00 Tsh</div>
+                        <div class="stat-subvalue">Revenue: 0.00 Tsh</div>
+                        
+                    </div>
+
+                    <div class="stat-card" onclick="switchTab(&#39;analytics&#39;)" style="background: #2e7d32;">
+                        <div class="stat-label">NET PROFIT (MONTH)</div>
+                        <div class="stat-value">💱 0.00 Tsh</div>
+                        <div class="stat-subvalue">Expenses: 0.00 Tsh</div>
+                    </div>
+
+                    <div class="stat-card" onclick="switchTab(&#39;unpaid&#39;)">
+                        <div class="stat-label">UNPAID ENTRIES</div>
+                        <div class="stat-value">0</div>
+                        <div class="stat-subvalue">Total: 0.00 Tsh</div>
+                    </div>
+
+                    <div class="stat-card" onclick="switchTab(&#39;inventory&#39;)">
+                        <div class="stat-label">LOW STOCK ALERT</div>
+                        <div class="stat-value">0</div>
+                        <div class="stat-subvalue">✅ All good</div>
+                    </div>
+                </div>
+
+                
+
+                
+
+                <div class="card">
+                    <h2>Quick Actions</h2>
+                    <div class="flex-gap">
+                        <button class="btn-success btn-small" onclick="switchTab(&#39;sales&#39;)">➕ New Sale</button>
+                        <button class="btn-danger btn-small" onclick="switchTab(&#39;expenses&#39;)">💸 Add Expense</button>
+                        <button class="btn-small" onclick="switchTab(&#39;products&#39;)">🛍️ Manage Products</button>
+                        <button class="btn-small" onclick="switchTab(&#39;transactions&#39;)">💳 Transactions</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Set Daily Target</h2>
+                    <div class="form-group">
+                        <label>Daily Profit Target (Tsh)</label>
+                        <input type="number" id="dailyTarget" value="0" step="1000">
+                    </div>
+                    <button onclick="setDailyTarget()">Save Target</button>
+                </div>
+
+                <div class="card">
+                    <h2>Set Monthly Target</h2>
+                    <div class="form-group">
+                        <label>Monthly Profit Target (Tsh)</label>
+                        <input type="number" id="monthlyTarget" value="0" step="10000">
+                    </div>
+                    <button onclick="setMonthlyTarget()">Save Target</button>
+                </div>
+
+                <div class="card">
+                    <h2>Recent Activity</h2>
+                    <p style="text-align: center; color: #666;">No recent activity</p>
+                </div>
+            </div>
+        <div class="bottom-nav" id="bottomNav">
+                <button class="nav-item active" onclick="switchTab(&#39;dashboard&#39;)">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;sales&#39;)">
+                    <span class="nav-icon">💰</span>
+                    <span>Sales</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;transactions&#39;)">
+                    <span class="nav-icon">💳</span>
+                    <span>Money</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;products&#39;)">
+                    <span class="nav-icon">🛍️</span>
+                    <span>Products</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;categories&#39;)">
+                    <span class="nav-icon">📁</span>
+                    <span>Categories</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;expenses&#39;)">
+                    <span class="nav-icon">💸</span>
+                    <span>Expenses</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;inventory&#39;)">
+                    <span class="nav-icon">📦</span>
+                    <span>Stock</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;customers&#39;)">
+                    <span class="nav-icon">👥</span>
+                    <span>Customers</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;invoices&#39;)">
+                    <span class="nav-icon">📄</span>
+                    <span>Invoices</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;analytics&#39;)">
+                    <span class="nav-icon">📈</span>
+                    <span>Analytics</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;unpaid&#39;)">
+                    <span class="nav-icon">⏳</span>
+                    <span>Unpaid</span>
+                </button>
+            
+                <button class="nav-item " onclick="switchTab(&#39;notes&#39;)">
+                    <span class="nav-icon">📝</span>
+                    <span>Notes</span>
+                </button>
+            </div>
+    </div>
+
+    <div class="modal" id="noteModal">
+        <div class="modal-content">
+            <div class="modal-title">Note Details</div>
+            <div id="noteModalContent"></div>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button class="btn-small" onclick="editNoteFromModal()">Edit</button>
+                <button class="btn-small btn-danger" onclick="deleteNoteFromModal()">Delete</button>
+                <button class="btn-small btn-secondary" onclick="closeNoteModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="floatModal">
+        <div class="modal-content">
+            <div class="modal-title">Set Initial Float</div>
+            <div id="floatModalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const SHOP_NAME = "Daniel's Finance Manager";
+        const SHOP_ADDRESS = "Arusha";
+        const SHOP_PHONE = "+255618721563";
+        const SHOP_EMAIL = "eastwindstationery12@gmail.com";
+
+        let state = {
+            activeTab: 'dashboard',
+            activeTransactionChannel: 'mpesa',
+            products: [],
+            sales: [],
+            expenses: [],
+            customers: [],
+            invoices: [],
+            categories: [],
+            inventory: {},
+            notes: [],
+            transactions: [],
+            unpaidEntries: [],
+            currentNoteIndex: null,
+            collapsedSections: {},
+            transactionFloats: {
+                mpesa: { initial: 0, current: 0 },
+                crdb: { initial: 0, current: 0 },
+                nmb: { initial: 0, current: 0 },
+                airtel: { initial: 0, current: 0 },
+                halopesa: { initial: 0, current: 0 },
+                yas: { initial: 0, current: 0 }
+            },
+            searchTerm: '',
+            filterDateFrom: '',
+            filterDateTo: '',
+            filterCategory: '',
+            filterCustomer: '',
+            dailyTarget: 0,
+            monthlyTarget: 0
+        };
+
+        let chartInstance = null;
+
+        function formatNumber(num) {
+            if (num === null || num === undefined || isNaN(num)) return '0.00';
+            return parseFloat(num).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('financeManagerData');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    state = { ...state, ...parsed };
+                    // Calculate current float balances
+                    calculateFloatBalances();
+                } catch (e) {
+                    console.error('Error loading data:', e);
+                }
+            }
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem('financeManagerData', JSON.stringify(state));
+            } catch (e) {
+                console.error('Error saving data:', e);
+                showToast('Error saving data!', 'error');
+            }
+        }
+
+        function calculateFloatBalances() {
+            // Reset to initial values
+            Object.keys(state.transactionFloats).forEach(channel => {
+                state.transactionFloats[channel].current = state.transactionFloats[channel].initial;
+            });
+
+            // Apply all transactions
+            (state.transactions || []).forEach(t => {
+                if (state.transactionFloats[t.channel]) {
+                    if (t.type === 'deposit') {
+                        state.transactionFloats[t.channel].current += t.amount;
+                    } else if (t.type === 'withdrawal') {
+                        state.transactionFloats[t.channel].current -= t.amount;
+                    }
+                }
+            });
+        }
+
+        function getStats() {
+            const totalCapital = state.sales.reduce((sum, s) => sum + (s.totalCost || 0), 0);
+            const totalProfit = state.sales.reduce((sum, s) => sum + (s.profit || 0), 0);
+            const totalRevenue = state.sales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+            
+            const today = new Date().toLocaleDateString();
+            const todaySales = state.sales.filter(s => s.date === today);
+            const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0);
+            const todayRevenue = todaySales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+            
+            const yesterday = new Date(Date.now() - 86400000).toLocaleDateString();
+            const yesterdayProfit = state.sales.filter(s => s.date === yesterday).reduce((sum, s) => sum + (s.profit || 0), 0);
+            
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString();
+            const monthSales = state.sales.filter(s => new Date(s.date) >= new Date(monthStart));
+            const monthProfit = monthSales.reduce((sum, s) => sum + (s.profit || 0), 0);
+            const monthRevenue = monthSales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+            
+            const totalExpenses = state.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+            const monthExpenses = state.expenses.filter(e => new Date(e.date) >= new Date(monthStart)).reduce((sum, e) => sum + (e.amount || 0), 0);
+            
+            const totalInvoiced = state.invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+            const totalPaid = state.invoices.filter(inv => inv.status === 'Paid').reduce((sum, inv) => sum + (inv.amount || 0), 0);
+            
+            const netProfit = totalProfit - totalExpenses;
+            const monthNetProfit = monthProfit - monthExpenses;
+            
+            return { 
+                totalCapital, 
+                totalProfit, 
+                totalRevenue,
+                todayProfit, 
+                todayRevenue,
+                yesterdayProfit,
+                monthProfit,
+                monthRevenue,
+                monthNetProfit,
+                totalExpenses,
+                monthExpenses,
+                totalInvoiced, 
+                totalPaid,
+                netProfit,
+                totalSalesCount: state.sales.length,
+                todaySalesCount: todaySales.length
+            };
+        }
+
+        const tabs = [
+            { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+            { id: 'sales', label: 'Sales', icon: '💰' },
+            { id: 'transactions', label: 'Money', icon: '💳' },
+            { id: 'products', label: 'Products', icon: '🛍️' },
+            { id: 'categories', label: 'Categories', icon: '📁' },
+            { id: 'expenses', label: 'Expenses', icon: '💸' },
+            { id: 'inventory', label: 'Stock', icon: '📦' },
+            { id: 'customers', label: 'Customers', icon: '👥' },
+            { id: 'invoices', label: 'Invoices', icon: '📄' },
+            { id: 'analytics', label: 'Analytics', icon: '📈' },
+            { id: 'unpaid', label: 'Unpaid', icon: '⏳' },
+            { id: 'notes', label: 'Notes', icon: '📝' }
+        ];
+
+        function renderNav() {
+            const nav = document.getElementById('bottomNav');
+            nav.innerHTML = tabs.map(tab => `
+                <button class="nav-item ${state.activeTab === tab.id ? 'active' : ''}" onclick="switchTab('${tab.id}')">
+                    <span class="nav-icon">${tab.icon}</span>
+                    <span>${tab.label}</span>
+                </button>
+            `).join('');
+        }
+
+        function switchTab(tabId) {
+            state.activeTab = tabId;
+            render();
+        }
+
+        function showToast(message, type = "info") {
+            const t = document.createElement('div');
+            t.className = 'toast toast-' + type;
+            t.textContent = message;
+            document.body.appendChild(t);
+            requestAnimationFrame(() => t.classList.add('show'));
+            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+        }
+
+        function showConfirm(text, onYes) {
+            if (confirm(text)) {
+                onYes();
+            }
+        }
+
+        function ensureWalkIn() {
+            if (!state.customers) state.customers = [];
+            const exists = state.customers.some(c => c && c.name && c.name.toString().toLowerCase().includes('walk'));
+            if (!exists) {
+                state.customers.unshift({ name: 'WALK IN', email: '', phone: '', address: '', totalPurchases: 0 });
+                saveData();
+            }
+        }
+        ensureWalkIn();
+
+        function renderDashboard() {
+            const stats = getStats();
+            const lowStockProducts = state.products.filter(p => {
+                const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
+                return inv.stock <= inv.minAlert;
+            });
+
+            const unpaidCount = state.unpaidEntries.filter(e => !e.paid).length;
+            const unpaidAmount = state.unpaidEntries.filter(e => !e.paid).reduce((sum, e) => sum + (e.amount || 0), 0);
+
+            const dailyProgress = state.dailyTarget > 0 ? (stats.todayProfit / state.dailyTarget * 100) : 0;
+            const monthlyProgress = state.monthlyTarget > 0 ? (stats.monthProfit / state.monthlyTarget * 100) : 0;
+
+            return `
+                <div class="stat-grid">
+                    <div class="stat-card" onclick="switchTab('sales')">
+                        <div class="stat-label">TODAY'S PROFIT</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.todayProfit)} Tsh</div>
+                        <div class="stat-subvalue">${stats.todaySalesCount} sales today</div>
+                        ${state.dailyTarget > 0 ? `
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${Math.min(dailyProgress, 100)}%"></div>
+                            </div>
+                            <div class="stat-subvalue">${dailyProgress.toFixed(0)}% of daily target</div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="stat-card" onclick="switchTab('sales')">
+                        <div class="stat-label">YESTERDAY'S PROFIT</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.yesterdayProfit)} Tsh</div>
+                        <div class="stat-subvalue">
+                            ${stats.todayProfit > stats.yesterdayProfit ? '📈 Better than yesterday!' : 
+                              stats.todayProfit < stats.yesterdayProfit ? '📉 Lower than yesterday' : '➡️ Same as yesterday'}
+                        </div>
+                    </div>
+
+                    <div class="stat-card" onclick="switchTab('analytics')">
+                        <div class="stat-label">MONTH PROFIT</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.monthProfit)} Tsh</div>
+                        <div class="stat-subvalue">Revenue: ${formatNumber(stats.monthRevenue)} Tsh</div>
+                        ${state.monthlyTarget > 0 ? `
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${Math.min(monthlyProgress, 100)}%"></div>
+                            </div>
+                            <div class="stat-subvalue">${monthlyProgress.toFixed(0)}% of monthly target</div>
+                        ` : ''}
+                    </div>
+
+                    <div class="stat-card" onclick="switchTab('analytics')" style="background: ${stats.monthNetProfit >= 0 ? '#2e7d32' : '#d32f2f'};">
+                        <div class="stat-label">NET PROFIT (MONTH)</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.monthNetProfit)} Tsh</div>
+                        <div class="stat-subvalue">Expenses: ${formatNumber(stats.monthExpenses)} Tsh</div>
+                    </div>
+
+                    <div class="stat-card" onclick="switchTab('unpaid')">
+                        <div class="stat-label">UNPAID ENTRIES</div>
+                        <div class="stat-value">${unpaidCount}</div>
+                        <div class="stat-subvalue">Total: ${formatNumber(unpaidAmount)} Tsh</div>
+                    </div>
+
+                    <div class="stat-card" onclick="switchTab('inventory')">
+                        <div class="stat-label">LOW STOCK ALERT</div>
+                        <div class="stat-value">${lowStockProducts.length}</div>
+                        <div class="stat-subvalue">${lowStockProducts.length > 0 ? '⚠️ Check inventory' : '✅ All good'}</div>
+                    </div>
+                </div>
+
+                ${lowStockProducts.length > 0 ? `
+                    <div class="alert-box-danger">
+                        <strong>⚠️ Low Stock Alert!</strong><br>
+                        ${lowStockProducts.slice(0, 3).map(p => `• ${p.name}`).join('<br>')}
+                        ${lowStockProducts.length > 3 ? `<br>...and ${lowStockProducts.length - 3} more` : ''}
+                    </div>
+                ` : ''}
+
+                ${unpaidCount > 0 ? `
+                    <div class="alert-box">
+                        <strong>💰 Pending Payments</strong><br>
+                        You have ${unpaidCount} unpaid entries totaling ${formatNumber(unpaidAmount)} Tsh
+                    </div>
+                ` : ''}
+
+                <div class="card">
+                    <h2>Quick Actions</h2>
+                    <div class="flex-gap">
+                        <button class="btn-success btn-small" onclick="switchTab('sales')">➕ New Sale</button>
+                        <button class="btn-danger btn-small" onclick="switchTab('expenses')">💸 Add Expense</button>
+                        <button class="btn-small" onclick="switchTab('products')">🛍️ Manage Products</button>
+                        <button class="btn-small" onclick="switchTab('transactions')">💳 Transactions</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Set Daily Target</h2>
+                    <div class="form-group">
+                        <label>Daily Profit Target (Tsh)</label>
+                        <input type="number" id="dailyTarget" value="${state.dailyTarget || 0}" step="1000">
+                    </div>
+                    <button onclick="setDailyTarget()">Save Target</button>
+                </div>
+
+                <div class="card">
+                    <h2>Set Monthly Target</h2>
+                    <div class="form-group">
+                        <label>Monthly Profit Target (Tsh)</label>
+                        <input type="number" id="monthlyTarget" value="${state.monthlyTarget || 0}" step="10000">
+                    </div>
+                    <button onclick="setMonthlyTarget()">Save Target</button>
+                </div>
+
+                <div class="card">
+                    <h2>Recent Activity</h2>
+                    ${state.sales.slice().reverse().slice(0, 5).map(s => `
+                        <div class="item">
+                            <div class="item-header">
+                                <span class="item-title">${s.productName}</span>
+                                <span style="color: #2e7d32; font-weight: 700;">💱 ${formatNumber(s.profit)} Tsh</span>
+                            </div>
+                            <div class="item-subtitle">
+                                ${s.date} ${s.time} | ${s.customer}
+                            </div>
+                        </div>
+                    `).join('') || '<p style="text-align: center; color: #666;">No recent activity</p>'}
+                </div>
+            `;
+        }
+
+        function setDailyTarget() {
+            const value = parseFloat(document.getElementById('dailyTarget').value) || 0;
+            state.dailyTarget = value;
+            saveData();
+            render();
+            showToast('Daily target updated', 'success');
+        }
+
+        function setMonthlyTarget() {
+            const value = parseFloat(document.getElementById('monthlyTarget').value) || 0;
+            state.monthlyTarget = value;
+            saveData();
+            render();
+            showToast('Monthly target updated', 'success');
+        }
+
+        function renderSales() {
+            const stats = getStats();
+            
+            // Filter sales based on search and filters
+            let filteredSales = state.sales.slice();
+            
+            if (state.searchTerm) {
+                const term = state.searchTerm.toLowerCase();
+                filteredSales = filteredSales.filter(s => 
+                    s.productName.toLowerCase().includes(term) ||
+                    s.customer.toLowerCase().includes(term) ||
+                    s.payment.toLowerCase().includes(term)
+                );
+            }
+            
+            if (state.filterDateFrom) {
+                filteredSales = filteredSales.filter(s => new Date(s.date) >= new Date(state.filterDateFrom));
+            }
+            
+            if (state.filterDateTo) {
+                filteredSales = filteredSales.filter(s => new Date(s.date) <= new Date(state.filterDateTo));
+            }
+            
+            if (state.filterCustomer) {
+                filteredSales = filteredSales.filter(s => s.customer === state.filterCustomer);
+            }
+
+            return `
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">TOTAL CAPITAL</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.totalCapital)} Tsh</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">TOTAL PROFIT</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.totalProfit)} Tsh</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">TODAY'S PROFIT</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.todayProfit)} Tsh</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">10% TODAY</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.todayProfit * 0.1)} Tsh</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Add Sale</h2>
+                    <div class="card-header-buttons">
+                        <button class="quick-nav-btn products" onclick="switchTab('products')">Products</button>
+                        <button class="quick-nav-btn categories" onclick="switchTab('categories')">Categories</button>
+                    </div>
+                    <form onsubmit="addSale(event)">
+                        <div class="form-group">
+                            <label>Product</label>
+                            <select id="saleProduct" onchange="updateSaleTotal()" required>
+                                <option value="">-- Select Product --</option>
+                                ${state.products.map((p, i) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || {stock: 0}).stock})</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Customer</label>
+                            <select id="saleCustomer" onchange="toggleCustomerInput()">
+                                <option value="">-- Walk-in --</option>
+                                ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+                                <option value="new">+ Add New Customer</option>
+                            </select>
+                        </div>
+                        <div id="newCustomerFields" style="display:none;">
+                            <div class="form-group">
+                                <label>New Customer Name</label>
+                                <input type="text" id="newCustomerName" placeholder="Enter customer name">
+                            </div>
+                            <div class="form-group">
+                                <label>Phone (Optional)</label>
+                                <input type="tel" id="newCustomerPhone" placeholder="+255...">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <input type="number" id="saleQuantity" value="1" min="1" onchange="updateSaleTotal()" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Method</label>
+                            <select id="salePayment">
+                                <option>Cash</option>
+                                <option>Card</option>
+                                <option>Mobile Money</option>
+                                <option>M-Pesa Lipa Number</option>
+                                <option>Bank Transfer</option>
+                            </select>
+                        </div>
+                        <div id="saleInfo"></div>
+                        <button type="submit">Record Sale</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Recent Sales (${filteredSales.length})</h2>
+                    
+                    <div class="search-box">
+                        <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
+                    </div>
+
+                    <div class="filter-row">
+                        <input type="date" placeholder="From" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
+                        <input type="date" placeholder="To" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
+                        <select onchange="updateFilterCustomer(this.value)">
+                            <option value="">All Customers</option>
+                            ${[...new Set(state.sales.map(s => s.customer))].map(c => 
+                                `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
+                            ).join('')}
+                        </select>
+                        <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
+                    </div>
+
+                    ${renderCollapsibleList(filteredSales.slice().reverse(), 10, 'sales', (s, idx) => `
+                        <div class="item">
+                            <div class="item-header">
+                                <span class="item-title">${s.productName}</span>
+                                <span style="color: #2e7d32; font-weight: 700;">💱 ${formatNumber(s.profit)} Tsh</span>
+                            </div>
+                            <div class="item-subtitle">
+                                ${s.date} ${s.time}<br>
+                                ${s.customer} | Qty: ${s.quantity} | ${s.payment}<br>
+                                Cost: ${formatNumber(s.totalCost)} | Price: ${formatNumber(s.totalPrice)}
+                            </div>
+                            <div class="flex-gap" style="margin-top:8px;">
+                                <button class="btn-small" onclick="editSaleByTimestamp(${s.timestamp})">Edit</button>
+                                <button class="btn-small btn-danger" onclick="deleteSaleByTimestamp(${s.timestamp})">Delete</button>
+                            </div>
+                        </div>
+                    `, 'No sales yet')}
+                </div>
+            `;
+        }
+
+        function updateSearchTerm(value) {
+            state.searchTerm = value;
+            render();
+        }
+
+        function updateFilterDateFrom(value) {
+            state.filterDateFrom = value;
+            render();
+        }
+
+        function updateFilterDateTo(value) {
+            state.filterDateTo = value;
+            render();
+        }
+
+        function updateFilterCustomer(value) {
+            state.filterCustomer = value;
+            render();
+        }
+
+        function clearFilters() {
+            state.searchTerm = '';
+            state.filterDateFrom = '';
+            state.filterDateTo = '';
+            state.filterCategory = '';
+            state.filterCustomer = '';
+            render();
+        }
+
+        function renderCollapsibleList(items, chunkSize, sectionKey, renderItem, emptyMessage) {
+            if (!items || items.length === 0) {
+                return `<p style="text-align: center; color: #666;">${emptyMessage}</p>`;
+            }
+
+            let html = '';
+            for (let i = 0; i < items.length; i += chunkSize) {
+                const chunk = items.slice(i, i + chunkSize);
+                const chunkId = `${sectionKey}_chunk_${i}`;
+                const isCollapsed = state.collapsedSections[chunkId];
+                
+                html += chunk.map((item, idx) => renderItem(item, i + idx)).join('');
+                
+                if (i + chunkSize < items.length) {
+                    html += `
+                        <button class="collapse-btn" onclick="toggleCollapse('${chunkId}')">
+                            <span class="collapse-icon ${isCollapsed ? '' : 'expanded'}">▼</span>
+                            <span>${isCollapsed ? 'Show More' : 'Show Less'}</span>
+                        </button>
+                    `;
+                    
+                    if (isCollapsed) {
+                        break;
+                    }
+                }
+            }
+            return html;
+        }
+
+        function toggleCollapse(chunkId) {
+            state.collapsedSections[chunkId] = !state.collapsedSections[chunkId];
+            render();
+        }
+
+        function editSaleByTimestamp(ts) {
+            const idx = state.sales.findIndex(s => s.timestamp === ts);
+            if (idx === -1) return showToast("Sale not found", "error");
+            const s = state.sales[idx];
+            const qty = prompt("Quantity:", s.quantity);
+            const price = prompt("Price per unit:", s.pricePerUnit);
+            if (qty && price && !isNaN(qty) && !isNaN(price)) {
+                const qtyNum = parseInt(qty);
+                const priceNum = parseFloat(price);
+                s.quantity = qtyNum;
+                s.pricePerUnit = priceNum;
+                s.totalPrice = +(priceNum * qtyNum).toFixed(2);
+                s.totalCost = s.costPerUnit * qtyNum;
+                s.profit = +(s.totalPrice - s.totalCost).toFixed(2);
+                s.timestamp = Date.now();
+                saveData(); render(); showToast("Sale updated", "success");
+            }
+        }
+
+        function deleteSaleByTimestamp(ts) {
+            showConfirm("Delete this sale?", function () {
+                const idx = state.sales.findIndex(s => s.timestamp === ts);
+                if (idx === -1) return showToast("Sale not found", "error");
+                const sale = state.sales[idx];
+                
+                // Return stock to inventory
+                if (state.inventory[sale.productName]) {
+                    state.inventory[sale.productName].stock += sale.quantity;
+                }
+                
+                state.sales.splice(idx, 1);
+                saveData(); render(); showToast("Sale deleted", "success");
+            });
+        }
+
+        function toggleCustomerInput() {
+            const select = document.getElementById('saleCustomer');
+            const fields = document.getElementById('newCustomerFields');
+            if (select && fields) {
+                if (select.value === 'new') {
+                    fields.style.display = 'block';
+                } else {
+                    fields.style.display = 'none';
+                }
+            }
+        }
+
+        function updateSaleTotal() {
+            const productIndex = document.getElementById('saleProduct')?.value;
+            const quantity = parseInt(document.getElementById('saleQuantity')?.value) || 1;
+            const infoDiv = document.getElementById('saleInfo');
+            if (!infoDiv) return;
+            if (!productIndex && productIndex !== '0') { infoDiv.innerHTML = ''; return; }
+            const product = state.products[productIndex];
+            if (!product) { infoDiv.innerHTML = ''; return; }
+            
+            const inventoryItem = state.inventory[product.name] || { stock: 0, minAlert: 5 };
+            const availableStock = inventoryItem.stock;
+            
+            if (quantity > availableStock) {
+                infoDiv.innerHTML = `
+                    <div class="alert-box-danger">
+                        <strong>⚠️ Insufficient Stock!</strong><br>
+                        Available: ${availableStock} units<br>
+                        Requested: ${quantity} units
+                    </div>
+                `;
+                return;
+            }
+            
+            const totalCost = product.cost * quantity;
+            const totalPrice = product.price * quantity;
+            infoDiv.innerHTML = `
+                <div class="info-box">
+                    <div class="info-row"><span>Cost/unit:</span><span>💱 ${formatNumber(product.cost)} Tsh</span></div>
+                    <div class="info-row"><span>Price/unit:</span>
+                        <input type="number" id="manualPrice" value="${product.price.toFixed(2)}" step="0.01" style="width:120px;text-align:right;padding:6px;border-radius:6px;border:1px solid #ddd;">
+                    </div>
+                    <div class="info-row"><span>Available Stock:</span><span>${availableStock} units</span></div>
+                    <div class="info-row" style="font-weight:700;"><span>Total Cost:</span><span id="totalCost">💱 ${formatNumber(totalCost)} Tsh</span></div>
+                    <div class="info-row" style="font-weight:700;"><span>Total Price:</span><span id="totalPrice">💱 ${formatNumber(product.price * quantity)} Tsh</span></div>
+                    <div class="info-row" style="font-weight:700; color: #2e7d32;"><span>Profit:</span><span id="totalProfit">💱 ${formatNumber((product.price - product.cost) * quantity)} Tsh</span></div>
+                </div>
+            `;
+            const manual = document.getElementById('manualPrice');
+            manual && manual.addEventListener('input', function () {
+                const p = parseFloat(this.value) || 0;
+                document.getElementById('totalPrice').textContent = `💱 ${formatNumber(p * quantity)} Tsh`;
+                document.getElementById('totalProfit').textContent = `💱 ${formatNumber((p - product.cost) * quantity)} Tsh`;
+            });
+
+            setTimeout(() => {
+                const submitBtn = document.querySelector('form[onsubmit*="addSale"] button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    submitBtn.classList.add('highlight-pulse');
+                    setTimeout(() => submitBtn.classList.remove('highlight-pulse'), 1000);
+                }
+            }, 100);
+        }
+
+        function addSale(e) {
+            e && e.preventDefault && e.preventDefault();
+            const productIndex = document.getElementById('saleProduct')?.value;
+            if (productIndex === null || productIndex === '' || productIndex === undefined) return showToast('Please select a product', 'error');
+            const product = state.products[productIndex];
+            if (!product) return showToast('Product not found', 'error');
+            
+            const customerSelect = document.getElementById('saleCustomer')?.value;
+            let customer;
+            
+            if (customerSelect === 'new') {
+                const newName = document.getElementById('newCustomerName')?.value.trim();
+                if (!newName) return showToast('Please enter customer name', 'error');
+                const newPhone = document.getElementById('newCustomerPhone')?.value.trim();
+                customer = { name: newName, email: '', phone: newPhone, address: '', totalPurchases: 0 };
+                state.customers.push(customer);
+            } else if (customerSelect) {
+                customer = state.customers[customerSelect];
+            } else {
+                customer = { name: 'WALK IN' };
+            }
+            
+            const quantity = parseInt(document.getElementById('saleQuantity')?.value) || 1;
+            const payment = document.getElementById('salePayment')?.value || 'Cash';
+            const manualPriceInput = document.getElementById('manualPrice');
+            const pricePerUnit = manualPriceInput ? parseFloat(manualPriceInput.value) : product.price;
+            
+            // Check stock
+            const inventoryItem = state.inventory[product.name] || { stock: 0, minAlert: 5 };
+            if (quantity > inventoryItem.stock) {
+                return showToast(`Insufficient stock! Available: ${inventoryItem.stock}`, 'error');
+            }
+            
+            const now = new Date();
+            const totalCost = product.cost * quantity;
+            const totalPrice = +(pricePerUnit * quantity).toFixed(2);
+            const sale = {
+                date: now.toLocaleDateString(),
+                time: now.toLocaleTimeString(),
+                timestamp: now.getTime(),
+                productName: product.name,
+                customer: customer ? customer.name : 'WALK IN',
+                quantity,
+                costPerUnit: product.cost,
+                pricePerUnit,
+                totalCost,
+                totalPrice,
+                profit: +(totalPrice - totalCost).toFixed(2),
+                payment
+            };
+            state.sales = state.sales || [];
+            state.sales.push(sale);
+            
+            // Update customer total purchases
+            if (customer && customer.name !== 'WALK IN') {
+                const custIndex = state.customers.findIndex(c => c.name === customer.name);
+                if (custIndex !== -1) {
+                    state.customers[custIndex].totalPurchases = (state.customers[custIndex].totalPurchases || 0) + totalPrice;
+                }
+            }
+            
+            // Update inventory
+            if (state.inventory && state.inventory[product.name]) {
+                state.inventory[product.name].stock = Math.max(0, (state.inventory[product.name].stock || 0) - quantity);
+            }
+            
+            saveData(); render();
+            showToast("Sale recorded successfully!", "success");
+        }
+
+        function renderTransactions() {
+            const channels = [
+                { id: 'mpesa', label: 'M-Pesa' },
+                { id: 'crdb', label: 'CRDB' },
+                { id: 'nmb', label: 'NMB' },
+                { id: 'airtel', label: 'Airtel Money' },
+                { id: 'halopesa', label: 'Halopesa' },
+                { id: 'yas', label: 'Yas Tanzania' }
+            ];
+            const currentChannel = state.activeTransactionChannel || 'mpesa';
+            const channelTransactions = (state.transactions || []).filter(t => t.channel === currentChannel);
+            
+            const floatData = state.transactionFloats[currentChannel];
+            const floatDifference = floatData.current - floatData.initial;
+
+            return `
+                <div class="transaction-tabs">
+                    ${channels.map(ch => `
+                        <button class="transaction-tab ${ch.id} ${currentChannel === ch.id ? 'active' : ''}" 
+                             onclick="switchTransactionChannel('${ch.id}')">
+                            ${ch.label}
+                        </button>
+                    `).join('')}
+                </div>
+
+                <div class="float-balance-container">
+                    <h3 style="margin-bottom: 12px; color: #0d47a1; font-size: 16px;">💰 Float Balance</h3>
+                    <div class="float-balance-row">
+                        <span class="float-balance-label">Initial Float:</span>
+                        <span class="editable-float" onclick="editInitialFloat('${currentChannel}')">
+                            💱 ${formatNumber(floatData.initial)} Tsh
+                        </span>
+                    </div>
+                    <div class="float-balance-row">
+                        <span class="float-balance-label">Current Balance:</span>
+                        <span class="float-balance-value ${floatDifference >= 0 ? 'positive' : 'negative'}">
+                            💱 ${formatNumber(floatData.current)} Tsh
+                        </span>
+                    </div>
+                    <div class="float-balance-row">
+                        <span class="float-balance-label">Difference:</span>
+                        <span class="float-balance-value ${floatDifference >= 0 ? 'positive' : 'negative'}">
+                            ${floatDifference >= 0 ? '+' : ''}${formatNumber(floatDifference)} Tsh
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Add ${channels.find(c => c.id === currentChannel).label} Transaction</h2>
+                    <form onsubmit="addTransaction(event)">
+                        <div class="form-group">
+                            <label>Customer Name (Optional)</label>
+                            <input type="text" id="transactionCustomer" placeholder="Enter customer name">
+                        </div>
+                        <div class="form-group">
+                            <label>Transaction Type</label>
+                            <select id="transactionType" required>
+                                <option value="deposit">Deposit (+)</option>
+                                <option value="withdrawal">Withdrawal (-)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount</label>
+                            <input type="number" id="transactionAmount" placeholder="0.00" step="0.01" required>
+                        </div>
+                        <button type="submit">Save Transaction</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>${channels.find(c => c.id === currentChannel).label} Transactions (${channelTransactions.length})</h2>
+                    ${renderCollapsibleList(channelTransactions.slice().reverse(), 10, 'transactions_' + currentChannel, (t, idx) => `
+                        <div class="item">
+                            <div class="item-header">
+                                <span class="item-title">${t.customerName || 'N/A'}</span>
+                                <span class="badge badge-${t.channel}">${t.type.toUpperCase()}</span>
+                            </div>
+                            <div class="item-subtitle">
+                                ${t.date} ${t.time}<br>
+                                Amount: <strong style="color: ${t.type === 'deposit' ? '#2e7d32' : '#d32f2f'};">
+                                    ${t.type === 'deposit' ? '+' : '-'}💱 ${formatNumber(t.amount)} Tsh
+                                </strong>
+                            </div>
+                            <div class="flex-gap" style="margin-top:8px;">
+                                <button class="btn-small" onclick="editTransactionByTimestamp(${t.timestamp})">Edit</button>
+                                <button class="btn-small btn-danger" onclick="deleteTransactionByTimestamp(${t.timestamp})">Delete</button>
+                            </div>
+                        </div>
+                    `, 'No transactions yet')}
+                </div>
+            `;
+        }
+
+        function editInitialFloat(channel) {
+            const current = state.transactionFloats[channel].initial;
+            const newValue = prompt(`Set initial float for ${channel.toUpperCase()}:`, current);
+            if (newValue !== null) {
+                const val = parseFloat(newValue);
+                if (!isNaN(val) && val >= 0) {
+                    state.transactionFloats[channel].initial = val;
+                    calculateFloatBalances();
+                    saveData();
+                    render();
+                    showToast('Float updated', 'success');
+                } else {
+                    showToast('Invalid amount', 'error');
+                }
+            }
+        }
+
+        function switchTransactionChannel(channel) {
+            state.activeTransactionChannel = channel;
+            render();
+        }
+
+        function addTransaction(e) {
+            e.preventDefault();
+            const now = new Date();
+            const amount = parseFloat(document.getElementById('transactionAmount').value);
+            
+            if (isNaN(amount) || amount <= 0) {
+                return showToast('Please enter a valid amount', 'error');
+            }
+            
+            const transaction = {
+                channel: state.activeTransactionChannel,
+                customerName: document.getElementById('transactionCustomer').value.trim() || 'N/A',
+                type: document.getElementById('transactionType').value,
+                amount: amount,
+                date: now.toLocaleDateString(),
+                time: now.toLocaleTimeString(),
+                timestamp: now.getTime()
+            };
+            state.transactions = state.transactions || [];
+            state.transactions.push(transaction);
+            
+            // Update float balance
+            calculateFloatBalances();
+            
+            saveData();
+            render();
+            showToast("Transaction recorded", "success");
+        }
+
+        function editTransactionByTimestamp(ts) {
+            const idx = state.transactions.findIndex(t => t.timestamp === ts);
+            if (idx === -1) return showToast("Transaction not found", "error");
+            const t = state.transactions[idx];
+            const customer = prompt("Customer Name:", t.customerName);
+            const type = confirm("Is this a DEPOSIT? (Cancel for Withdrawal)") ? 'deposit' : 'withdrawal';
+            const amount = prompt("Amount:", t.amount);
+            if (customer !== null && amount) {
+                const amountNum = parseFloat(amount);
+                if (!isNaN(amountNum) && amountNum > 0) {
+                    t.customerName = customer.trim() || 'N/A';
+                    t.type = type;
+                    t.amount = amountNum;
+                    t.timestamp = Date.now();
+                    calculateFloatBalances();
+                    saveData(); render(); showToast("Transaction updated", "success");
+                } else {
+                    showToast("Invalid amount", "error");
+                }
+            }
+        }
+
+        function deleteTransactionByTimestamp(ts) {
+            showConfirm("Delete this transaction?", function () {
+                const idx = state.transactions.findIndex(t => t.timestamp === ts);
+                if (idx === -1) return showToast("Transaction not found", "error");
+                state.transactions.splice(idx, 1);
+                calculateFloatBalances();
+                saveData(); render(); showToast("Transaction deleted", "success");
+            });
+        }
+
+        function renderProducts() {
+            return `
+                <div class="card">
+                    <h2>Add Product</h2>
+                    <div class="card-header-buttons">
+                        <button class="quick-nav-btn back" onclick="switchTab('sales')">← Sales</button>
+                    </div>
+                    <form onsubmit="addProduct(event)">
+                        <div class="form-group">
+                            <label>Product Name</label>
+                            <input type="text" id="productName" placeholder="Enter name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="productCategory" required>
+                                <option value="">-- Select Category --</option>
+                                ${state.categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cost (Capital)</label>
+                            <input type="number" id="productCost" placeholder="0.00" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Price (Selling)</label>
+                            <input type="number" id="productPrice" placeholder="0.00" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Initial Stock</label>
+                            <input type="number" id="productStock" placeholder="0" min="0" value="0">
+                        </div>
+                        <button type="submit">Add Product</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>All Products (${state.products.length})</h2>
+                    <div class="search-box">
+                        <input type="text" placeholder="🔍 Search products..." oninput="searchProducts(this.value)" id="productSearch">
+                    </div>
+                    <div id="productsList">
+                        ${renderProductsList()}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderProductsList(searchTerm = '') {
+            let products = state.products;
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                products = products.filter(p => 
+                    p.name.toLowerCase().includes(term) ||
+                    p.category.toLowerCase().includes(term)
+                );
+            }
+            
+            if (products.length === 0) {
+                return '<p style="text-align: center; color: #666;">No products found</p>';
+            }
+            
+            return products.map((p, i) => {
+                const actualIndex = state.products.indexOf(p);
+                const inv = state.inventory[p.name] || { stock: 0 };
+                const margin = ((p.price - p.cost) / p.cost * 100).toFixed(1);
+                return `
+                    <div class="item">
+                        <div class="item-title">${p.name}</div>
+                        <div class="item-subtitle">
+                            Category: ${p.category} | Stock: ${inv.stock} units<br>
+                            Margin: ${margin}%
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 14px;">
+                            <span>Cost: 💱 ${formatNumber(p.cost)} Tsh</span>
+                            <span>Price: 💱 ${formatNumber(p.price)} Tsh</span>
+                            <span style="color: #2e7d32; font-weight: 600;">+${formatNumber(p.price - p.cost)} Tsh</span>
+                        </div>
+                        <div class="flex-gap" style="margin-top:8px;">
+                            <button class="btn-small" onclick="editProductIndex(${actualIndex})">Edit</button>
+                            <button class="btn-small btn-danger" onclick="deleteProductIndex(${actualIndex})">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function searchProducts(term) {
+            document.getElementById('productsList').innerHTML = renderProductsList(term);
+        }
+
+        function addProduct(e) {
+            e.preventDefault();
+            const name = document.getElementById('productName').value.trim();
+            const category = document.getElementById('productCategory').value;
+            const cost = parseFloat(document.getElementById('productCost').value);
+            const price = parseFloat(document.getElementById('productPrice').value);
+            const stock = parseInt(document.getElementById('productStock').value) || 0;
+            
+            if (cost < 0 || price < 0) {
+                return showToast('Cost and price must be positive', 'error');
+            }
+            
+            if (price < cost) {
+                if (!confirm('Warning: Selling price is less than cost. Continue?')) {
+                    return;
+                }
+            }
+            
+            // Check for duplicate
+            if (state.products.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                return showToast('Product already exists', 'error');
+            }
+            
+            state.products.push({ name, category, cost, price });
+            state.inventory[name] = { stock: stock, minAlert: 5 };
+            saveData();
+            render();
+            showToast("Product added successfully!", "success");
+        }
+
+        function editProductIndex(i) {
+            const p = state.products[i];
+            if (!p) return showToast("Product not found", "error");
+            const name = prompt("Product name:", p.name);
+            const cost = prompt("Cost:", p.cost);
+            const price = prompt("Price:", p.price);
+            if (name && cost && price && !isNaN(cost) && !isNaN(price)) {
+                const costNum = parseFloat(cost);
+                const priceNum = parseFloat(price);
+                
+                if (costNum < 0 || priceNum < 0) {
+                    return showToast('Cost and price must be positive', 'error');
+                }
+                
+                const oldName = p.name;
+                p.name = name.trim();
+                p.cost = costNum;
+                p.price = priceNum;
+                
+                if (state.inventory && oldName !== p.name) {
+                    state.inventory[p.name] = state.inventory[oldName] || { stock: 0, minAlert: 5 };
+                    delete state.inventory[oldName];
+                }
+                saveData(); render(); showToast("Product updated", "success");
+            }
+        }
+
+        function deleteProductIndex(i) {
+            showConfirm("Delete this product?", function () {
+                const p = state.products[i];
+                if (p && p.name && state.inventory && state.inventory[p.name]) delete state.inventory[p.name];
+                state.products.splice(i, 1);
+                saveData(); render(); showToast("Product deleted", "success");
+            });
+        }
+
+        function renderCategories() {
+            return `
+                <div class="card">
+                    <h2>Add Category</h2>
+                    <div class="card-header-buttons">
+                        <button class="quick-nav-btn back" onclick="switchTab('products')">← Products</button>
+                    </div>
+                    <form onsubmit="addCategory(event)">
+                        <div class="form-group">
+                            <input type="text" id="categoryName" placeholder="Category Name" required>
+                        </div>
+                        <button type="submit">Add Category</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>All Categories (${state.categories.length})</h2>
+                    ${state.categories.map((cat, i) => {
+                        const productCount = state.products.filter(p => p.category === cat).length;
+                        return `
+                            <div class="item">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <span class="item-title">${cat}</span>
+                                        <div class="item-subtitle">${productCount} products</div>
+                                    </div>
+                                    <div class="flex-gap">
+                                        <button class="btn-small" onclick="editCategoryIndex(${i})">Edit</button>
+                                        <button class="btn-small btn-danger" onclick="deleteCategoryIndex(${i})">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('') || '<p style="text-align: center; color: #666;">No categories yet</p>'}
+                </div>
+            `;
+        }
+
+        function addCategory(e) {
+            e.preventDefault();
+            const name = document.getElementById('categoryName').value.trim();
+            if (state.categories.includes(name)) return showToast('Category already exists', 'error');
+            state.categories.push(name);
+            saveData();
+            render();
+            showToast("Category added", "success");
+        }
+
+        function editCategoryIndex(i) {
+            const oldName = state.categories[i];
+            const name = prompt("Category name:", oldName);
+            if (name && name.trim()) {
+                const newName = name.trim();
+                if (state.categories.includes(newName) && newName !== oldName) {
+                    return showToast('Category already exists', 'error');
+                }
+                state.categories[i] = newName;
+                // Update products with this category
+                state.products.forEach(p => {
+                    if (p.category === oldName) p.category = newName;
+                });
+                saveData(); render(); showToast("Category updated", "success");
+            }
+        }
+
+        function deleteCategoryIndex(i) {
+            const cat = state.categories[i];
+            const productsInCategory = state.products.filter(p => p.category === cat).length;
+            if (productsInCategory > 0) {
+                if (!confirm(`This category has ${productsInCategory} products. Delete anyway?`)) {
+                    return;
+                }
+            }
+            showConfirm("Delete this category?", function () {
+                state.categories.splice(i, 1);
+                saveData(); render(); showToast("Category deleted", "success");
+            });
+        }
+
+        function renderExpenses() {
+            const stats = getStats();
+            
+            let filteredExpenses = state.expenses.slice();
+            
+            if (state.searchTerm) {
+                const term = state.searchTerm.toLowerCase();
+                filteredExpenses = filteredExpenses.filter(e => 
+                    e.description.toLowerCase().includes(term) ||
+                    e.category.toLowerCase().includes(term)
+                );
+            }
+            
+            if (state.filterDateFrom) {
+                filteredExpenses = filteredExpenses.filter(e => new Date(e.date) >= new Date(state.filterDateFrom));
+            }
+            
+            if (state.filterDateTo) {
+                filteredExpenses = filteredExpenses.filter(e => new Date(e.date) <= new Date(state.filterDateTo));
+            }
+            
+            if (state.filterCategory) {
+                filteredExpenses = filteredExpenses.filter(e => e.category === state.filterCategory);
+            }
+
+            return `
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">TOTAL EXPENSES</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.totalExpenses)} Tsh</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">MONTH EXPENSES</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.monthExpenses)} Tsh</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Add Expense</h2>
+                    <form onsubmit="addExpense(event)">
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="expenseDesc" placeholder="e.g., Rent, Utilities" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="expenseCategory">
+                                <option>Rent</option>
+                                <option>Utilities</option>
+                                <option>Supplies</option>
+                                <option>Salaries</option>
+                                <option>Marketing</option>
+                                <option>Transportation</option>
+                                <option>Office Electricity bills</option>
+                                <option>Waste disposal bills</option>
+                                <option>Food Expenses</option>
+                                <option>Miscellaneous</option>
+                                <option>Machine Repair bills</option>
+                                <option>Home rent</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount</label>
+                            <input type="number" id="expenseAmount" placeholder="0.00" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Method</label>
+                            <select id="expensePayment">
+                                <option>Cash</option>
+                                <option>Card</option>
+                                <option>Mobile Money</option>
+                                <option>M-Pesa Lipa Number</option>
+                                <option>Bank Transfer</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Comment (Optional)</label>
+                            <textarea id="expenseComment" placeholder="Additional notes..."></textarea>
+                        </div>
+                        <button type="submit">Add Expense</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Recent Expenses (${filteredExpenses.length})</h2>
+                    
+                    <div class="search-box">
+                        <input type="text" placeholder="🔍 Search expenses..." oninput="updateSearchTerm(this.value)">
+                    </div>
+
+                    <div class="filter-row">
+                        <input type="date" placeholder="From" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
+                        <input type="date" placeholder="To" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
+                        <select onchange="updateFilterCategory(this.value)">
+                            <option value="">All Categories</option>
+                            ${[...new Set(state.expenses.map(e => e.category))].map(c => 
+                                `<option value="${c}" ${state.filterCategory === c ? 'selected' : ''}>${c}</option>`
+                            ).join('')}
+                        </select>
+                        <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
+                    </div>
+
+                    ${filteredExpenses.slice().reverse().map((e, idx) => `
+                        <div class="item">
+                            <div class="item-header">
+                                <span class="item-title">${e.description}</span>
+                                <span style="color: #d32f2f; font-weight: 700;">💱 ${formatNumber(e.amount)} Tsh</span>
+                            </div>
+                            <div class="item-subtitle">
+                                ${e.date} | ${e.category} | ${e.payment}
+                                ${e.comment ? '<br>💬 ' + e.comment : ''}
+                            </div>
+                            <div class="flex-gap" style="margin-top:8px;">
+                                <button class="btn-small" onclick="editExpenseIndex(${state.expenses.length - 1 - idx})">Edit</button>
+                                <button class="btn-small btn-danger" onclick="deleteExpenseIndex(${state.expenses.length - 1 - idx})">Delete</button>
+                            </div>
+                        </div>
+                    `).join('') || '<p style="text-align: center; color: #666;">No expenses yet</p>'}
+                </div>
+            `;
+        }
+
+        function updateFilterCategory(value) {
+            state.filterCategory = value;
+            render();
+        }
+
+        function addExpense(e) {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            if (isNaN(amount) || amount <= 0) {
+                return showToast('Please enter a valid amount', 'error');
+            }
+            
+            const now = new Date();
+            state.expenses.push({
+                date: now.toLocaleDateString(),
+                time: now.toLocaleTimeString(),
+                timestamp: now.getTime(),
+                description: document.getElementById('expenseDesc').value.trim(),
+                category: document.getElementById('expenseCategory').value,
+                amount: amount,
+                payment: document.getElementById('expensePayment').value,
+                comment: document.getElementById('expenseComment').value.trim()
+            });
+            saveData();
+            render();
+            showToast("Expense added", "success");
+        }
+
+        function editExpenseIndex(i) {
+            const e = state.expenses[i];
+            if (!e) return showToast("Expense not found", "error");
+            const desc = prompt("Description:", e.description);
+            const amt = prompt("Amount:", e.amount);
+            if (desc && amt) {
+                const amtNum = parseFloat(amt);
+                if (!isNaN(amtNum) && amtNum > 0) {
+                    e.description = desc.trim();
+                    e.amount = amtNum;
+                    e.timestamp = Date.now();
+                    saveData(); render(); showToast("Expense updated", "success");
+                } else {
+                    showToast("Invalid amount", "error");
+                }
+            }
+        }
+
+        function deleteExpenseIndex(i) {
+            showConfirm("Delete this expense?", function () {
+                state.expenses.splice(i, 1);
+                saveData(); render(); showToast("Expense deleted", "success");
+            });
+        }
+
+        function renderInventory() {
+            const lowStock = state.products.filter(p => {
+                const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
+                return inv.stock <= inv.minAlert;
+            });
+
+            return `
+                ${lowStock.length > 0 ? `
+                    <div class="alert-box-danger">
+                        <strong>⚠️ ${lowStock.length} Products Low on Stock!</strong>
+                    </div>
+                ` : ''}
+
+                <div class="card">
+                    <h2>Stock Levels (${state.products.length} Products)</h2>
+                    ${state.products.map(p => {
+                        const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
+                        const isLow = inv.stock <= inv.minAlert;
+                        const stockValue = inv.stock * p.cost;
+                        return `
+                            <div class="item" style="${isLow ? 'border-left: 4px solid #d32f2f;' : ''}">
+                                <div class="item-header">
+                                    <span class="item-title">${p.name}</span>
+                                    <span class="badge ${isLow ? 'badge-danger' : 'badge-success'}">
+                                        ${isLow ? '⚠️ LOW' : '✅ OK'}
+                                    </span>
+                                </div>
+                                <div class="item-subtitle">
+                                    Stock: ${inv.stock} units | Min Alert: ${inv.minAlert}<br>
+                                    Value: 💱 ${formatNumber(stockValue)} Tsh
+                                </div>
+                                <div class="flex-gap" style="margin-top: 8px;">
+                                    <button class="btn-success btn-small" onclick="adjustStock('${p.name}', 10)">+10</button>
+                                    <button class="btn-success btn-small" onclick="adjustStock('${p.name}', 1)">+1</button>
+                                    <button class="btn-danger btn-small" onclick="adjustStock('${p.name}', -1)">-1</button>
+                                    <input type="number" id="inv_input_${encodeURIComponent(p.name)}" value="${inv.stock}" min="0" style="width:80px;padding:6px;">
+                                    <button class="btn-small" onclick="saveStockFor('${p.name}')">Save</button>
+                                    <button class="btn-small btn-secondary" onclick="setMinAlert('${p.name}')">⚠️ ${inv.minAlert}</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('') || '<p style="text-align: center; color: #666;">No products yet</p>'}
+                </div>
+            `;
+        }
+
+        function adjustStock(productName, amount) {
+            if (!state.inventory[productName]) {
+                state.inventory[productName] = { stock: 0, minAlert: 5 };
+            }
+            state.inventory[productName].stock = Math.max(0, state.inventory[productName].stock + amount);
+            saveData();
+            render();
+            showToast(`Stock ${amount > 0 ? 'increased' : 'decreased'}`, 'success');
+        }
+
+        function saveStockFor(productName) {
+            const el = document.getElementById('inv_input_' + encodeURIComponent(productName));
+            if (!el) return showToast("Input not found", "error");
+            const v = parseInt(el.value);
+            if (isNaN(v) || v < 0) return showToast("Invalid value", "error");
+            if (!state.inventory) state.inventory = {};
+            state.inventory[productName] = state.inventory[productName] || { stock: 0, minAlert: 5 };
+            state.inventory[productName].stock = v;
+            saveData(); render(); showToast("Stock updated", "success");
+        }
+
+        function setMinAlert(productName) {
+            const current = state.inventory[productName]?.minAlert || 5;
+            const newValue = prompt(`Set minimum stock alert for ${productName}:`, current);
+            if (newValue !== null) {
+                const val = parseInt(newValue);
+                if (!isNaN(val) && val >= 0) {
+                    if (!state.inventory[productName]) {
+                        state.inventory[productName] = { stock: 0, minAlert: 5 };
+                    }
+                    state.inventory[productName].minAlert = val;
+                    saveData();
+                    render();
+                    showToast('Min alert updated', 'success');
+                } else {
+                    showToast('Invalid value', 'error');
+                }
+            }
+        }
+
+        function renderCustomers() {
+            // Sort customers by total purchases
+            const sortedCustomers = [...state.customers].sort((a, b) => 
+                (b.totalPurchases || 0) - (a.totalPurchases || 0)
+            );
+
+            return `
+                <div class="card">
+                    <h2>Add Customer</h2>
+                    <form onsubmit="addCustomer(event)">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="customerName" placeholder="Full name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="customerEmail" placeholder="email@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="tel" id="customerPhone" placeholder="+255...">
+                        </div>
+                        <div class="form-group">
+                            <label>Address</label>
+                            <input type="text" id="customerAddress" placeholder="Address">
+                        </div>
+                        <button type="submit">Add Customer</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>All Customers (${state.customers.length})</h2>
+                    <div class="search-box">
+                        <input type="text" placeholder="🔍 Search customers..." oninput="searchCustomers(this.value)" id="customerSearch">
+                    </div>
+                    <div id="customersList">
+                        ${renderCustomersList()}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCustomersList(searchTerm = '') {
+            let customers = state.customers;
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                customers = customers.filter(c => 
+                    c.name.toLowerCase().includes(term) ||
+                    (c.email && c.email.toLowerCase().includes(term)) ||
+                    (c.phone && c.phone.includes(term))
+                );
+            }
+            
+            if (customers.length === 0) {
+                return '<p style="text-align: center; color: #666;">No customers found</p>';
+            }
+            
+            return customers.map((c, i) => {
+                const actualIndex = state.customers.indexOf(c);
+                const purchaseCount = state.sales.filter(s => s.customer === c.name).length;
+                return `
+                    <div class="item">
+                        <div class="item-title">${c.name}</div>
+                        <div class="item-subtitle">
+                            ${c.email ? '📧 ' + c.email + '<br>' : ''}
+                            ${c.phone ? '📱 ' + c.phone + '<br>' : ''}
+                            ${c.address ? '📍 ' + c.address + '<br>' : ''}
+                            <div style="color: #2e7d32; font-weight: 600; margin-top: 4px;">
+                                💰 Total Purchases: 💱 ${formatNumber(c.totalPurchases || 0)} Tsh<br>
+                                📊 ${purchaseCount} transactions
+                            </div>
+                        </div>
+                        <div class="flex-gap" style="margin-top:8px;">
+                            <button class="btn-small" onclick="viewCustomerHistory(${actualIndex})">History</button>
+                            <button class="btn-small" onclick="editCustomerIndex(${actualIndex})">Edit</button>
+                            <button class="btn-small btn-danger" onclick="deleteCustomerIndex(${actualIndex})">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function searchCustomers(term) {
+            document.getElementById('customersList').innerHTML = renderCustomersList(term);
+        }
+
+        function viewCustomerHistory(i) {
+            const customer = state.customers[i];
+            if (!customer) return showToast("Customer not found", "error");
+            
+            const sales = state.sales.filter(s => s.customer === customer.name);
+            
+            if (sales.length === 0) {
+                showToast("No purchase history", "info");
+                return;
+            }
+            
+            let history = `${customer.name}'s Purchase History:\n\n`;
+            sales.slice(-10).reverse().forEach(s => {
+                history += `${s.date}: ${s.productName} - ${formatNumber(s.totalPrice)} Tsh\n`;
+            });
+            
+            alert(history);
+        }
+
+        function addCustomer(e) {
+            e.preventDefault();
+            const name = document.getElementById('customerName').value.trim();
+            
+            // Check for duplicate
+            if (state.customers.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                return showToast('Customer already exists', 'error');
+            }
+            
+            state.customers.push({
+                name: name,
+                email: document.getElementById('customerEmail').value.trim(),
+                phone: document.getElementById('customerPhone').value.trim(),
+                address: document.getElementById('customerAddress').value.trim(),
+                totalPurchases: 0
+            });
+            saveData();
+            render();
+            showToast("Customer added", "success");
+        }
+
+        function editCustomerIndex(i) {
+            const c = state.customers[i];
+            if (!c) return showToast("Customer not found", "error");
+            const name = prompt("Name:", c.name);
+            const email = prompt("Email:", c.email);
+            const phone = prompt("Phone:", c.phone);
+            if (name) {
+                c.name = name.trim();
+                if (email !== null) c.email = email.trim();
+                if (phone !== null) c.phone = phone.trim();
+                saveData(); render(); showToast("Customer updated", "success");
+            }
+        }
+
+        function deleteCustomerIndex(i) {
+            showConfirm("Delete this customer?", function () {
+                state.customers.splice(i, 1);
+                saveData(); render(); showToast("Customer deleted", "success");
+            });
+        }
+
+        function renderInvoices() {
+            const stats = getStats();
+            return `
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">TOTAL INVOICED</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.totalInvoiced)} Tsh</div>
+                    </div>
+                    <div class="stat-card" style="background: #2e7d32;">
+                        <div class="stat-label">PAID</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.totalPaid)} Tsh</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Create Invoice</h2>
+                    <form onsubmit="createInvoice(event)">
+                        <div class="form-group">
+                            <label>Customer</label>
+                            <select id="invoiceCustomer" onchange="toggleInvoiceCustomerInput()" required>
+                                <option value="">-- Select Customer --</option>
+                                ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+                                <option value="new">+ Add New Customer</option>
+                            </select>
+                        </div>
+                        <div id="newInvoiceCustomerFields" style="display:none;">
+                            <div class="form-group">
+                                <label>New Customer Name</label>
+                                <input type="text" id="newInvoiceCustomerName" placeholder="Enter customer name">
+                            </div>
+                            <div class="form-group">
+                                <label>Phone (Optional)</label>
+                                <input type="tel" id="newInvoiceCustomerPhone" placeholder="+255...">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Due Date</label>
+                            <input type="date" id="invoiceDueDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Items</label>
+                            <input type="text" id="invoiceItems" placeholder="Item 1, Item 2, Item 3" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount</label>
+                            <input type="number" id="invoiceAmount" placeholder="0.00" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="invoiceStatus">
+                                <option>Pending</option>
+                                <option>Paid</option>
+                                <option>Overdue</option>
+                            </select>
+                        </div>
+                        <button type="submit">Create Invoice</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>All Invoices (${state.invoices.length})</h2>
+                    ${state.invoices.slice().reverse().map((inv, idx) => `
+                        <div class="item">
+                            <div class="item-header">
+                                <span class="item-title">${inv.number}</span>
+                                <span class="badge ${inv.status === 'Paid' ? 'badge-success' : inv.status === 'Overdue' ? 'badge-danger' : 'badge-warning'}">
+                                    ${inv.status}
+                                </span>
+                            </div>
+                            <div class="item-subtitle">
+                                ${inv.customer}<br>
+                                Due: ${inv.dueDate}<br>
+                                <span style="font-weight: 700; color: #000;">Amount: 💱 ${formatNumber(inv.amount)} Tsh</span>
+                            </div>
+                            <div class="flex-gap" style="margin-top:8px;">
+                                <button class="btn-small" onclick="downloadInvoicePDF(${state.invoices.length - 1 - idx})">📥 PDF</button>
+                                <button class="btn-small" onclick="toggleInvoiceStatus(${state.invoices.length - 1 - idx})">Change Status</button>
+                            </div>
+                        </div>
+                    `).join('') || '<p style="text-align: center; color: #666;">No invoices yet</p>'}
+                </div>
+            `;
+        }
+
+        function toggleInvoiceCustomerInput() {
+            const select = document.getElementById('invoiceCustomer');
+            const fields = document.getElementById('newInvoiceCustomerFields');
+            if (select && fields) {
+                if (select.value === 'new') {
+                    fields.style.display = 'block';
+                } else {
+                    fields.style.display = 'none';
+                }
+            }
+        }
+
+        function toggleInvoiceStatus(idx) {
+            const inv = state.invoices[idx];
+            if (!inv) return;
+            
+            const statuses = ['Pending', 'Paid', 'Overdue'];
+            const currentIdx = statuses.indexOf(inv.status);
+            inv.status = statuses[(currentIdx + 1) % statuses.length];
+            
+            saveData();
+            render();
+            showToast(`Invoice status changed to ${inv.status}`, 'success');
+        }
+
+        function createInvoice(e) {
+            e.preventDefault();
+            const customerSelect = document.getElementById('invoiceCustomer').value;
+            let customer;
+            
+            if (customerSelect === 'new') {
+                const newName = document.getElementById('newInvoiceCustomerName')?.value.trim();
+                if (!newName) return showToast('Please enter customer name', 'error');
+                const newPhone = document.getElementById('newInvoiceCustomerPhone')?.value.trim();
+                customer = { name: newName, email: '', phone: newPhone, address: '', totalPurchases: 0 };
+                state.customers.push(customer);
+            } else {
+                customer = state.customers[customerSelect];
+            }
+            
+            const amount = parseFloat(document.getElementById('invoiceAmount').value);
+            if (isNaN(amount) || amount <= 0) {
+                return showToast('Please enter a valid amount', 'error');
+            }
+            
+            const now = new Date();
+            state.invoices.push({
+                number: 'INV-' + Date.now().toString().slice(-6),
+                customer: customer.name,
+                date: now.toLocaleDateString(),
+                dueDate: document.getElementById('invoiceDueDate').value,
+                items: document.getElementById('invoiceItems').value.trim(),
+                amount: amount,
+                status: document.getElementById('invoiceStatus').value
+            });
+            saveData();
+            render();
+            showToast("Invoice created", "success");
+        }
+
+        function downloadInvoicePDF(i) {
+            const inv = state.invoices[i];
+            if (!inv) return showToast("Invoice not found", "error");
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            const left = 40; let y = 40;
+            doc.setFontSize(20); doc.text(SHOP_NAME, left, y);
+            doc.setFontSize(11); doc.text(`${SHOP_ADDRESS} | ${SHOP_PHONE} | ${SHOP_EMAIL}`, left, y + 18);
+            doc.setFontSize(12); doc.text(`Invoice: ${inv.number}`, 420, y); doc.text(`Date: ${inv.date}`, 420, y + 16); doc.text(`Due: ${inv.dueDate}`, 420, y + 32);
+            y += 64;
+            doc.setDrawColor(200); doc.line(left, y, 555, y); y += 18;
+            doc.setFontSize(11); doc.text("Item(s)", left, y); doc.text("Amount", 420, y); doc.text("10%", 500, y); y += 10; doc.line(left, y, 555, y); y += 18;
+            const items = inv.items.split(',').map(s => s.trim()).filter(Boolean);
+            items.forEach(it => { doc.text(it, left, y); y += 14; });
+            y += 6;
+            doc.setFontSize(12); doc.text(`Total: ${formatNumber(inv.amount)} Tsh`, 420, y); doc.text(`${formatNumber(inv.amount * 0.1)} Tsh`, 500, y);
+            y += 40; doc.setFontSize(10); doc.text("Thank you for your business.", left, y);
+            doc.save(`${inv.number}.pdf`);
+            showToast("Invoice PDF downloaded", "success");
+        }
+
+        function renderUnpaid() {
+            const unpaidList = state.unpaidEntries.filter(e => !e.paid);
+            const unpaidTotal = unpaidList.reduce((sum, e) => sum + (e.amount || 0), 0);
+            
+            return `
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">UNPAID ENTRIES</div>
+                        <div class="stat-value">${unpaidList.length}</div>
+                    </div>
+                    <div class="stat-card" style="background: #d32f2f;">
+                        <div class="stat-label">UNPAID AMOUNT</div>
+                        <div class="stat-value">💱 ${formatNumber(unpaidTotal)} Tsh</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Add Unpaid Entry</h2>
+                    <form onsubmit="addUnpaidEntry(event)">
+                        <div class="form-group">
+                            <label>Customer</label>
+                            <select id="unpaidCustomer">
+                                <option value="">-- Select Customer --</option>
+                                ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>OR Enter Customer Name</label>
+                            <input type="text" id="unpaidName" placeholder="Enter name manually">
+                        </div>
+                        <div class="form-group">
+                            <label>Product</label>
+                            <select id="unpaidProduct" onchange="updateUnpaidAmount()">
+                                <option value="">-- Select Product --</option>
+                                ${state.products.map((p, i) => `<option value="${i}">${p.name} - 💱 ${formatNumber(p.price)} Tsh</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>OR Transaction Type</label>
+                            <input type="text" id="unpaidType" placeholder="e.g., Product Sale">
+                        </div>
+                        <div class="form-group">
+                            <label>Amount</label>
+                            <input type="number" id="unpaidAmount" placeholder="0.00" step="0.01" required>
+                        </div>
+                        <button type="submit">Add Unpaid Entry</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Unpaid Entries (${unpaidList.length})</h2>
+                    ${unpaidList.map((entry, idx) => `
+                        <div class="item" style="border-left: 4px solid #d32f2f;">
+                            <div class="item-header">
+                                <span class="item-title">${entry.name}</span>
+                                <span class="badge badge-unpaid">UNPAID</span>
+                            </div>
+                            <div class="item-subtitle">
+                                ${entry.date} ${entry.time}<br>
+                                Type: ${entry.type}<br>
+                                Amount: <strong style="color: #d32f2f;">💱 ${formatNumber(entry.amount)} Tsh</strong>
+                            </div>
+                            <div class="flex-gap" style="margin-top:8px;">
+                                <button class="btn-success btn-small" onclick="markAsPaid(${entry.timestamp})">✓ Mark Paid</button>
+                                <button class="btn-small btn-danger" onclick="deleteUnpaidEntry(${entry.timestamp})">Delete</button>
+                            </div>
+                        </div>
+                    `).join('') || '<p style="text-align: center; color: #666;">No unpaid entries</p>'}
+                </div>
+
+                <div class="card">
+                    <h2>Paid Entries (Last 10)</h2>
+                    ${state.unpaidEntries.filter(e => e.paid).slice().reverse().slice(0, 10).map(entry => `
+                        <div class="item">
+                            <div class="item-header">
+                                <span class="item-title">${entry.name}</span>
+                                <span class="badge badge-paid">✓ PAID</span>
+                            </div>
+                            <div class="item-subtitle">
+                                ${entry.date} ${entry.time}<br>
+                                Type: ${entry.type}<br>
+                                Amount: 💱 ${formatNumber(entry.amount)} Tsh
+                            </div>
+                        </div>
+                    `).join('') || '<p style="text-align: center; color: #666;">No paid entries yet</p>'}
+                </div>
+            `;
+        }
+
+        function updateUnpaidAmount() {
+            const productIndex = document.getElementById('unpaidProduct')?.value;
+            if (productIndex !== null && productIndex !== '') {
+                const product = state.products[productIndex];
+                if (product) {
+                    document.getElementById('unpaidAmount').value = product.price.toFixed(2);
+                }
+            }
+        }
+
+        function addUnpaidEntry(e) {
+            e.preventDefault();
+            const now = new Date();
+            state.unpaidEntries = state.unpaidEntries || [];
+            
+            const customerIndex = document.getElementById('unpaidCustomer')?.value;
+            const manualName = document.getElementById('unpaidName')?.value.trim();
+            let customerName = manualName;
+            if (!customerName && customerIndex) {
+                customerName = state.customers[customerIndex].name;
+            }
+            if (!customerName) {
+                return showToast("Please select or enter customer name", "error");
+            }
+
+            const productIndex = document.getElementById('unpaidProduct')?.value;
+            const manualType = document.getElementById('unpaidType')?.value.trim();
+            let transactionType = manualType;
+            if (!transactionType && productIndex !== null && productIndex !== '') {
+                transactionType = state.products[productIndex].name;
+            }
+            if (!transactionType) {
+                return showToast("Please select product or enter transaction type", "error");
+            }
+            
+            const amount = parseFloat(document.getElementById('unpaidAmount').value);
+            if (isNaN(amount) || amount <= 0) {
+                return showToast("Please enter a valid amount", "error");
+            }
+            
+            state.unpaidEntries.push({
+                name: customerName,
+                type: transactionType,
+                amount: amount,
+                date: now.toLocaleDateString(),
+                time: now.toLocaleTimeString(),
+                timestamp: now.getTime(),
+                paid: false
+            });
+            saveData();
+            render();
+            showToast("Unpaid entry added", "success");
+        }
+
+        function markAsPaid(timestamp) {
+            const entry = state.unpaidEntries.find(e => e.timestamp === timestamp);
+            if (!entry) return showToast("Entry not found", "error");
+            
+            entry.paid = true;
+            const now = new Date();
+            state.sales.push({
+                date: now.toLocaleDateString(),
+                time: now.toLocaleTimeString(),
+                timestamp: now.getTime(),
+                productName: entry.type,
+                customer: entry.name,
+                quantity: 1,
+                costPerUnit: 0,
+                pricePerUnit: entry.amount,
+                totalCost: 0,
+                totalPrice: entry.amount,
+                profit: entry.amount,
+                payment: 'Unpaid Entry - Now Paid'
+            });
+            
+            // Update customer total
+            const customer = state.customers.find(c => c.name === entry.name);
+            if (customer) {
+                customer.totalPurchases = (customer.totalPurchases || 0) + entry.amount;
+            }
+            
+            saveData();
+            render();
+            showToast("Marked as paid and added to sales", "success");
+        }
+
+        function deleteUnpaidEntry(timestamp) {
+            showConfirm("Delete this unpaid entry?", function () {
+                const idx = state.unpaidEntries.findIndex(e => e.timestamp === timestamp);
+                if (idx !== -1) {
+                    state.unpaidEntries.splice(idx, 1);
+                    saveData();
+                    render();
+                    showToast("Entry deleted", "success");
+                }
+            });
+        }
+
+        function renderNotes() {
+            return `
+                <div class="card">
+                    <h2>Add Note</h2>
+                    <form onsubmit="addNote(event)">
+                        <div class="form-group">
+                            <label>Note Title (Optional)</label>
+                            <input type="text" id="noteTitle" placeholder="Brief title...">
+                        </div>
+                        <div class="form-group">
+                            <textarea id="noteContent" placeholder="Write your note here..." required></textarea>
+                        </div>
+                        <button type="submit">Save Note</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>All Notes (${state.notes.length})</h2>
+                    <div class="search-box">
+                        <input type="text" placeholder="🔍 Search notes..." oninput="searchNotes(this.value)" id="noteSearch">
+                    </div>
+                    <div id="notesList">
+                        ${renderNotesList()}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderNotesList(searchTerm = '') {
+            let notes = state.notes.slice().reverse();
+            
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                notes = notes.filter(n => 
+                    n.content.toLowerCase().includes(term) ||
+                    (n.title && n.title.toLowerCase().includes(term))
+                );
+            }
+            
+            if (notes.length === 0) {
+                return '<p style="text-align: center; color: #666;">No notes found</p>';
+            }
+            
+            return notes.map((note, idx) => {
+                const actualIndex = state.notes.length - 1 - idx;
+                return `
+                    <div class="item note-preview" onclick="openNoteModal(${actualIndex})">
+                        ${note.title ? `<div class="item-title" style="margin-bottom: 8px;">${note.title}</div>` : ''}
+                        <div class="item-subtitle" style="margin-bottom: 8px;">${note.date} ${note.time}</div>
+                        <div style="white-space: pre-wrap;">${note.content}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function searchNotes(term) {
+            document.getElementById('notesList').innerHTML = renderNotesList(term);
+        }
+
+        function addNote(e) {
+            e.preventDefault();
+            const now = new Date();
+            const content = document.getElementById('noteContent').value.trim();
+            const title = document.getElementById('noteTitle')?.value.trim();
+            
+            if (!content) {
+                return showToast('Please enter note content', 'error');
+            }
+            
+            state.notes.push({
+                title: title || '',
+                content: content,
+                date: now.toLocaleDateString(),
+                time: now.toLocaleTimeString(),
+                timestamp: now.getTime()
+            });
+            saveData();
+            render();
+            showToast("Note saved", "success");
+        }
+
+        function openNoteModal(index) {
+            state.currentNoteIndex = index;
+            const note = state.notes[index];
+            const modal = document.getElementById('noteModal');
+            const content = document.getElementById('noteModalContent');
+            content.innerHTML = `
+                ${note.title ? `<h3 style="margin-bottom: 12px; color: #1a1a1a;">${note.title}</h3>` : ''}
+                <div style="margin-bottom: 12px; color: #666; font-size: 13px;">${note.date} ${note.time}</div>
+                <div style="white-space: pre-wrap; line-height: 1.6;">${note.content}</div>
+            `;
+            modal.classList.add('show');
+        }
+
+        function closeNoteModal() {
+            document.getElementById('noteModal').classList.remove('show');
+            state.currentNoteIndex = null;
+        }
+
+        function editNoteFromModal() {
+            if (state.currentNoteIndex === null) return;
+            const note = state.notes[state.currentNoteIndex];
+            const newTitle = prompt("Edit title:", note.title);
+            const newContent = prompt("Edit note:", note.content);
+            if (newContent !== null && newContent.trim()) {
+                if (newTitle !== null) note.title = newTitle.trim();
+                note.content = newContent.trim();
+                saveData();
+                closeNoteModal();
+                render();
+                showToast("Note updated", "success");
+            }
+        }
+
+        function deleteNoteFromModal() {
+            if (state.currentNoteIndex === null) return;
+            showConfirm("Delete this note?", function () {
+                state.notes.splice(state.currentNoteIndex, 1);
+                saveData();
+                closeNoteModal();
+                render();
+                showToast("Note deleted", "success");
+            });
+        }
+
+        function renderAnalytics() {
+            const stats = getStats();
+            const netProfit = stats.netProfit;
+
+            return `
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">REVENUE</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.totalRevenue)} Tsh</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">EXPENSES</div>
+                        <div class="stat-value">💱 ${formatNumber(stats.totalExpenses)} Tsh</div>
+                    </div>
+                    <div class="stat-card" style="background: ${netProfit >= 0 ? '#2e7d32' : '#d32f2f'};">
+                        <div class="stat-label">NET PROFIT</div>
+                        <div class="stat-value">💱 ${formatNumber(netProfit)} Tsh</div>
+                    </div>
+                    <div class="stat-card" style="background: #1976d2;">
+                        <div class="stat-label">TOTAL SALES</div>
+                        <div class="stat-value">${stats.totalSalesCount}</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Payment Methods</h2>
+                    ${getPaymentMethodsHTML()}
+                </div>
+
+                <div class="card">
+                    <h2>Money Transactions Summary</h2>
+                    ${getTransactionSummaryHTML()}
+                </div>
+
+                <div class="card">
+                    <h2>Category Performance</h2>
+                    ${getCategoryPerformanceHTML()}
+                </div>
+
+                <div class="card">
+                    <h2>Top Products by Profit</h2>
+                    ${getTopProductsHTML()}
+                </div>
+
+                <div class="card">
+                    <h2>Analytics Chart</h2>
+                    <canvas id="analyticsChart"></canvas>
+                </div>
+
+                <div class="card">
+                    <h2>Download Reports</h2>
+                    <button onclick="downloadSalesReportPDF()">📥 Download Report (PDF)</button>
+                    <button class="btn-secondary" style="margin-top:8px;" onclick="downloadSalesReportExcel()">📥 Download Report (Excel)</button>
+                    <button class="btn-secondary" style="margin-top:8px;" onclick="downloadBackup()">💾 Backup All Data</button>
+                </div>
+            `;
+        }
+
+        function getCategoryPerformanceHTML() {
+            const categoryStats = {};
+            state.sales.forEach(s => {
+                const product = state.products.find(p => p.name === s.productName);
+                if (product) {
+                    if (!categoryStats[product.category]) {
+                        categoryStats[product.category] = { profit: 0, revenue: 0, count: 0 };
+                    }
+                    categoryStats[product.category].profit += s.profit;
+                    categoryStats[product.category].revenue += s.totalPrice;
+                    categoryStats[product.category].count += 1;
+                }
+            });
+
+            const entries = Object.entries(categoryStats).sort((a, b) => b[1].profit - a[1].profit);
+            
+            if (entries.length === 0) {
+                return '<p style="text-align: center; color: #666;">No category data yet</p>';
+            }
+
+            return entries.map(([category, data]) => `
+                <div class="item">
+                    <div class="item-header">
+                        <span class="item-title">${category}</span>
+                        <span style="color: #2e7d32; font-weight: 700;">💱 ${formatNumber(data.profit)} Tsh</span>
+                    </div>
+                    <div class="item-subtitle">
+                        Revenue: ${formatNumber(data.revenue)} Tsh | ${data.count} sales
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getTopProductsHTML() {
+            const productStats = {};
+            state.sales.forEach(s => {
+                if (!productStats[s.productName]) {
+                    productStats[s.productName] = { profit: 0, quantity: 0, revenue: 0 };
+                }
+                productStats[s.productName].profit += s.profit;
+                productStats[s.productName].quantity += s.quantity;
+                productStats[s.productName].revenue += s.totalPrice;
+            });
+
+            const entries = Object.entries(productStats).sort((a, b) => b[1].profit - a[1].profit).slice(0, 10);
+            
+            if (entries.length === 0) {
+                return '<p style="text-align: center; color: #666;">No product data yet</p>';
+            }
+
+            return entries.map(([product, data], index) => `
+                <div class="item">
+                    <div class="item-header">
+                        <span class="item-title">${index + 1}. ${product}</span>
+                        <span style="color: #2e7d32; font-weight: 700;">💱 ${formatNumber(data.profit)} Tsh</span>
+                    </div>
+                    <div class="item-subtitle">
+                        Sold: ${data.quantity} units | Revenue: ${formatNumber(data.revenue)} Tsh
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getPaymentMethodsHTML() {
+            const paymentTotals = {};
+            state.sales.forEach(s => {
+                paymentTotals[s.payment] = (paymentTotals[s.payment] || 0) + s.totalPrice;
+            });
+            if (Object.keys(paymentTotals).length === 0) {
+                return '<p style="text-align: center; color: #666;">No payment data yet</p>';
+            }
+            
+            const entries = Object.entries(paymentTotals).sort((a, b) => b[1] - a[1]);
+            return entries.map(([method, total]) => `
+                <div class="item">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span class="item-title">${method}</span>
+                        <span style="font-weight: 700;">💱 ${formatNumber(total)} Tsh</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getTransactionSummaryHTML() {
+            const transactionTotals = {
+                mpesa: { deposit: 0, withdrawal: 0 },
+                crdb: { deposit: 0, withdrawal: 0 },
+                nmb: { deposit: 0, withdrawal: 0 },
+                airtel: { deposit: 0, withdrawal: 0 },
+                halopesa: { deposit: 0, withdrawal: 0 },
+                yas: { deposit: 0, withdrawal: 0 }
+            };
+            
+            (state.transactions || []).forEach(t => {
+                if (transactionTotals[t.channel]) {
+                    transactionTotals[t.channel][t.type] += t.amount || 0;
+                }
+            });
+
+            const channelLabels = {
+                mpesa: 'M-Pesa',
+                crdb: 'CRDB',
+                nmb: 'NMB',
+                airtel: 'Airtel Money',
+                halopesa: 'Halopesa',
+                yas: 'Yas Tanzania'
+            };
+
+            const channelColors = {
+                mpesa: '#d32f2f',
+                crdb: '#2e7d32',
+                nmb: '#e65100',
+                airtel: '#b71c1c',
+                halopesa: '#fdd835',
+                yas: '#0d47a1'
+            };
+
+            const hasTransactions = Object.values(transactionTotals).some(val => val.deposit > 0 || val.withdrawal > 0);
+            
+            if (!hasTransactions) {
+                return '<p style="text-align: center; color: #666;">No transaction data yet</p>';
+            }
+
+            const entries = Object.entries(transactionTotals).filter(([channel, amounts]) => 
+                amounts.deposit > 0 || amounts.withdrawal > 0
+            );
+
+            return entries.map(([channel, amounts]) => `
+                <div class="item">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="width: 12px; height: 12px; border-radius: 50%; background: ${channelColors[channel]};"></span>
+                        <span class="item-title">${channelLabels[channel]}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: #666;">
+                        <span>Deposits: <strong style="color: #2e7d32;">💱 ${formatNumber(amounts.deposit)} Tsh</strong></span>
+                        <span>Withdrawals: <strong style="color: #d32f2f;">💱 ${formatNumber(amounts.withdrawal)} Tsh</strong></span>
+                    </div>
+                    <div style="margin-top: 4px; font-weight: 600;">
+                        Net: <span style="color: ${amounts.deposit - amounts.withdrawal >= 0 ? '#2e7d32' : '#d32f2f'};">
+                            ${amounts.deposit - amounts.withdrawal >= 0 ? '+' : ''}💱 ${formatNumber(amounts.deposit - amounts.withdrawal)} Tsh
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function createAnalyticsChart() {
+            setTimeout(() => {
+                const canvas = document.getElementById('analyticsChart');
+                if (!canvas) return;
+
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
+
+                const stats = getStats();
+                const revenue = stats.totalRevenue;
+                const expenses = stats.totalExpenses;
+                const profit = stats.totalProfit;
+
+                const transactionTotals = {
+                    mpesa: 0, crdb: 0, nmb: 0, airtel: 0, halopesa: 0, yas: 0
+                };
+                (state.transactions || []).forEach(t => {
+                    if (transactionTotals.hasOwnProperty(t.channel)) {
+                        transactionTotals[t.channel] += t.amount || 0;
+                    }
+                });
+
+                const ctx = canvas.getContext('2d');
+                chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Revenue', 'Expenses', 'Profit', 'M-Pesa', 'CRDB', 'NMB', 'Airtel', 'Halopesa', 'Yas'],
+                        datasets: [{
+                            label: 'Amount (Tsh)',
+                            data: [
+                                revenue,
+                                expenses,
+                                profit,
+                                transactionTotals.mpesa,
+                                transactionTotals.crdb,
+                                transactionTotals.nmb,
+                                transactionTotals.airtel,
+                                transactionTotals.halopesa,
+                                transactionTotals.yas
+                            ],
+                            backgroundColor: [
+                                '#1976d2',
+                                '#d32f2f',
+                                '#2e7d32',
+                                '#d32f2f',
+                                '#2e7d32',
+                                '#e65100',
+                                '#b71c1c',
+                                '#fdd835',
+                                '#0d47a1'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }, 100);
+        }
+
+        function downloadSalesReportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            const pageWidth = 595.28;
+            const margin = 50;
+            const usableWidth = pageWidth - margin * 2;
+            let y = 50;
+
+            // Header
+            doc.setFillColor(26, 26, 26);
+            doc.rect(0, 0, pageWidth, 100, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(24);
+            doc.setFont(undefined, 'bold');
+            doc.text(SHOP_NAME, margin, 45);
+            
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${SHOP_ADDRESS} | ${SHOP_PHONE} | ${SHOP_EMAIL}`, margin, 70);
+            
+            doc.setDrawColor(102, 126, 234);
+            doc.setLineWidth(3);
+            doc.line(margin, 85, pageWidth - margin, 85);
+            
+            y = 120;
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.text("Financial Report", margin, y);
+            
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, y + 20);
+            y += 50;
+
+            function drawTable(headers, rows, startY) {
+                const colCount = headers.length;
+                const colWidth = usableWidth / colCount;
+                let curY = startY;
+                const rowHeight = 22;
+                
+                doc.setFillColor(102, 126, 234);
+                doc.roundedRect(margin, curY, usableWidth, rowHeight, 3, 3, 'F');
+                
+                doc.setTextColor(255, 255, 255);
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(10);
+                for (let i = 0; i < colCount; i++) {
+                    const txtX = margin + i * colWidth + 8;
+                    doc.text(String(headers[i]), txtX, curY + 15);
+                }
+                curY += rowHeight + 2;
+
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(9);
+                for (let r = 0; r < rows.length; r++) {
+                    if (curY + rowHeight > 750) { 
+                        doc.addPage(); 
+                        curY = margin;
+                    }
+                    
+                    if (r % 2 === 0) {
+                        doc.setFillColor(248, 249, 250);
+                        doc.roundedRect(margin, curY, usableWidth, rowHeight, 2, 2, 'F');
+                    }
+                    
+                    doc.setTextColor(40, 40, 40);
+                    for (let c = 0; c < colCount; c++) {
+                        const txt = rows[r][c] === null || rows[r][c] === undefined ? '' : String(rows[r][c]);
+                        const txtX = margin + c * colWidth + 8;
+                        doc.text(txt, txtX, curY + 15, { maxWidth: colWidth - 16 });
+                    }
+                    curY += rowHeight;
+                }
+                return curY + 20;
+            }
+
+            // Sales
+            const salesHeaders = ["Date", "Product", "Customer", "Qty", "Price", "Profit"];
+            const salesRows = (state.sales || []).map(s => [
+                s.date, s.productName, s.customer, s.quantity, formatNumber(s.totalPrice) + ' Tsh', formatNumber(s.profit) + ' Tsh'
+            ]);
+            if (salesRows.length > 0) {
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(0, 0, 0);
+                doc.text("Sales Records", margin, y);
+                y += 15;
+                y = drawTable(salesHeaders, salesRows, y);
+            }
+
+            // Expenses
+            const expHeaders = ["Date", "Description", "Category", "Amount"];
+            const expRows = (state.expenses || []).map(e => [
+                e.date, e.description, e.category, formatNumber(e.amount || 0) + ' Tsh'
+            ]);
+            if (expRows.length > 0) {
+                if (y > 650) { doc.addPage(); y = margin; }
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text("Expenses", margin, y);
+                y += 15;
+                y = drawTable(expHeaders, expRows, y);
+            }
+
+            // Transactions
+            const transHeaders = ["Type", "Date", "Customer", "Amount"];
+            const transRows = (state.transactions || []).map(t => [
+                t.channel.toUpperCase(), t.date, t.customerName || 'N/A', formatNumber(t.amount || 0) + ' Tsh'
+            ]);
+            if (transRows.length > 0) {
+                if (y > 650) { doc.addPage(); y = margin; }
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text("Money Transactions", margin, y);
+                y += 15;
+                y = drawTable(transHeaders, transRows, y);
+            }
+
+            // Chart
+            if (chartInstance) {
+                doc.addPage();
+                doc.setFontSize(16);
+                doc.setFont(undefined, 'bold');
+                doc.text("Analytics Overview", margin, 50);
+                
+                const chartImage = chartInstance.toBase64Image();
+                doc.addImage(chartImage, 'PNG', margin, 70, usableWidth, 250);
+            }
+
+            // Footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFillColor(240, 240, 240);
+                doc.rect(0, 792 - 30, pageWidth, 30, 'F');
+                doc.setTextColor(100, 100, 100);
+                doc.setFontSize(9);
+                doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 12);
+                doc.text(`Daniel's Finance Manager © ${new Date().getFullYear()}`, pageWidth - margin - 150, 792 - 12);
+            }
+
+            doc.save(`Financial_Report_${new Date().toLocaleDateString()}.pdf`);
+            showToast("PDF downloaded successfully!", "success");
+        }
+
+        function downloadSalesReportExcel() {
+            const rows = [
+                ["DANIEL'S FINANCE MANAGER"],
+                ["Financial Report"],
+                [`Generated: ${new Date().toLocaleDateString()}`],
+                [],
+                ["SALES RECORDS"],
+                ["Date", "Product", "Customer", "Quantity", "Price (Tsh)", "Profit (Tsh)"],
+                ...((state.sales || []).map(s => [s.date, s.productName, s.customer, s.quantity, s.totalPrice, s.profit])),
+                [],
+                ["EXPENSES"],
+                ["Date", "Description", "Category", "Amount (Tsh)"],
+                ...((state.expenses || []).map(e => [e.date, e.description, e.category, e.amount])),
+                [],
+                ["MONEY TRANSACTIONS"],
+                ["Type", "Date", "Customer", "Amount (Tsh)"],
+                ...((state.transactions || []).map(t => [t.channel.toUpperCase(), t.date, t.customerName || 'N/A', t.amount]))
+            ];
+            
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            
+            ws['!cols'] = [
+                { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 15 }
+            ];
+            
+            XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
+            XLSX.writeFile(wb, `Financial_Report_${new Date().toLocaleDateString()}.xlsx`);
+            showToast("Excel downloaded successfully!", "success");
+        }
+
+        function downloadBackup() {
+            exportData();
+        }
+
+        function exportData() {
+            const data = {
+                products: state.products,
+                sales: state.sales,
+                expenses: state.expenses,
+                customers: state.customers,
+                invoices: state.invoices,
+                categories: state.categories,
+                inventory: state.inventory,
+                notes: state.notes,
+                transactions: state.transactions,
+                unpaidEntries: state.unpaidEntries,
+                transactionFloats: state.transactionFloats,
+                dailyTarget: state.dailyTarget,
+                monthlyTarget: state.monthlyTarget,
+                exportDate: new Date().toISOString(),
+                version: '2.0'
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `daniels_finance_backup_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Data exported successfully!', 'success');
+        }
+
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        if (confirm('This will replace all current data. Continue?')) {
+                            state.products = data.products || [];
+                            state.sales = data.sales || [];
+                            state.expenses = data.expenses || [];
+                            state.customers = data.customers || [];
+                            state.invoices = data.invoices || [];
+                            state.categories = data.categories || [];
+                            state.inventory = data.inventory || {};
+                            state.notes = data.notes || [];
+                            state.transactions = data.transactions || [];
+                            state.unpaidEntries = data.unpaidEntries || [];
+                            state.transactionFloats = data.transactionFloats || state.transactionFloats;
+                            state.dailyTarget = data.dailyTarget || 0;
+                            state.monthlyTarget = data.monthlyTarget || 0;
+                            calculateFloatBalances();
+                            saveData();
+                            render();
+                            showToast('Data imported successfully!', 'success');
+                        }
+                    } catch (error) {
+                        showToast('Error importing file. Please check the file format.', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            switch (state.activeTab) {
+                case 'dashboard': app.innerHTML = renderDashboard(); break;
+                case 'sales': app.innerHTML = renderSales(); break;
+                case 'transactions': app.innerHTML = renderTransactions(); break;
+                case 'products': app.innerHTML = renderProducts(); break;
+                case 'categories': app.innerHTML = renderCategories(); break;
+                case 'expenses': app.innerHTML = renderExpenses(); break;
+                case 'inventory': app.innerHTML = renderInventory(); break;
+                case 'customers': app.innerHTML = renderCustomers(); break;
+                case 'invoices': app.innerHTML = renderInvoices(); break;
+                case 'analytics': 
+                    app.innerHTML = renderAnalytics();
+                    createAnalyticsChart();
+                    break;
+                case 'unpaid': app.innerHTML = renderUnpaid(); break;
+                case 'notes': app.innerHTML = renderNotes(); break;
+            }
+            renderNav();
+        }
+
+        // Initialize
+        loadData();
+        render();
+
+        // Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+
+        // Auto-save every 30 seconds
+        setInterval(() => {
+            saveData();
+        }, 30000);
+
+        // PWA Manifest
+        const manifestData = {
+            "name": "Daniel's Finance Manager Pro",
+            "short_name": "Daniel's Pro",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#000000",
+            "theme_color": "#000000",
+            "icons": [{
+                "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='75' font-size='75'%3E💼%3C/text%3E%3C/svg%3E",
+                "sizes": "512x512",
+                "type": "image/svg+xml"
+            }]
+        };
+
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
+        const manifestURL = URL.createObjectURL(manifestBlob);
+        document.querySelector('link[rel="manifest"]').setAttribute('href', manifestURL);
+    </script>
+
+</body></html>
