@@ -2059,32 +2059,33 @@
             const searchInput = document.querySelector('input[placeholder*="Search"]');
             if (searchInput) searchInput.value = '';
             render();
-            function render() {
-                const app = document.getElementById('app');
-                switch (state.activeTab) {
-                    case 'dashboard': app.innerHTML = renderDashboard(); break;
-                    case 'account': app.innerHTML = renderAccount(); break;
-                    case 'sales':
-                        app.innerHTML = renderSales();
-                        // Initialize the sales list after rendering
-                        setTimeout(() => renderSalesList(), 0);
-                        break;
-                    case 'products': app.innerHTML = renderProducts(); break;
-                    case 'categories': app.innerHTML = renderCategories(); break;
-                    case 'expenses': app.innerHTML = renderExpenses(); break;
-                    case 'inventory': app.innerHTML = renderInventory(); break;
-                    case 'customers': app.innerHTML = renderCustomers(); break;
-                    case 'invoices': app.innerHTML = renderInvoices(); break;
-                    case 'analytics':
-                        app.innerHTML = renderAnalytics();
-                        createAnalyticsChart();
-                        break;
-                    case 'unpaid': app.innerHTML = renderUnpaid(); break;
-                    case 'notes': app.innerHTML = renderNotes(); break;
-                }
-                renderNav();
-            }
         }
+        function render() {
+            const app = document.getElementById('app');
+            switch (state.activeTab) {
+                case 'dashboard': app.innerHTML = renderDashboard(); break;
+                case 'account': app.innerHTML = renderAccount(); break;
+                case 'sales':
+                    app.innerHTML = renderSales();
+                    // Initialize the sales list after rendering
+                    setTimeout(() => renderSalesList(), 0);
+                    break;
+                case 'products': app.innerHTML = renderProducts(); break;
+                case 'categories': app.innerHTML = renderCategories(); break;
+                case 'expenses': app.innerHTML = renderExpenses(); break;
+                case 'inventory': app.innerHTML = renderInventory(); break;
+                case 'customers': app.innerHTML = renderCustomers(); break;
+                case 'invoices': app.innerHTML = renderInvoices(); break;
+                case 'analytics':
+                    app.innerHTML = renderAnalytics();
+                    createAnalyticsChart();
+                    break;
+                case 'unpaid': app.innerHTML = renderUnpaid(); break;
+                case 'notes': app.innerHTML = renderNotes(); break;
+            }
+            renderNav();
+        }
+
         function renderCollapsibleList(items, chunkSize, sectionKey, renderItem, emptyMessage) {
             if (!items || items.length === 0) {
                 return `<p style="text-align: center; color: #666;">${emptyMessage}</p>`;
