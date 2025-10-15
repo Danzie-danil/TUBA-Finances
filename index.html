@@ -1535,6 +1535,14 @@
         let chartInstance = null;
         let isSyncing = false; // ADD THIS LINE
 
+        function getTodayDateString() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`; // Returns: 2025-01-15
+        }
+
         function formatNumber(num) {
             if (num === null || num === undefined || isNaN(num)) return '0.00';
             return parseFloat(num).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -1586,16 +1594,18 @@
             const totalProfit = state.sales.reduce((sum, s) => sum + (s.profit || 0), 0);
             const totalRevenue = state.sales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
 
-            const today = new Date().toLocaleDateString();
+            const today = getTodayDateString();
             const todaySales = state.sales.filter(s => s.date === today);
             const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0);
             const todayRevenue = todaySales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
 
-            const yesterday = new Date(Date.now() - 86400000).toLocaleDateString();
+            const yesterdayDate = new Date(Date.now() - 86400000);
+            const yesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`;
             const yesterdayProfit = state.sales.filter(s => s.date === yesterday).reduce((sum, s) => sum + (s.profit || 0), 0);
 
             const now = new Date();
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString();
+            const monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthStart = `${monthStartDate.getFullYear()}-${String(monthStartDate.getMonth() + 1).padStart(2, '0')}-${String(monthStartDate.getDate()).padStart(2, '0')}`;
             const monthSales = state.sales.filter(s => new Date(s.date) >= new Date(monthStart));
             const monthProfit = monthSales.reduce((sum, s) => sum + (s.profit || 0), 0);
             const monthRevenue = monthSales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
@@ -2392,7 +2402,7 @@
             const totalCost = product.cost * quantity;
             const totalPrice = +(pricePerUnit * quantity).toFixed(2);
             const sale = {
-                date: now.toLocaleDateString(),
+                date: getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
                 productName: product.name,
@@ -2579,7 +2589,7 @@
                 customerName: document.getElementById('transactionCustomer').value.trim() || 'N/A',
                 type: document.getElementById('transactionType').value,
                 amount: amount,
-                date: now.toLocaleDateString(),
+                date: now.getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime()
             };
@@ -3031,7 +3041,7 @@
 
             const now = new Date();
             const expense = {
-                date: now.toLocaleDateString(),
+                date: now.getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
                 description: document.getElementById('expenseDesc').value.trim(),
@@ -3476,7 +3486,7 @@
             const invoice = {
                 number: 'INV-' + Date.now().toString().slice(-6),
                 customer: customer.name,
-                date: now.toLocaleDateString(),
+                date: now.getTodayDateString(),
                 dueDate: document.getElementById('invoiceDueDate').value,
                 items: document.getElementById('invoiceItems').value.trim(),
                 amount: amount,
@@ -3657,7 +3667,7 @@
                 name: customerName,
                 type: transactionType,
                 amount: amount,
-                date: now.toLocaleDateString(),
+                date: now.getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
                 paid: false
@@ -3689,7 +3699,7 @@
             entry.paid = true;
             const now = new Date();
             state.sales.push({
-                date: now.toLocaleDateString(),
+                date: now.getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
                 productName: entry.type,
@@ -3798,7 +3808,7 @@
             const note = {
                 title: title || '',
                 content: content,
-                date: now.toLocaleDateString(),
+                date: now.getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime()
             };
@@ -4174,7 +4184,7 @@
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
             doc.setTextColor(100, 100, 100);
-            doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, y + 20);
+            doc.text(`Generated: ${new Date().getTodayDateString()}`, margin, y + 20);
             y += 50;
 
             function drawTable(headers, rows, startY) {
@@ -4284,7 +4294,7 @@
                 doc.text(`Daniel's Finance Manager © ${new Date().getFullYear()}`, pageWidth - margin - 150, 792 - 12);
             }
 
-            doc.save(`Financial_Report_${new Date().toLocaleDateString()}.pdf`);
+            doc.save(`Financial_Report_${new Date().getTodayDateString()}.pdf`);
             showToast("PDF downloaded successfully!", "success");
         }
 
@@ -4292,7 +4302,7 @@
             const rows = [
                 ["DANIEL'S FINANCE MANAGER"],
                 ["Financial Report"],
-                [`Generated: ${new Date().toLocaleDateString()}`],
+                [`Generated: ${new Date().getTodayDateString()}`],
                 [],
                 ["SALES RECORDS"],
                 ["Date", "Product", "Customer", "Quantity", "Price (Tsh)", "Profit (Tsh)"],
@@ -4315,7 +4325,7 @@
             ];
 
             XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
-            XLSX.writeFile(wb, `Financial_Report_${new Date().toLocaleDateString()}.xlsx`);
+            XLSX.writeFile(wb, `Financial_Report_${new Date().getTodayDateString()}.xlsx`);
             showToast("Excel downloaded successfully!", "success");
         }
 
