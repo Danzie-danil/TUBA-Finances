@@ -1338,9 +1338,6 @@
             { id: 'dashboard', label: 'Dashboard', icon: '📊' },
             { id: 'account', label: 'Account', icon: '👤' },  // ADD THIS LINE
             { id: 'sales', label: 'Sales', icon: '💰' },
-            // ... rest of your tabs
-
-            { id: 'sales', label: 'Sales', icon: '💰' },
             { id: 'transactions', label: 'Money', icon: '💳' },
             { id: 'products', label: 'Products', icon: '🛍️' },
             { id: 'categories', label: 'Categories', icon: '📁' },
@@ -1767,24 +1764,27 @@
                     </form>
                 </div>
 
-                <div class="card">
-                    <h2>Recent Sales (${filteredSales.length})</h2>
-                    
-                    <div class="search-box">
-                        <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
-                    </div>
+                    <div class="card">
+    <h2>Recent Sales (${state.sales.length})</h2>
+    
+    <div class="search-box">
+        <input type="text" placeholder="🔍 Search sales..." value="${state.searchTerm}" oninput="updateSearchTerm(this.value)">
+    </div>
 
-                    <div class="filter-row">
-                        <input type="date" placeholder="From" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
-                        <input type="date" placeholder="To" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
-                        <select onchange="updateFilterCustomer(this.value)">
-                            <option value="">All Customers</option>
-                            ${[...new Set(state.sales.map(s => s.customer))].map(c =>
+    <div class="filter-row">
+        <input type="date" placeholder="From" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
+        <input type="date" placeholder="To" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
+        <select onchange="updateFilterCustomer(this.value)">
+            <option value="">All Customers</option>
+            ${[...new Set(state.sales.map(s => s.customer))].map(c =>
                 `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
             ).join('')}
-                        </select>
-                        <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
-                    </div>
+        </select>
+        <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
+    </div>
+
+    <div id="salesList"></div>
+</div>
 
                     ${renderCollapsibleList(filteredSales.slice().reverse(), 10, 'sales', (s, idx) => `
                         <div class="item">
@@ -1809,22 +1809,69 @@
 
         function updateSearchTerm(value) {
             state.searchTerm = value;
-            render();
+            // Don't re-render, just update the list
+            renderSalesList();
+        }
+
+        function renderSalesList() {
+            const container = document.getElementById('salesList');
+            if (!container) return;
+
+            let filteredSales = state.sales.slice();
+
+            if (state.searchTerm) {
+                const term = state.searchTerm.toLowerCase();
+                filteredSales = filteredSales.filter(s =>
+                    s.productName.toLowerCase().includes(term) ||
+                    s.customer.toLowerCase().includes(term) ||
+                    s.payment.toLowerCase().includes(term)
+                );
+            }
+
+            if (state.filterDateFrom) {
+                filteredSales = filteredSales.filter(s => new Date(s.date) >= new Date(state.filterDateFrom));
+            }
+
+            if (state.filterDateTo) {
+                filteredSales = filteredSales.filter(s => new Date(s.date) <= new Date(state.filterDateTo));
+            }
+
+            if (state.filterCustomer) {
+                filteredSales = filteredSales.filter(s => s.customer === state.filterCustomer);
+            }
+
+            container.innerHTML = filteredSales.slice().reverse().slice(0, 50).map(s => `
+        <div class="item">
+            <div class="item-header">
+                <span class="item-title">${s.productName}</span>
+                <span style="color: #2e7d32; font-weight: 700;">💱 ${formatNumber(s.profit)} Tsh</span>
+            </div>
+            <div class="item-subtitle">
+                ${s.date} ${s.time}<br>
+                ${s.customer} | Qty: ${s.quantity} | ${s.payment}<br>
+                Cost: ${formatNumber(s.totalCost)} | Price: ${formatNumber(s.totalPrice)}
+            </div>
+            <div class="flex-gap" style="margin-top:8px;">
+                <button class="btn-small" onclick="editSaleByTimestamp(${s.timestamp})">Edit</button>
+                <button class="btn-small btn-danger" onclick="deleteSaleByTimestamp(${s.timestamp})">Delete</button>
+            </div>
+        </div>
+    `).join('') || '<p style="text-align: center; color: #666;">No sales found</p>';
         }
 
         function updateFilterDateFrom(value) {
             state.filterDateFrom = value;
-            render();
+            renderSalesList();
         }
 
         function updateFilterDateTo(value) {
             state.filterDateTo = value;
-            render();
+            renderSalesList();
         }
 
         function updateFilterCustomer(value) {
             state.filterCustomer = value;
-            render();
+            renderSalesList();
         }
 
         function clearFilters() {
@@ -1833,9 +1880,36 @@
             state.filterDateTo = '';
             state.filterCategory = '';
             state.filterCustomer = '';
+            // Clear the search input
+            const searchInput = document.querySelector('input[placeholder*="Search"]');
+            if (searchInput) searchInput.value = '';
             render();
+            function render() {
+                const app = document.getElementById('app');
+                switch (state.activeTab) {
+                    case 'dashboard': app.innerHTML = renderDashboard(); break;
+                    case 'account': app.innerHTML = renderAccount(); break;
+                    case 'sales':
+                        app.innerHTML = renderSales();
+                        // Initialize the sales list after rendering
+                        setTimeout(() => renderSalesList(), 0);
+                        break;
+                    case 'products': app.innerHTML = renderProducts(); break;
+                    case 'categories': app.innerHTML = renderCategories(); break;
+                    case 'expenses': app.innerHTML = renderExpenses(); break;
+                    case 'inventory': app.innerHTML = renderInventory(); break;
+                    case 'customers': app.innerHTML = renderCustomers(); break;
+                    case 'invoices': app.innerHTML = renderInvoices(); break;
+                    case 'analytics':
+                        app.innerHTML = renderAnalytics();
+                        createAnalyticsChart();
+                        break;
+                    case 'unpaid': app.innerHTML = renderUnpaid(); break;
+                    case 'notes': app.innerHTML = renderNotes(); break;
+                }
+                renderNav();
+            }
         }
-
         function renderCollapsibleList(items, chunkSize, sectionKey, renderItem, emptyMessage) {
             if (!items || items.length === 0) {
                 return `<p style="text-align: center; color: #666;">${emptyMessage}</p>`;
@@ -2320,7 +2394,41 @@
         }
 
         function searchProducts(term) {
-            document.getElementById('productsList').innerHTML = renderProductsList(term);
+            const container = document.getElementById('productsList');
+            if (!container) return;
+
+            let products = state.products;
+            if (term) {
+                const search = term.toLowerCase();
+                products = products.filter(p =>
+                    p.name.toLowerCase().includes(search) ||
+                    p.category.toLowerCase().includes(search)
+                );
+            }
+
+            container.innerHTML = products.map((p, i) => {
+                const actualIndex = state.products.indexOf(p);
+                const inv = state.inventory[p.name] || { stock: 0 };
+                const margin = ((p.price - p.cost) / p.cost * 100).toFixed(1);
+                return `
+            <div class="item">
+                <div class="item-title">${p.name}</div>
+                <div class="item-subtitle">
+                    Category: ${p.category} | Stock: ${inv.stock} units<br>
+                    Margin: ${margin}%
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 14px;">
+                    <span>Cost: 💱 ${formatNumber(p.cost)} Tsh</span>
+                    <span>Price: 💱 ${formatNumber(p.price)} Tsh</span>
+                    <span style="color: #2e7d32; font-weight: 600;">+${formatNumber(p.price - p.cost)} Tsh</span>
+                </div>
+                <div class="flex-gap" style="margin-top:8px;">
+                    <button class="btn-small" onclick="editProductIndex(${actualIndex})">Edit</button>
+                    <button class="btn-small btn-danger" onclick="deleteProductIndex(${actualIndex})">Delete</button>
+                </div>
+            </div>
+        `;
+            }).join('') || '<p style="text-align: center; color: #666;">No products found</p>';
         }
 
         function addProduct(e) {
@@ -2813,7 +2921,42 @@
         }
 
         function searchCustomers(term) {
-            document.getElementById('customersList').innerHTML = renderCustomersList(term);
+            const container = document.getElementById('customersList');
+            if (!container) return;
+
+            let customers = state.customers;
+            if (term) {
+                const search = term.toLowerCase();
+                customers = customers.filter(c =>
+                    c.name.toLowerCase().includes(search) ||
+                    (c.email && c.email.toLowerCase().includes(search)) ||
+                    (c.phone && c.phone.includes(search))
+                );
+            }
+
+            container.innerHTML = customers.map((c, i) => {
+                const actualIndex = state.customers.indexOf(c);
+                const purchaseCount = state.sales.filter(s => s.customer === c.name).length;
+                return `
+            <div class="item">
+                <div class="item-title">${c.name}</div>
+                <div class="item-subtitle">
+                    ${c.email ? '📧 ' + c.email + '<br>' : ''}
+                    ${c.phone ? '📱 ' + c.phone + '<br>' : ''}
+                    ${c.address ? '📍 ' + c.address + '<br>' : ''}
+                    <div style="color: #2e7d32; font-weight: 600; margin-top: 4px;">
+                        💰 Total Purchases: 💱 ${formatNumber(c.totalPurchases || 0)} Tsh<br>
+                        📊 ${purchaseCount} transactions
+                    </div>
+                </div>
+                <div class="flex-gap" style="margin-top:8px;">
+                    <button class="btn-small" onclick="viewCustomerHistory(${actualIndex})">History</button>
+                    <button class="btn-small" onclick="editCustomerIndex(${actualIndex})">Edit</button>
+                    <button class="btn-small btn-danger" onclick="deleteCustomerIndex(${actualIndex})">Delete</button>
+                </div>
+            </div>
+        `;
+            }).join('') || '<p style="text-align: center; color: #666;">No customers found</p>';
         }
 
         function viewCustomerHistory(i) {
@@ -3285,7 +3428,29 @@
         }
 
         function searchNotes(term) {
-            document.getElementById('notesList').innerHTML = renderNotesList(term);
+            const container = document.getElementById('notesList');
+            if (!container) return;
+
+            let notes = state.notes.slice().reverse();
+
+            if (term) {
+                const search = term.toLowerCase();
+                notes = notes.filter(n =>
+                    n.content.toLowerCase().includes(search) ||
+                    (n.title && n.title.toLowerCase().includes(search))
+                );
+            }
+
+            container.innerHTML = notes.map((note, idx) => {
+                const actualIndex = state.notes.length - 1 - idx;
+                return `
+            <div class="item note-preview" onclick="openNoteModal(${actualIndex})">
+                ${note.title ? `<div class="item-title" style="margin-bottom: 8px;">${note.title}</div>` : ''}
+                <div class="item-subtitle" style="margin-bottom: 8px;">${note.date} ${note.time}</div>
+                <div style="white-space: pre-wrap;">${note.content}</div>
+            </div>
+        `;
+            }).join('') || '<p style="text-align: center; color: #666;">No notes found</p>';
         }
 
         function addNote(e) {
