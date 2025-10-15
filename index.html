@@ -1146,14 +1146,23 @@
 
         async function signOut() {
             try {
-                const { error } = await supabase.auth.signOut();
-                if (error) throw error;
+                // Set these first in case signOut fails
                 currentUser = null;
                 syncEnabled = false;
+                updateSyncIndicator('offline');
+
+                const { error } = await supabase.auth.signOut();
+                if (error) {
+                    console.error('Sign out error:', error);
+                    // Still consider it signed out locally
+                }
+
                 showToast('Signed out successfully', 'info');
                 render();
             } catch (error) {
-                showToast('Sign out error: ' + error.message, 'error');
+                console.error('Sign out error:', error);
+                showToast('Signed out (with errors)', 'info');
+                render();
             }
         }
         async function pushAllDataToSupabase() {
@@ -2144,8 +2153,11 @@
             try {
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
+
                 currentUser = data.user;
                 syncEnabled = true;
+
+                showToast('Signed in successfully!', 'success');
 
                 // Check if local data exists
                 const localHasData = state.sales.length > 0 || state.products.length > 0;
@@ -2156,46 +2168,74 @@
                         'You have local data. Click OK to KEEP LOCAL data (push to cloud), or Cancel to LOAD CLOUD data (replace local).'
                     );
 
-                    if (choice) {
-                        // Keep local, push to cloud
-                        await clearAndPushAllData();
-                        showToast('Local data pushed to cloud', 'success');
-                    } else {
-                        // Load from cloud, replace local
-                        localStorage.removeItem('financeManagerData');
-                        await pullDataFromSupabase();
-                        showToast('Cloud data loaded', 'success');
+                    try {
+                        if (choice) {
+                            // Keep local, push to cloud
+                            await clearAndPushAllData();
+                            showToast('Local data pushed to cloud', 'success');
+                        } else {
+                            // Load from cloud, replace local
+                            localStorage.removeItem('financeManagerData');
+                            await pullDataFromSupabase();
+                            showToast('Cloud data loaded', 'success');
+                        }
+                    } catch (syncError) {
+                        console.error('Sync error after sign in:', syncError);
+                        showToast('Signed in but sync failed. Try manual sync.', 'error');
                     }
                 } else {
                     // No local data, just pull from cloud
-                    await pullDataFromSupabase();
+                    try {
+                        await pullDataFromSupabase();
+                    } catch (syncError) {
+                        console.error('Pull error after sign in:', syncError);
+                        showToast('Signed in but data pull failed. Try manual pull.', 'error');
+                    }
                 }
 
                 return data;
             } catch (error) {
+                console.error('Sign in error:', error);
                 showToast('Sign in error: ' + error.message, 'error');
+                currentUser = null;
+                syncEnabled = false;
                 return null;
             }
         }
 
-        async function handleSignUp() {
-            const email = document.getElementById('signupEmail').value;
-            const password = document.getElementById('signupPassword').value;
-            const confirm = document.getElementById('signupPasswordConfirm').value;
+        async function handleSignIn() {
+            const email = document.getElementById('loginEmail')?.value;
+            const password = document.getElementById('loginPassword')?.value;
 
-            if (!email || !password || !confirm) {
+            if (!email || !password) {
                 return showToast('Please fill in all fields', 'error');
             }
 
-            if (password !== confirm) {
-                return showToast('Passwords do not match', 'error');
+            // Disable button during sign in
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) {
+                const buttons = loginForm.querySelectorAll('button');
+                buttons.forEach(btn => btn.disabled = true);
             }
 
-            if (password.length < 6) {
-                return showToast('Password must be at least 6 characters', 'error');
+            try {
+                const result = await signIn(email, password);
+                if (result) {
+                    // Success - form will disappear on render
+                } else {
+                    // Failed - re-enable buttons
+                    if (loginForm) {
+                        const buttons = loginForm.querySelectorAll('button');
+                        buttons.forEach(btn => btn.disabled = false);
+                    }
+                }
+            } catch (error) {
+                console.error('Handle sign in error:', error);
+                if (loginForm) {
+                    const buttons = loginForm.querySelectorAll('button');
+                    buttons.forEach(btn => btn.disabled = false);
+                }
             }
-
-            await signUp(email, password);
         }
 
         function renderSales() {
