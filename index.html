@@ -2514,7 +2514,7 @@
             render();
         }
 
-        function editSaleByTimestamp(ts) {
+        async function editSaleByTimestamp(ts) {
             const idx = state.sales.findIndex(s => s.timestamp === ts);
             if (idx === -1) return showToast("Sale not found", "error");
             const s = state.sales[idx];
@@ -2529,12 +2529,18 @@
                 s.totalCost = s.costPerUnit * qtyNum;
                 s.profit = +(s.totalPrice - s.totalCost).toFixed(2);
                 s.timestamp = Date.now();
-                saveData(); render(); showToast("Sale updated", "success");
+                saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
+                render();
+                showToast("Sale updated & synced", "success");
             }
         }
 
         function deleteSaleByTimestamp(ts) {
-            showConfirm("Delete this sale?", function () {
+            showConfirm("Delete this sale?", async function () {
                 const idx = state.sales.findIndex(s => s.timestamp === ts);
                 if (idx === -1) return showToast("Sale not found", "error");
                 const sale = state.sales[idx];
@@ -2545,7 +2551,13 @@
                 }
 
                 state.sales.splice(idx, 1);
-                saveData(); render(); showToast("Sale deleted", "success");
+                saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
+                render();
+                showToast("Sale deleted & synced", "success");
             });
         }
 
@@ -2865,7 +2877,7 @@
             showToast("Transaction recorded", "success");
         }
 
-        function editTransactionByTimestamp(ts) {
+        async function editTransactionByTimestamp(ts) {
             const idx = state.transactions.findIndex(t => t.timestamp === ts);
             if (idx === -1) return showToast("Transaction not found", "error");
             const t = state.transactions[idx];
@@ -2880,7 +2892,13 @@
                     t.amount = amountNum;
                     t.timestamp = Date.now();
                     calculateFloatBalances();
-                    saveData(); render(); showToast("Transaction updated", "success");
+                    saveData();
+
+                    // Auto-sync to cloud
+                    if (syncEnabled) await clearAndPushAllData();
+
+                    render();
+                    showToast("Transaction updated & synced", "success");
                 } else {
                     showToast("Invalid amount", "error");
                 }
@@ -2888,12 +2906,18 @@
         }
 
         function deleteTransactionByTimestamp(ts) {
-            showConfirm("Delete this transaction?", function () {
+            showConfirm("Delete this transaction?", async function () {
                 const idx = state.transactions.findIndex(t => t.timestamp === ts);
                 if (idx === -1) return showToast("Transaction not found", "error");
                 state.transactions.splice(idx, 1);
                 calculateFloatBalances();
-                saveData(); render(); showToast("Transaction deleted", "success");
+                saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
+                render();
+                showToast("Transaction deleted & synced", "success");
             });
         }
 
@@ -3033,7 +3057,7 @@
             showToast("Product added successfully!", "success");
         }
 
-        function editProductIndex(i) {
+        async function editProductIndex(i) {
             const p = state.products[i];
             if (!p) return showToast("Product not found", "error");
             const name = prompt("Product name:", p.name);
@@ -3056,16 +3080,28 @@
                     state.inventory[p.name] = state.inventory[oldName] || { stock: 0, minAlert: 5 };
                     delete state.inventory[oldName];
                 }
-                saveData(); render(); showToast("Product updated", "success");
+                saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
+                render();
+                showToast("Product updated & synced", "success");
             }
         }
 
         function deleteProductIndex(i) {
-            showConfirm("Delete this product?", function () {
+            showConfirm("Delete this product?", async function () {
                 const p = state.products[i];
                 if (p && p.name && state.inventory && state.inventory[p.name]) delete state.inventory[p.name];
                 state.products.splice(i, 1);
-                saveData(); render(); showToast("Product deleted", "success");
+                saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
+                render();
+                showToast("Product deleted & synced", "success");
             });
         }
 
@@ -3123,7 +3159,7 @@
             showToast("Category added", "success");
         }
 
-        function editCategoryIndex(i) {
+        async function editCategoryIndex(i) {
             const oldName = state.categories[i];
             const name = prompt("Category name:", oldName);
             if (name && name.trim()) {
@@ -3136,10 +3172,15 @@
                 state.products.forEach(p => {
                     if (p.category === oldName) p.category = newName;
                 });
-                saveData(); render(); showToast("Category updated", "success");
+                saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
+                render();
+                showToast("Category updated & synced", "success");
             }
         }
-
         function deleteCategoryIndex(i) {
             const cat = state.categories[i];
             const productsInCategory = state.products.filter(p => p.category === cat).length;
@@ -3148,9 +3189,15 @@
                     return;
                 }
             }
-            showConfirm("Delete this category?", function () {
+            showConfirm("Delete this category?", async function () {
                 state.categories.splice(i, 1);
-                saveData(); render(); showToast("Category deleted", "success");
+                saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
+                render();
+                showToast("Category deleted & synced", "success");
             });
         }
 
@@ -3321,7 +3368,7 @@
             showToast("Expense added", "success");
         }
 
-        function editExpenseIndex(i) {
+        async function editExpenseIndex(i) {
             const e = state.expenses[i];
             if (!e) return showToast("Expense not found", "error");
             const desc = prompt("Description:", e.description);
@@ -3332,7 +3379,13 @@
                     e.description = desc.trim();
                     e.amount = amtNum;
                     e.timestamp = Date.now();
-                    saveData(); render(); showToast("Expense updated", "success");
+                    saveData();
+
+                    // Auto-sync to cloud
+                    if (syncEnabled) await clearAndPushAllData();
+
+                    render();
+                    showToast("Expense updated & synced", "success");
                 } else {
                     showToast("Invalid amount", "error");
                 }
@@ -3340,9 +3393,15 @@
         }
 
         function deleteExpenseIndex(i) {
-            showConfirm("Delete this expense?", function () {
+            showConfirm("Delete this expense?", async function () {
                 state.expenses.splice(i, 1);
-                saveData(); render(); showToast("Expense deleted", "success");
+                saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
+                render();
+                showToast("Expense deleted & synced", "success");
             });
         }
 
@@ -3392,14 +3451,18 @@
             `;
         }
 
-        function adjustStock(productName, amount) {
+        async function adjustStock(productName, amount) {
             if (!state.inventory[productName]) {
                 state.inventory[productName] = { stock: 0, minAlert: 5 };
             }
             state.inventory[productName].stock = Math.max(0, state.inventory[productName].stock + amount);
             saveData();
+
+            // Auto-sync to cloud
+            if (syncEnabled) await clearAndPushAllData();
+
             render();
-            showToast(`Stock ${amount > 0 ? 'increased' : 'decreased'}`, 'success');
+            showToast(`Stock ${amount > 0 ? 'increased' : 'decreased'} & synced`, 'success');
         }
 
         async function saveStockFor(productName) {
@@ -3425,7 +3488,7 @@
             showToast("Stock updated", "success");
         }
 
-        function setMinAlert(productName) {
+        async function setMinAlert(productName) {
             const current = state.inventory[productName]?.minAlert || 5;
             const newValue = prompt(`Set minimum stock alert for ${productName}:`, current);
             if (newValue !== null) {
@@ -3436,8 +3499,12 @@
                     }
                     state.inventory[productName].minAlert = val;
                     saveData();
+
+                    // Auto-sync to cloud
+                    if (syncEnabled) await clearAndPushAllData();
+
                     render();
-                    showToast('Min alert updated', 'success');
+                    showToast('Min alert updated & synced', 'success');
                 } else {
                     showToast('Invalid value', 'error');
                 }
@@ -3582,7 +3649,7 @@
             showToast("Customer added", "success");
         }
 
-        function editCustomerIndex(i) {
+        async function editCustomerIndex(i) {
             const c = state.customers[i];
             if (!c) return showToast("Customer not found", "error");
             const name = prompt("Name:", c.name);
@@ -3592,17 +3659,28 @@
                 c.name = name.trim();
                 if (email !== null) c.email = email.trim();
                 if (phone !== null) c.phone = phone.trim();
-                saveData(); render(); showToast("Customer updated", "success");
+                saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
+                render();
+                showToast("Customer updated & synced", "success");
             }
         }
 
         function deleteCustomerIndex(i) {
-            showConfirm("Delete this customer?", function () {
+            showConfirm("Delete this customer?", async function () {
                 state.customers.splice(i, 1);
-                saveData(); render(); showToast("Customer deleted", "success");
+                saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
+                render();
+                showToast("Customer deleted & synced", "success");
             });
         }
-
         function renderInvoices() {
             const stats = getStats();
             return `
@@ -3699,7 +3777,7 @@
             }
         }
 
-        function toggleInvoiceStatus(idx) {
+        async function toggleInvoiceStatus(idx) {
             const inv = state.invoices[idx];
             if (!inv) return;
 
@@ -3708,8 +3786,12 @@
             inv.status = statuses[(currentIdx + 1) % statuses.length];
 
             saveData();
+
+            // Auto-sync to cloud
+            if (syncEnabled) await clearAndPushAllData();
+
             render();
-            showToast(`Invoice status changed to ${inv.status}`, 'success');
+            showToast(`Invoice status changed to ${inv.status} & synced`, 'success');
         }
 
         async function createInvoice(e) {
@@ -3942,7 +4024,7 @@
             showToast("Unpaid entry added", "success");
         }
 
-        function markAsPaid(timestamp) {
+        async function markAsPaid(timestamp) {
             const entry = state.unpaidEntries.find(e => e.timestamp === timestamp);
             if (!entry) return showToast("Entry not found", "error");
 
@@ -3970,18 +4052,26 @@
             }
 
             saveData();
+
+            // Auto-sync to cloud
+            if (syncEnabled) await clearAndPushAllData();
+
             render();
-            showToast("Marked as paid and added to sales", "success");
+            showToast("Marked as paid, added to sales & synced", "success");
         }
 
         function deleteUnpaidEntry(timestamp) {
-            showConfirm("Delete this unpaid entry?", function () {
+            showConfirm("Delete this unpaid entry?", async function () {
                 const idx = state.unpaidEntries.findIndex(e => e.timestamp === timestamp);
                 if (idx !== -1) {
                     state.unpaidEntries.splice(idx, 1);
                     saveData();
+
+                    // Auto-sync to cloud
+                    if (syncEnabled) await clearAndPushAllData();
+
                     render();
-                    showToast("Entry deleted", "success");
+                    showToast("Entry deleted & synced", "success");
                 }
             });
         }
@@ -4098,7 +4188,7 @@
             state.currentNoteIndex = null;
         }
 
-        function editNoteFromModal() {
+        async function editNoteFromModal() {
             if (state.currentNoteIndex === null) return;
             const note = state.notes[state.currentNoteIndex];
             const newTitle = prompt("Edit title:", note.title);
@@ -4107,20 +4197,28 @@
                 if (newTitle !== null) note.title = newTitle.trim();
                 note.content = newContent.trim();
                 saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
                 closeNoteModal();
                 render();
-                showToast("Note updated", "success");
+                showToast("Note updated & synced", "success");
             }
         }
 
         function deleteNoteFromModal() {
             if (state.currentNoteIndex === null) return;
-            showConfirm("Delete this note?", function () {
+            showConfirm("Delete this note?", async function () {
                 state.notes.splice(state.currentNoteIndex, 1);
                 saveData();
+
+                // Auto-sync to cloud
+                if (syncEnabled) await clearAndPushAllData();
+
                 closeNoteModal();
                 render();
-                showToast("Note deleted", "success");
+                showToast("Note deleted & synced", "success");
             });
         }
 
