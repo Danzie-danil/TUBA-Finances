@@ -1062,13 +1062,13 @@
                         syncAllData();
                     }
                 });
-
                 supabase.auth.onAuthStateChange((event, session) => {
                     if (event === 'SIGNED_IN') {
                         currentUser = session.user;
                         syncEnabled = true;
-                        showToast('Signed in! Syncing data...', 'success');
-                        syncAllData();
+                        updateSyncIndicator('synced');
+                        render();
+                        // Don't call syncAllData() here - it's already called in signIn()
                     } else if (event === 'SIGNED_OUT') {
                         currentUser = null;
                         syncEnabled = false;
@@ -1115,6 +1115,10 @@
                 if (error) throw error;
                 currentUser = data.user;
                 syncEnabled = true;
+
+                // Pull data from cloud (don't push to avoid duplicates)
+                await syncAllData();
+
                 return data;
             } catch (error) {
                 showToast('Sign in error: ' + error.message, 'error');
@@ -1283,10 +1287,14 @@
             }
         }
 
-
         async function syncAllData() {
             if (!syncEnabled || !currentUser) return;
+            if (isSyncing) {
+                console.log('Sync already in progress, skipping...');
+                return; // Prevent concurrent syncs
+            }
 
+            isSyncing = true;
             updateSyncIndicator('syncing');
 
             try {
@@ -1297,7 +1305,9 @@
             } catch (error) {
                 console.error('Sync error:', error);
                 updateSyncIndicator('synced');
-                showToast('Sync failed', 'error');
+                showToast('Sync failed: ' + error.message, 'error');
+            } finally {
+                isSyncing = false; // Always release the lock
             }
         }
 
@@ -1520,6 +1530,7 @@
         };
 
         let chartInstance = null;
+        let isSyncing = false; // ADD THIS LINE
 
         function formatNumber(num) {
             if (num === null || num === undefined || isNaN(num)) return '0.00';
