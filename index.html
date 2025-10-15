@@ -2055,11 +2055,44 @@
             state.filterDateTo = '';
             state.filterCategory = '';
             state.filterCustomer = '';
-            // Clear the search input
             const searchInput = document.querySelector('input[placeholder*="Search"]');
             if (searchInput) searchInput.value = '';
             render();
         }
+
+        function renderCollapsibleList(items, chunkSize, sectionKey, renderItem, emptyMessage) {
+            if (!items || items.length === 0) {
+                return `<p style="text-align: center; color: #666;">${emptyMessage}</p>`;
+            }
+
+            let html = '';
+            for (let i = 0; i < items.length; i += chunkSize) {
+                const chunk = items.slice(i, i + chunkSize);
+                const chunkId = `${sectionKey}_chunk_${i}`;
+                const isCollapsed = state.collapsedSections[chunkId];
+
+                if (isCollapsed) {
+                    html += `
+                        <button class="collapse-btn" onclick="toggleCollapse('${chunkId}')">
+                            Show More
+                        </button>
+                    `;
+                    break;
+                }
+
+                html += chunk.map((item, idx) => renderItem(item, i + idx)).join('');
+
+                if (i + chunkSize < items.length) {
+                    html += `
+                        <button class="collapse-btn" onclick="toggleCollapse('${chunkId}')">
+                            Show More
+                        </button>
+                    `;
+                }
+            }
+            return html;
+        }
+
         function render() {
             const app = document.getElementById('app');
             switch (state.activeTab) {
