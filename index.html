@@ -1642,6 +1642,8 @@
 
         let chartInstance = null;
         let isSyncing = false; // ADD THIS LINE
+        let isOperationInProgress = false; // ADD THIS
+        let operationTimeouts = {}; // ADD THIS
 
         function getTodayDateString() {
             const now = new Date();
@@ -1676,6 +1678,34 @@
             } catch (e) {
                 console.error('Error saving data:', e);
                 showToast('Error saving data!', 'error');
+            }
+        }
+
+        // ADD THESE TWO FUNCTIONS BELOW:
+
+        function lockOperation(operationName = 'default') {
+            if (isOperationInProgress) {
+                showToast('Please wait, processing...', 'info');
+                return false;
+            }
+            isOperationInProgress = true;
+
+            // Auto-unlock after 5 seconds as safety measure
+            if (operationTimeouts[operationName]) {
+                clearTimeout(operationTimeouts[operationName]);
+            }
+            operationTimeouts[operationName] = setTimeout(() => {
+                unlockOperation(operationName);
+            }, 5000);
+
+            return true;
+        }
+
+        function unlockOperation(operationName = 'default') {
+            isOperationInProgress = false;
+            if (operationTimeouts[operationName]) {
+                clearTimeout(operationTimeouts[operationName]);
+                delete operationTimeouts[operationName];
             }
         }
 
@@ -2515,11 +2545,19 @@
         }
 
         async function editSaleByTimestamp(ts) {
+            // Prevent duplicate operations
+            if (!lockOperation('editSale')) return;
+
             const idx = state.sales.findIndex(s => s.timestamp === ts);
-            if (idx === -1) return showToast("Sale not found", "error");
+            if (idx === -1) {
+                unlockOperation('editSale');
+                return showToast("Sale not found", "error");
+            }
+
             const s = state.sales[idx];
             const qty = prompt("Quantity:", s.quantity);
             const price = prompt("Price per unit:", s.pricePerUnit);
+
             if (qty && price && !isNaN(qty) && !isNaN(price)) {
                 const qtyNum = parseInt(qty);
                 const priceNum = parseFloat(price);
@@ -2529,20 +2567,29 @@
                 s.totalCost = s.costPerUnit * qtyNum;
                 s.profit = +(s.totalPrice - s.totalCost).toFixed(2);
                 s.timestamp = Date.now();
+
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 render();
-                showToast("Sale updated & synced", "success");
+                showToast("Sale updated", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
             }
+
+            unlockOperation('editSale');
         }
 
         function deleteSaleByTimestamp(ts) {
             showConfirm("Delete this sale?", async function () {
+                // Prevent duplicate operations
+                if (!lockOperation('deleteSale')) return;
+
                 const idx = state.sales.findIndex(s => s.timestamp === ts);
-                if (idx === -1) return showToast("Sale not found", "error");
+                if (idx === -1) {
+                    unlockOperation('deleteSale');
+                    return showToast("Sale not found", "error");
+                }
+
                 const sale = state.sales[idx];
 
                 // Return stock to inventory
@@ -2552,12 +2599,13 @@
 
                 state.sales.splice(idx, 1);
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 render();
-                showToast("Sale deleted & synced", "success");
+                showToast("Sale deleted", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
+
+                unlockOperation('deleteSale');
             });
         }
 
@@ -2627,8 +2675,12 @@
             }, 100);
         }
 
-        function addSale(e) {
+        async function addSale(e) {
             e && e.preventDefault && e.preventDefault();
+
+            // Prevent duplicate operations
+            if (!lockOperation('addSale')) return;
+
             const productIndex = document.getElementById('saleProduct')?.value;
             if (productIndex === null || productIndex === '' || productIndex === undefined) return showToast('Please select a product', 'error');
             const product = state.products[productIndex];
@@ -2709,8 +2761,15 @@
                 state.inventory[product.name].stock = Math.max(0, (state.inventory[product.name].stock || 0) - quantity);
             }
 
-            saveData(); render();
+            saveData();
+            render();
             showToast("Sale recorded successfully!", "success");
+
+            // Sync in background
+            if (syncEnabled) syncInBackground();
+
+            // Unlock operation
+            unlockOperation('addSale');
         }
 
         function renderTransactions() {
@@ -2807,6 +2866,9 @@
         }
 
         async function editInitialFloat(channel) {
+            // Prevent duplicate operations
+            if (!lockOperation('editFloat')) return;
+
             const current = state.transactionFloats[channel].initial;
             const newValue = prompt(`Set initial float for ${channel.toUpperCase()}:`, current);
             if (newValue !== null) {
@@ -2830,8 +2892,8 @@
                     showToast('Invalid amount', 'error');
                 }
             }
+            unlockOperation('editFloat');
         }
-
         function switchTransactionChannel(channel) {
             state.activeTransactionChannel = channel;
             render();
@@ -2839,10 +2901,15 @@
 
         async function addTransaction(e) {
             e.preventDefault();
+
+            // Prevent duplicate operations
+            if (!lockOperation('addTransaction')) return;
+
             const now = new Date();
             const amount = parseFloat(document.getElementById('transactionAmount').value);
 
             if (isNaN(amount) || amount <= 0) {
+                unlockOperation('addTransaction');
                 return showToast('Please enter a valid amount', 'error');
             }
 
@@ -2875,15 +2942,25 @@
             saveData();
             render();
             showToast("Transaction recorded", "success");
+
+            unlockOperation('addTransaction');
         }
 
         async function editTransactionByTimestamp(ts) {
+            // Prevent duplicate operations
+            if (!lockOperation('editTransaction')) return;
+
             const idx = state.transactions.findIndex(t => t.timestamp === ts);
-            if (idx === -1) return showToast("Transaction not found", "error");
+            if (idx === -1) {
+                unlockOperation('editTransaction');
+                return showToast("Transaction not found", "error");
+            }
+
             const t = state.transactions[idx];
             const customer = prompt("Customer Name:", t.customerName);
             const type = confirm("Is this a DEPOSIT? (Cancel for Withdrawal)") ? 'deposit' : 'withdrawal';
             const amount = prompt("Amount:", t.amount);
+
             if (customer !== null && amount) {
                 const amountNum = parseFloat(amount);
                 if (!isNaN(amountNum) && amountNum > 0) {
@@ -2891,33 +2968,43 @@
                     t.type = type;
                     t.amount = amountNum;
                     t.timestamp = Date.now();
+
                     calculateFloatBalances();
                     saveData();
-
-                    // Auto-sync to cloud
-                    if (syncEnabled) await clearAndPushAllData();
-
                     render();
-                    showToast("Transaction updated & synced", "success");
+                    showToast("Transaction updated", "success");
+
+                    // Sync in background
+                    if (syncEnabled) syncInBackground();
                 } else {
                     showToast("Invalid amount", "error");
                 }
             }
+
+            unlockOperation('editTransaction');
         }
 
         function deleteTransactionByTimestamp(ts) {
             showConfirm("Delete this transaction?", async function () {
+                // Prevent duplicate operations
+                if (!lockOperation('deleteTransaction')) return;
+
                 const idx = state.transactions.findIndex(t => t.timestamp === ts);
-                if (idx === -1) return showToast("Transaction not found", "error");
+                if (idx === -1) {
+                    unlockOperation('deleteTransaction');
+                    return showToast("Transaction not found", "error");
+                }
+
                 state.transactions.splice(idx, 1);
                 calculateFloatBalances();
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 render();
-                showToast("Transaction deleted & synced", "success");
+                showToast("Transaction deleted", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
+
+                unlockOperation('deleteTransaction');
             });
         }
 
@@ -3013,6 +3100,10 @@
 
         async function addProduct(e) {
             e.preventDefault();
+
+            // Prevent duplicate operations
+            if (!lockOperation('addProduct')) return;
+
             const name = document.getElementById('productName').value.trim();
             const category = document.getElementById('productCategory').value;
             const cost = parseFloat(document.getElementById('productCost').value);
@@ -3020,16 +3111,19 @@
             const stock = parseInt(document.getElementById('productStock').value) || 0;
 
             if (cost < 0 || price < 0) {
+                unlockOperation('addProduct');
                 return showToast('Cost and price must be positive', 'error');
             }
 
             if (price < cost) {
                 if (!confirm('Warning: Selling price is less than cost. Continue?')) {
+                    unlockOperation('addProduct');
                     return;
                 }
             }
 
             if (state.products.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                unlockOperation('addProduct');
                 return showToast('Product already exists', 'error');
             }
 
@@ -3055,19 +3149,30 @@
             saveData();
             render();
             showToast("Product added successfully!", "success");
+
+            unlockOperation('addProduct');
         }
 
         async function editProductIndex(i) {
+            // Prevent duplicate operations
+            if (!lockOperation('editProduct')) return;
+
             const p = state.products[i];
-            if (!p) return showToast("Product not found", "error");
+            if (!p) {
+                unlockOperation('editProduct');
+                return showToast("Product not found", "error");
+            }
+
             const name = prompt("Product name:", p.name);
             const cost = prompt("Cost:", p.cost);
             const price = prompt("Price:", p.price);
+
             if (name && cost && price && !isNaN(cost) && !isNaN(price)) {
                 const costNum = parseFloat(cost);
                 const priceNum = parseFloat(price);
 
                 if (costNum < 0 || priceNum < 0) {
+                    unlockOperation('editProduct');
                     return showToast('Cost and price must be positive', 'error');
                 }
 
@@ -3080,28 +3185,37 @@
                     state.inventory[p.name] = state.inventory[oldName] || { stock: 0, minAlert: 5 };
                     delete state.inventory[oldName];
                 }
+
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 render();
-                showToast("Product updated & synced", "success");
+                showToast("Product updated", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
             }
+
+            unlockOperation('editProduct');
         }
 
         function deleteProductIndex(i) {
             showConfirm("Delete this product?", async function () {
+                // Prevent duplicate operations
+                if (!lockOperation('deleteProduct')) return;
+
                 const p = state.products[i];
-                if (p && p.name && state.inventory && state.inventory[p.name]) delete state.inventory[p.name];
+                if (p && p.name && state.inventory && state.inventory[p.name]) {
+                    delete state.inventory[p.name];
+                }
+
                 state.products.splice(i, 1);
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 render();
-                showToast("Product deleted & synced", "success");
+                showToast("Product deleted", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
+
+                unlockOperation('deleteProduct');
             });
         }
 
@@ -3145,8 +3259,16 @@
 
         async function addCategory(e) {
             e.preventDefault();
+
+            // Prevent duplicate operations
+            if (!lockOperation('addCategory')) return;
+
             const name = document.getElementById('categoryName').value.trim();
-            if (state.categories.includes(name)) return showToast('Category already exists', 'error');
+
+            if (state.categories.includes(name)) {
+                unlockOperation('addCategory');
+                return showToast('Category already exists', 'error');
+            }
 
             state.categories.push(name);
 
@@ -3157,47 +3279,65 @@
             saveData();
             render();
             showToast("Category added", "success");
+
+            unlockOperation('addCategory');
         }
 
         async function editCategoryIndex(i) {
+            // Prevent duplicate operations
+            if (!lockOperation('editCategory')) return;
+
             const oldName = state.categories[i];
             const name = prompt("Category name:", oldName);
+
             if (name && name.trim()) {
                 const newName = name.trim();
                 if (state.categories.includes(newName) && newName !== oldName) {
+                    unlockOperation('editCategory');
                     return showToast('Category already exists', 'error');
                 }
+
                 state.categories[i] = newName;
+
                 // Update products with this category
                 state.products.forEach(p => {
                     if (p.category === oldName) p.category = newName;
                 });
+
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 render();
-                showToast("Category updated & synced", "success");
+                showToast("Category updated", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
             }
+
+            unlockOperation('editCategory');
         }
+
         function deleteCategoryIndex(i) {
             const cat = state.categories[i];
             const productsInCategory = state.products.filter(p => p.category === cat).length;
+
             if (productsInCategory > 0) {
                 if (!confirm(`This category has ${productsInCategory} products. Delete anyway?`)) {
                     return;
                 }
             }
+
             showConfirm("Delete this category?", async function () {
+                // Prevent duplicate operations
+                if (!lockOperation('deleteCategory')) return;
+
                 state.categories.splice(i, 1);
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 render();
-                showToast("Category deleted & synced", "success");
+                showToast("Category deleted", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
+
+                unlockOperation('deleteCategory');
             });
         }
 
@@ -3331,8 +3471,13 @@
 
         async function addExpense(e) {
             e.preventDefault();
+
+            // Prevent duplicate operations
+            if (!lockOperation('addExpense')) return;
+
             const amount = parseFloat(document.getElementById('expenseAmount').value);
             if (isNaN(amount) || amount <= 0) {
+                unlockOperation('addExpense');
                 return showToast('Please enter a valid amount', 'error');
             }
 
@@ -3366,6 +3511,8 @@
             saveData();
             render();
             showToast("Expense added", "success");
+
+            unlockOperation('addExpense');
         }
 
         async function editExpenseIndex(i) {
@@ -3394,14 +3541,18 @@
 
         function deleteExpenseIndex(i) {
             showConfirm("Delete this expense?", async function () {
+                // Prevent duplicate operations
+                if (!lockOperation('deleteExpense')) return;
+
                 state.expenses.splice(i, 1);
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 render();
-                showToast("Expense deleted & synced", "success");
+                showToast("Expense deleted", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
+
+                unlockOperation('deleteExpense');
             });
         }
 
@@ -3452,24 +3603,39 @@
         }
 
         async function adjustStock(productName, amount) {
+            // Prevent duplicate operations
+            if (!lockOperation('adjustStock')) return;
+
             if (!state.inventory[productName]) {
                 state.inventory[productName] = { stock: 0, minAlert: 5 };
             }
+
             state.inventory[productName].stock = Math.max(0, state.inventory[productName].stock + amount);
+
             saveData();
-
-            // Auto-sync to cloud
-            if (syncEnabled) await clearAndPushAllData();
-
             render();
-            showToast(`Stock ${amount > 0 ? 'increased' : 'decreased'} & synced`, 'success');
+            showToast(`Stock ${amount > 0 ? 'increased' : 'decreased'}`, 'success');
+
+            // Sync in background
+            if (syncEnabled) syncInBackground();
+
+            unlockOperation('adjustStock');
         }
 
         async function saveStockFor(productName) {
+            // Prevent duplicate operations
+            if (!lockOperation('saveStock')) return;
+
             const el = document.getElementById('inv_input_' + encodeURIComponent(productName));
-            if (!el) return showToast("Input not found", "error");
+            if (!el) {
+                unlockOperation('saveStock');
+                return showToast("Input not found", "error");
+            }
             const v = parseInt(el.value);
-            if (isNaN(v) || v < 0) return showToast("Invalid value", "error");
+            if (isNaN(v) || v < 0) {
+                unlockOperation('saveStock');
+                return showToast("Invalid value", "error");
+            }
             if (!state.inventory) state.inventory = {};
             state.inventory[productName] = state.inventory[productName] || { stock: 0, minAlert: 5 };
             state.inventory[productName].stock = v;
@@ -3486,11 +3652,17 @@
             saveData();
             render();
             showToast("Stock updated", "success");
+
+            unlockOperation('saveStock');
         }
 
         async function setMinAlert(productName) {
+            // Prevent duplicate operations
+            if (!lockOperation('setMinAlert')) return;
+
             const current = state.inventory[productName]?.minAlert || 5;
             const newValue = prompt(`Set minimum stock alert for ${productName}:`, current);
+
             if (newValue !== null) {
                 const val = parseInt(newValue);
                 if (!isNaN(val) && val >= 0) {
@@ -3498,17 +3670,19 @@
                         state.inventory[productName] = { stock: 0, minAlert: 5 };
                     }
                     state.inventory[productName].minAlert = val;
+
                     saveData();
-
-                    // Auto-sync to cloud
-                    if (syncEnabled) await clearAndPushAllData();
-
                     render();
-                    showToast('Min alert updated & synced', 'success');
+                    showToast('Min alert updated', 'success');
+
+                    // Sync in background
+                    if (syncEnabled) syncInBackground();
                 } else {
                     showToast('Invalid value', 'error');
                 }
             }
+
+            unlockOperation('setMinAlert');
         }
 
         function renderCustomers() {
@@ -3618,9 +3792,14 @@
 
         async function addCustomer(e) {
             e.preventDefault();
+
+            // Prevent duplicate operations
+            if (!lockOperation('addCustomer')) return;
+
             const name = document.getElementById('customerName').value.trim();
 
             if (state.customers.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                unlockOperation('addCustomer');
                 return showToast('Customer already exists', 'error');
             }
 
@@ -3647,38 +3826,54 @@
             saveData();
             render();
             showToast("Customer added", "success");
+
+            unlockOperation('addCustomer');
         }
 
         async function editCustomerIndex(i) {
+            // Prevent duplicate operations
+            if (!lockOperation('editCustomer')) return;
+
             const c = state.customers[i];
-            if (!c) return showToast("Customer not found", "error");
+            if (!c) {
+                unlockOperation('editCustomer');
+                return showToast("Customer not found", "error");
+            }
+
             const name = prompt("Name:", c.name);
             const email = prompt("Email:", c.email);
             const phone = prompt("Phone:", c.phone);
+
             if (name) {
                 c.name = name.trim();
                 if (email !== null) c.email = email.trim();
                 if (phone !== null) c.phone = phone.trim();
+
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 render();
-                showToast("Customer updated & synced", "success");
+                showToast("Customer updated", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
             }
+
+            unlockOperation('editCustomer');
         }
 
         function deleteCustomerIndex(i) {
             showConfirm("Delete this customer?", async function () {
+                // Prevent duplicate operations
+                if (!lockOperation('deleteCustomer')) return;
+
                 state.customers.splice(i, 1);
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 render();
-                showToast("Customer deleted & synced", "success");
+                showToast("Customer deleted", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
+
+                unlockOperation('deleteCustomer');
             });
         }
         function renderInvoices() {
@@ -3778,30 +3973,44 @@
         }
 
         async function toggleInvoiceStatus(idx) {
+            // Prevent duplicate operations
+            if (!lockOperation('toggleInvoice')) return;
+
             const inv = state.invoices[idx];
-            if (!inv) return;
+            if (!inv) {
+                unlockOperation('toggleInvoice');
+                return;
+            }
 
             const statuses = ['Pending', 'Paid', 'Overdue'];
             const currentIdx = statuses.indexOf(inv.status);
             inv.status = statuses[(currentIdx + 1) % statuses.length];
 
             saveData();
-
-            // Auto-sync to cloud
-            if (syncEnabled) await clearAndPushAllData();
-
             render();
-            showToast(`Invoice status changed to ${inv.status} & synced`, 'success');
+            showToast(`Invoice status changed to ${inv.status}`, 'success');
+
+            // Sync in background
+            if (syncEnabled) syncInBackground();
+
+            unlockOperation('toggleInvoice');
         }
 
         async function createInvoice(e) {
             e.preventDefault();
+
+            // Prevent duplicate operations
+            if (!lockOperation('createInvoice')) return;
+
             const customerSelect = document.getElementById('invoiceCustomer').value;
             let customer;
 
             if (customerSelect === 'new') {
                 const newName = document.getElementById('newInvoiceCustomerName')?.value.trim();
-                if (!newName) return showToast('Please enter customer name', 'error');
+                if (!newName) {
+                    unlockOperation('createInvoice');
+                    return showToast('Please enter customer name', 'error');
+                }
                 const newPhone = document.getElementById('newInvoiceCustomerPhone')?.value.trim();
                 customer = { name: newName, email: '', phone: newPhone, address: '', totalPurchases: 0 };
                 state.customers.push(customer);
@@ -3811,6 +4020,7 @@
 
             const amount = parseFloat(document.getElementById('invoiceAmount').value);
             if (isNaN(amount) || amount <= 0) {
+                unlockOperation('createInvoice');
                 return showToast('Please enter a valid amount', 'error');
             }
 
@@ -3843,6 +4053,8 @@
             saveData();
             render();
             showToast("Invoice created", "success");
+
+            unlockOperation('createInvoice');
         }
 
         function downloadInvoicePDF(i) {
@@ -3967,6 +4179,10 @@
 
         async function addUnpaidEntry(e) {
             e.preventDefault();
+
+            // Prevent duplicate operations
+            if (!lockOperation('addUnpaid')) return;
+
             const now = new Date();
             state.unpaidEntries = state.unpaidEntries || [];
 
@@ -3977,6 +4193,7 @@
                 customerName = state.customers[customerIndex].name;
             }
             if (!customerName) {
+                unlockOperation('addUnpaid');
                 return showToast("Please select or enter customer name", "error");
             }
 
@@ -3987,11 +4204,13 @@
                 transactionType = state.products[productIndex].name;
             }
             if (!transactionType) {
+                unlockOperation('addUnpaid');
                 return showToast("Please select product or enter transaction type", "error");
             }
 
             const amount = parseFloat(document.getElementById('unpaidAmount').value);
             if (isNaN(amount) || amount <= 0) {
+                unlockOperation('addUnpaid');
                 return showToast("Please enter a valid amount", "error");
             }
 
@@ -4022,11 +4241,19 @@
             saveData();
             render();
             showToast("Unpaid entry added", "success");
+
+            unlockOperation('addUnpaid');
         }
 
         async function markAsPaid(timestamp) {
+            // Prevent duplicate operations
+            if (!lockOperation('markPaid')) return;
+
             const entry = state.unpaidEntries.find(e => e.timestamp === timestamp);
-            if (!entry) return showToast("Entry not found", "error");
+            if (!entry) {
+                unlockOperation('markPaid');
+                return showToast("Entry not found", "error");
+            }
 
             entry.paid = true;
             const now = new Date();
@@ -4052,27 +4279,32 @@
             }
 
             saveData();
-
-            // Auto-sync to cloud
-            if (syncEnabled) await clearAndPushAllData();
-
             render();
-            showToast("Marked as paid, added to sales & synced", "success");
+            showToast("Marked as paid and added to sales", "success");
+
+            // Sync in background
+            if (syncEnabled) syncInBackground();
+
+            unlockOperation('markPaid');
         }
 
         function deleteUnpaidEntry(timestamp) {
             showConfirm("Delete this unpaid entry?", async function () {
+                // Prevent duplicate operations
+                if (!lockOperation('deleteUnpaid')) return;
+
                 const idx = state.unpaidEntries.findIndex(e => e.timestamp === timestamp);
                 if (idx !== -1) {
                     state.unpaidEntries.splice(idx, 1);
                     saveData();
-
-                    // Auto-sync to cloud
-                    if (syncEnabled) await clearAndPushAllData();
-
                     render();
-                    showToast("Entry deleted & synced", "success");
+                    showToast("Entry deleted", "success");
+
+                    // Sync in background
+                    if (syncEnabled) syncInBackground();
                 }
+
+                unlockOperation('deleteUnpaid');
             });
         }
 
@@ -4137,11 +4369,16 @@
 
         async function addNote(e) {
             e.preventDefault();
+
+            // Prevent duplicate operations
+            if (!lockOperation('addNote')) return;
+
             const now = new Date();
             const content = document.getElementById('noteContent').value.trim();
             const title = document.getElementById('noteTitle')?.value.trim();
 
             if (!content) {
+                unlockOperation('addNote');
                 return showToast('Please enter note content', 'error');
             }
 
@@ -4168,6 +4405,8 @@
             saveData();
             render();
             showToast("Note saved", "success");
+
+            unlockOperation('addNote');
         }
 
         function openNoteModal(index) {
@@ -4189,36 +4428,51 @@
         }
 
         async function editNoteFromModal() {
-            if (state.currentNoteIndex === null) return;
+            // Prevent duplicate operations
+            if (!lockOperation('editNote')) return;
+
+            if (state.currentNoteIndex === null) {
+                unlockOperation('editNote');
+                return;
+            }
+
             const note = state.notes[state.currentNoteIndex];
             const newTitle = prompt("Edit title:", note.title);
             const newContent = prompt("Edit note:", note.content);
+
             if (newContent !== null && newContent.trim()) {
                 if (newTitle !== null) note.title = newTitle.trim();
                 note.content = newContent.trim();
+
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 closeNoteModal();
                 render();
-                showToast("Note updated & synced", "success");
+                showToast("Note updated", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
             }
+
+            unlockOperation('editNote');
         }
 
         function deleteNoteFromModal() {
             if (state.currentNoteIndex === null) return;
+
             showConfirm("Delete this note?", async function () {
+                // Prevent duplicate operations
+                if (!lockOperation('deleteNote')) return;
+
                 state.notes.splice(state.currentNoteIndex, 1);
                 saveData();
-
-                // Auto-sync to cloud
-                if (syncEnabled) await clearAndPushAllData();
-
                 closeNoteModal();
                 render();
-                showToast("Note deleted & synced", "success");
+                showToast("Note deleted", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
+
+                unlockOperation('deleteNote');
             });
         }
 
