@@ -2589,7 +2589,7 @@
                 customerName: document.getElementById('transactionCustomer').value.trim() || 'N/A',
                 type: document.getElementById('transactionType').value,
                 amount: amount,
-                date: now.getTodayDateString(),
+                date: getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime()
             };
@@ -3041,7 +3041,7 @@
 
             const now = new Date();
             const expense = {
-                date: now.getTodayDateString(),
+                date: getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
                 description: document.getElementById('expenseDesc').value.trim(),
@@ -3486,7 +3486,7 @@
             const invoice = {
                 number: 'INV-' + Date.now().toString().slice(-6),
                 customer: customer.name,
-                date: now.getTodayDateString(),
+                date: getTodayDateString(),
                 dueDate: document.getElementById('invoiceDueDate').value,
                 items: document.getElementById('invoiceItems').value.trim(),
                 amount: amount,
@@ -3667,7 +3667,7 @@
                 name: customerName,
                 type: transactionType,
                 amount: amount,
-                date: now.getTodayDateString(),
+                date: getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
                 paid: false
@@ -3699,7 +3699,7 @@
             entry.paid = true;
             const now = new Date();
             state.sales.push({
-                date: now.getTodayDateString(),
+                date: getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
                 productName: entry.type,
@@ -3808,7 +3808,7 @@
             const note = {
                 title: title || '',
                 content: content,
-                date: now.getTodayDateString(),
+                date: getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime()
             };
@@ -4184,7 +4184,7 @@
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
             doc.setTextColor(100, 100, 100);
-            doc.text(`Generated: ${new Date().getTodayDateString()}`, margin, y + 20);
+            doc.text(`Generated: ${getTodayDateString()}`, margin, y + 20);
             y += 50;
 
             function drawTable(headers, rows, startY) {
@@ -4294,7 +4294,7 @@
                 doc.text(`Daniel's Finance Manager © ${new Date().getFullYear()}`, pageWidth - margin - 150, 792 - 12);
             }
 
-            doc.save(`Financial_Report_${new Date().getTodayDateString()}.pdf`);
+            doc.save(`Financial_Report_${getTodayDateString()}.pdf`);
             showToast("PDF downloaded successfully!", "success");
         }
 
@@ -4302,7 +4302,7 @@
             const rows = [
                 ["DANIEL'S FINANCE MANAGER"],
                 ["Financial Report"],
-                [`Generated: ${new Date().getTodayDateString()}`],
+                [`Generated: ${getTodayDateString()}`],
                 [],
                 ["SALES RECORDS"],
                 ["Date", "Product", "Customer", "Quantity", "Price (Tsh)", "Profit (Tsh)"],
@@ -4325,7 +4325,7 @@
             ];
 
             XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
-            XLSX.writeFile(wb, `Financial_Report_${new Date().getTodayDateString()}.xlsx`);
+            XLSX.writeFile(wb, `Financial_Report_${getTodayDateString()}.xlsx`);
             showToast("Excel downloaded successfully!", "success");
         }
 
