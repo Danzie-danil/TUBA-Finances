@@ -1153,207 +1153,48 @@
         }
 
         async function pullDataFromSupabase() {
-            try {
-                // Products
-                const { data: products } = await supabase
-                    .from('products')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (products) state.products = products.map(p => ({
-                    name: p.name,
-                    category: p.category,
-                    cost: parseFloat(p.cost),
-                    price: parseFloat(p.price)
-                }));
+            // Products
+            const { data: products } = await supabase
+                .from('products')
+                .select('*')
+                .eq('user_id', currentUser.id);
+            if (products) state.products = products.map(p => ({
+                name: p.name,
+                category: p.category,
+                cost: parseFloat(p.cost),
+                price: parseFloat(p.price)
+            }));
 
-                // Sales
-                const { data: sales } = await supabase
-                    .from('sales')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .order('timestamp', { ascending: false });
-                if (sales) state.sales = sales.map(s => ({
-                    date: s.date,
-                    time: s.time,
-                    timestamp: s.timestamp,
-                    productName: s.product_name,
-                    customer: s.customer,
-                    quantity: s.quantity,
-                    costPerUnit: parseFloat(s.cost_per_unit),
-                    pricePerUnit: parseFloat(s.price_per_unit),
-                    totalCost: parseFloat(s.total_cost),
-                    totalPrice: parseFloat(s.total_price),
-                    profit: parseFloat(s.profit),
-                    payment: s.payment
-                }));
+            // Sales
+            const { data: sales } = await supabase
+                .from('sales')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('timestamp', { ascending: false });
+            if (sales) state.sales = sales.map(s => ({
+                date: s.date,
+                time: s.time,
+                timestamp: s.timestamp,
+                productName: s.product_name,
+                customer: s.customer,
+                quantity: s.quantity,
+                costPerUnit: parseFloat(s.cost_per_unit),
+                pricePerUnit: parseFloat(s.price_per_unit),
+                totalCost: parseFloat(s.total_cost),
+                totalPrice: parseFloat(s.total_price),
+                profit: parseFloat(s.profit),
+                payment: s.payment
+            }));
 
-                // Expenses
-                const { data: expenses } = await supabase
-                    .from('expenses')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .order('timestamp', { ascending: false });
-                if (expenses) state.expenses = expenses.map(e => ({
-                    date: e.date,
-                    time: e.time,
-                    timestamp: e.timestamp,
-                    description: e.description,
-                    category: e.category,
-                    amount: parseFloat(e.amount),
-                    payment: e.payment,
-                    comment: e.comment
-                }));
+            // Categories
+            const { data: categories } = await supabase
+                .from('categories')
+                .select('*')
+                .eq('user_id', currentUser.id);
+            if (categories) state.categories = categories.map(c => c.name);
 
-                // Customers
-                const { data: customers } = await supabase
-                    .from('customers')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (customers) state.customers = customers.map(c => ({
-                    name: c.name,
-                    email: c.email,
-                    phone: c.phone,
-                    address: c.address,
-                    totalPurchases: parseFloat(c.total_purchases || 0)
-                }));
-
-                // Categories
-                const { data: categories } = await supabase
-                    .from('categories')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (categories) state.categories = categories.map(c => c.name);
-
-                // Inventory
-                const { data: inventory } = await supabase
-                    .from('inventory')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (inventory) {
-                    state.inventory = {};
-                    inventory.forEach(i => {
-                        state.inventory[i.product_name] = {
-                            stock: i.stock,
-                            minAlert: i.min_alert
-                        };
-                    });
-                }
-
-                // Transactions
-                const { data: transactions } = await supabase
-                    .from('transactions')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .order('timestamp', { ascending: false });
-                if (transactions) state.transactions = transactions.map(t => ({
-                    channel: t.channel,
-                    customerName: t.customer_name,
-                    type: t.type,
-                    amount: parseFloat(t.amount),
-                    date: t.date,
-                    time: t.time,
-                    timestamp: t.timestamp
-                }));
-
-                // Invoices
-                const { data: invoices } = await supabase
-                    .from('invoices')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (invoices) state.invoices = invoices.map(inv => ({
-                    number: inv.number,
-                    customer: inv.customer,
-                    date: inv.date,
-                    dueDate: inv.due_date,
-                    items: inv.items,
-                    amount: parseFloat(inv.amount),
-                    status: inv.status
-                }));
-
-                // Notes
-                const { data: notes } = await supabase
-                    .from('notes')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .order('timestamp', { ascending: false });
-                if (notes) state.notes = notes.map(n => ({
-                    title: n.title,
-                    content: n.content,
-                    date: n.date,
-                    time: n.time,
-                    timestamp: n.timestamp
-                }));
-
-                // Unpaid Entries
-                const { data: unpaidEntries } = await supabase
-                    .from('unpaid_entries')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (unpaidEntries) state.unpaidEntries = unpaidEntries.map(u => ({
-                    name: u.name,
-                    type: u.type,
-                    amount: parseFloat(u.amount),
-                    date: u.date,
-                    time: u.time,
-                    timestamp: u.timestamp,
-                    paid: u.paid
-                }));
-
-                // Settings (targets and floats)
-                const { data: settings } = await supabase
-                    .from('settings')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .single();
-                if (settings) {
-                    state.dailyTarget = parseFloat(settings.daily_target) || 0;
-                    state.monthlyTarget = parseFloat(settings.monthly_target) || 0;
-                    state.transactionFloats = settings.transaction_floats || state.transactionFloats;
-                }
-
-                // Recalculate float balances
-                calculateFloatBalances();
-
-                // Save to localStorage as backup
-                saveData();
-
-                console.log('✅ All data pulled from Supabase');
-            } catch (error) {
-                console.error('Pull error:', error);
-                throw error;
-            }
+            saveData();
         }
-
-        // Sales
-        const { data: sales } = await supabase
-            .from('sales')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('timestamp', { ascending: false });
-        if (sales) state.sales = sales.map(s => ({
-            date: s.date,
-            time: s.time,
-            timestamp: s.timestamp,
-            productName: s.product_name,
-            customer: s.customer,
-            quantity: s.quantity,
-            costPerUnit: parseFloat(s.cost_per_unit),
-            pricePerUnit: parseFloat(s.price_per_unit),
-            totalCost: parseFloat(s.total_cost),
-            totalPrice: parseFloat(s.total_price),
-            profit: parseFloat(s.profit),
-            payment: s.payment
-        }));
-
-        // Categories
-        const { data: categories } = await supabase
-            .from('categories')
-            .select('*')
-            .eq('user_id', currentUser.id);
-        if (categories) state.categories = categories.map(c => c.name);
-
-        saveData();
-
 
         async function pushToSupabase(table, data) {
             if (!syncEnabled || !currentUser) return;
@@ -1679,14 +1520,6 @@
         function setDailyTarget() {
             const value = parseFloat(document.getElementById('dailyTarget').value) || 0;
             state.dailyTarget = value;
-            if (syncEnabled) {
-                supabase.from('settings').upsert({
-                    user_id: currentUser.id,
-                    daily_target: value,
-                    monthly_target: state.monthlyTarget,
-                    transaction_floats: state.transactionFloats
-                });
-            }
             saveData();
             render();
             showToast('Daily target updated', 'success');
@@ -1695,14 +1528,6 @@
         function setMonthlyTarget() {
             const value = parseFloat(document.getElementById('monthlyTarget').value) || 0;
             state.monthlyTarget = value;
-            if (syncEnabled) {
-                supabase.from('settings').upsert({
-                    user_id: currentUser.id,
-                    daily_target: state.dailyTarget,
-                    monthly_target: value,
-                    transaction_floats: state.transactionFloats
-                });
-            }
             saveData();
             render();
             showToast('Monthly target updated', 'success');
@@ -1939,27 +1764,24 @@
                     </form>
                 </div>
 
-                    <div class="card">
-    <h2>Recent Sales (${state.sales.length})</h2>
-    
-    <div class="search-box">
-        <input type="text" placeholder="🔍 Search sales..." value="${state.searchTerm}" oninput="updateSearchTerm(this.value)">
-    </div>
+                <div class="card">
+                    <h2>Recent Sales (${filteredSales.length})</h2>
+                    
+                    <div class="search-box">
+                        <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
+                    </div>
 
-    <div class="filter-row">
-        <input type="date" placeholder="From" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
-        <input type="date" placeholder="To" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
-        <select onchange="updateFilterCustomer(this.value)">
-            <option value="">All Customers</option>
-            ${[...new Set(state.sales.map(s => s.customer))].map(c =>
+                    <div class="filter-row">
+                        <input type="date" placeholder="From" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
+                        <input type="date" placeholder="To" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
+                        <select onchange="updateFilterCustomer(this.value)">
+                            <option value="">All Customers</option>
+                            ${[...new Set(state.sales.map(s => s.customer))].map(c =>
                 `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
             ).join('')}
-        </select>
-        <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
-    </div>
-
-    <div id="salesList"></div>
-</div>
+                        </select>
+                        <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
+                    </div>
 
                     ${renderCollapsibleList(filteredSales.slice().reverse(), 10, 'sales', (s, idx) => `
                         <div class="item">
@@ -2036,17 +1858,17 @@
 
         function updateFilterDateFrom(value) {
             state.filterDateFrom = value;
-            renderSalesList();
+            render();
         }
 
         function updateFilterDateTo(value) {
             state.filterDateTo = value;
-            renderSalesList();
+            render();
         }
 
         function updateFilterCustomer(value) {
             state.filterCustomer = value;
-            renderSalesList();
+            render();
         }
 
         function clearFilters() {
@@ -2055,68 +1877,7 @@
             state.filterDateTo = '';
             state.filterCategory = '';
             state.filterCustomer = '';
-            const searchInput = document.querySelector('input[placeholder*="Search"]');
-            if (searchInput) searchInput.value = '';
             render();
-        }
-
-        function renderCollapsibleList(items, chunkSize, sectionKey, renderItem, emptyMessage) {
-            if (!items || items.length === 0) {
-                return `<p style="text-align: center; color: #666;">${emptyMessage}</p>`;
-            }
-
-            let html = '';
-            for (let i = 0; i < items.length; i += chunkSize) {
-                const chunk = items.slice(i, i + chunkSize);
-                const chunkId = `${sectionKey}_chunk_${i}`;
-                const isCollapsed = state.collapsedSections[chunkId];
-
-                if (isCollapsed) {
-                    html += `
-                        <button class="collapse-btn" onclick="toggleCollapse('${chunkId}')">
-                            Show More
-                        </button>
-                    `;
-                    break;
-                }
-
-                html += chunk.map((item, idx) => renderItem(item, i + idx)).join('');
-
-                if (i + chunkSize < items.length) {
-                    html += `
-                        <button class="collapse-btn" onclick="toggleCollapse('${chunkId}')">
-                            Show More
-                        </button>
-                    `;
-                }
-            }
-            return html;
-        }
-
-        function render() {
-            const app = document.getElementById('app');
-            switch (state.activeTab) {
-                case 'dashboard': app.innerHTML = renderDashboard(); break;
-                case 'account': app.innerHTML = renderAccount(); break;
-                case 'sales':
-                    app.innerHTML = renderSales();
-                    // Initialize the sales list after rendering
-                    setTimeout(() => renderSalesList(), 0);
-                    break;
-                case 'products': app.innerHTML = renderProducts(); break;
-                case 'categories': app.innerHTML = renderCategories(); break;
-                case 'expenses': app.innerHTML = renderExpenses(); break;
-                case 'inventory': app.innerHTML = renderInventory(); break;
-                case 'customers': app.innerHTML = renderCustomers(); break;
-                case 'invoices': app.innerHTML = renderInvoices(); break;
-                case 'analytics':
-                    app.innerHTML = renderAnalytics();
-                    createAnalyticsChart();
-                    break;
-                case 'unpaid': app.innerHTML = renderUnpaid(); break;
-                case 'notes': app.innerHTML = renderNotes(); break;
-            }
-            renderNav();
         }
 
         function renderCollapsibleList(items, chunkSize, sectionKey, renderItem, emptyMessage) {
@@ -2475,17 +2236,6 @@
             };
             state.transactions = state.transactions || [];
             state.transactions.push(transaction);
-            if (syncEnabled) {
-                pushToSupabase('transactions', {
-                    channel: transaction.channel,
-                    customer_name: transaction.customerName,
-                    type: transaction.type,
-                    amount: transaction.amount,
-                    date: transaction.date,
-                    time: transaction.time,
-                    timestamp: transaction.timestamp
-                });
-            }
 
             // Update float balance
             calculateFloatBalances();
@@ -2614,41 +2364,7 @@
         }
 
         function searchProducts(term) {
-            const container = document.getElementById('productsList');
-            if (!container) return;
-
-            let products = state.products;
-            if (term) {
-                const search = term.toLowerCase();
-                products = products.filter(p =>
-                    p.name.toLowerCase().includes(search) ||
-                    p.category.toLowerCase().includes(search)
-                );
-            }
-
-            container.innerHTML = products.map((p, i) => {
-                const actualIndex = state.products.indexOf(p);
-                const inv = state.inventory[p.name] || { stock: 0 };
-                const margin = ((p.price - p.cost) / p.cost * 100).toFixed(1);
-                return `
-            <div class="item">
-                <div class="item-title">${p.name}</div>
-                <div class="item-subtitle">
-                    Category: ${p.category} | Stock: ${inv.stock} units<br>
-                    Margin: ${margin}%
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 14px;">
-                    <span>Cost: 💱 ${formatNumber(p.cost)} Tsh</span>
-                    <span>Price: 💱 ${formatNumber(p.price)} Tsh</span>
-                    <span style="color: #2e7d32; font-weight: 600;">+${formatNumber(p.price - p.cost)} Tsh</span>
-                </div>
-                <div class="flex-gap" style="margin-top:8px;">
-                    <button class="btn-small" onclick="editProductIndex(${actualIndex})">Edit</button>
-                    <button class="btn-small btn-danger" onclick="deleteProductIndex(${actualIndex})">Delete</button>
-                </div>
-            </div>
-        `;
-            }).join('') || '<p style="text-align: center; color: #666;">No products found</p>';
+            document.getElementById('productsList').innerHTML = renderProductsList(term);
         }
 
         function addProduct(e) {
@@ -2942,21 +2658,6 @@
                 payment: document.getElementById('expensePayment').value,
                 comment: document.getElementById('expenseComment').value.trim()
             });
-            state.expenses.push(expense);
-
-            // ADD THIS SYNC:
-            if (syncEnabled) {
-                pushToSupabase('expenses', {
-                    date: expense.date,
-                    time: expense.time,
-                    timestamp: expense.timestamp,
-                    description: expense.description,
-                    category: expense.category,
-                    amount: expense.amount,
-                    payment: expense.payment,
-                    comment: expense.comment
-                });
-            }
             saveData();
             render();
             showToast("Expense added", "success");
@@ -3051,13 +2752,6 @@
             if (!state.inventory) state.inventory = {};
             state.inventory[productName] = state.inventory[productName] || { stock: 0, minAlert: 5 };
             state.inventory[productName].stock = v;
-            if (syncEnabled) {
-                pushToSupabase('inventory', {
-                    product_name: productName,
-                    stock: v,
-                    min_alert: state.inventory[productName].minAlert
-                });
-            }
             saveData(); render(); showToast("Stock updated", "success");
         }
 
@@ -3163,42 +2857,7 @@
         }
 
         function searchCustomers(term) {
-            const container = document.getElementById('customersList');
-            if (!container) return;
-
-            let customers = state.customers;
-            if (term) {
-                const search = term.toLowerCase();
-                customers = customers.filter(c =>
-                    c.name.toLowerCase().includes(search) ||
-                    (c.email && c.email.toLowerCase().includes(search)) ||
-                    (c.phone && c.phone.includes(search))
-                );
-            }
-
-            container.innerHTML = customers.map((c, i) => {
-                const actualIndex = state.customers.indexOf(c);
-                const purchaseCount = state.sales.filter(s => s.customer === c.name).length;
-                return `
-            <div class="item">
-                <div class="item-title">${c.name}</div>
-                <div class="item-subtitle">
-                    ${c.email ? '📧 ' + c.email + '<br>' : ''}
-                    ${c.phone ? '📱 ' + c.phone + '<br>' : ''}
-                    ${c.address ? '📍 ' + c.address + '<br>' : ''}
-                    <div style="color: #2e7d32; font-weight: 600; margin-top: 4px;">
-                        💰 Total Purchases: 💱 ${formatNumber(c.totalPurchases || 0)} Tsh<br>
-                        📊 ${purchaseCount} transactions
-                    </div>
-                </div>
-                <div class="flex-gap" style="margin-top:8px;">
-                    <button class="btn-small" onclick="viewCustomerHistory(${actualIndex})">History</button>
-                    <button class="btn-small" onclick="editCustomerIndex(${actualIndex})">Edit</button>
-                    <button class="btn-small btn-danger" onclick="deleteCustomerIndex(${actualIndex})">Delete</button>
-                </div>
-            </div>
-        `;
-            }).join('') || '<p style="text-align: center; color: #666;">No customers found</p>';
+            document.getElementById('customersList').innerHTML = renderCustomersList(term);
         }
 
         function viewCustomerHistory(i) {
@@ -3236,18 +2895,6 @@
                 address: document.getElementById('customerAddress').value.trim(),
                 totalPurchases: 0
             });
-            state.customers.push(customer);
-
-            // ADD THIS SYNC:
-            if (syncEnabled) {
-                pushToSupabase('customers', {
-                    name: customer.name,
-                    email: customer.email,
-                    phone: customer.phone,
-                    address: customer.address,
-                    total_purchases: 0
-                });
-            }
             saveData();
             render();
             showToast("Customer added", "success");
@@ -3682,29 +3329,7 @@
         }
 
         function searchNotes(term) {
-            const container = document.getElementById('notesList');
-            if (!container) return;
-
-            let notes = state.notes.slice().reverse();
-
-            if (term) {
-                const search = term.toLowerCase();
-                notes = notes.filter(n =>
-                    n.content.toLowerCase().includes(search) ||
-                    (n.title && n.title.toLowerCase().includes(search))
-                );
-            }
-
-            container.innerHTML = notes.map((note, idx) => {
-                const actualIndex = state.notes.length - 1 - idx;
-                return `
-            <div class="item note-preview" onclick="openNoteModal(${actualIndex})">
-                ${note.title ? `<div class="item-title" style="margin-bottom: 8px;">${note.title}</div>` : ''}
-                <div class="item-subtitle" style="margin-bottom: 8px;">${note.date} ${note.time}</div>
-                <div style="white-space: pre-wrap;">${note.content}</div>
-            </div>
-        `;
-            }).join('') || '<p style="text-align: center; color: #666;">No notes found</p>';
+            document.getElementById('notesList').innerHTML = renderNotesList(term);
         }
 
         function addNote(e) {
@@ -4299,6 +3924,29 @@
                 reader.readAsText(file);
             };
             input.click();
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            switch (state.activeTab) {
+                case 'dashboard': app.innerHTML = renderDashboard(); break;
+                case 'account': app.innerHTML = renderAccount(); break;  // ADD THIS LINE
+                case 'sales': app.innerHTML = renderSales(); break;
+                case 'transactions': app.innerHTML = renderTransactions(); break;
+                case 'products': app.innerHTML = renderProducts(); break;
+                case 'categories': app.innerHTML = renderCategories(); break;
+                case 'expenses': app.innerHTML = renderExpenses(); break;
+                case 'inventory': app.innerHTML = renderInventory(); break;
+                case 'customers': app.innerHTML = renderCustomers(); break;
+                case 'invoices': app.innerHTML = renderInvoices(); break;
+                case 'analytics':
+                    app.innerHTML = renderAnalytics();
+                    createAnalyticsChart();
+                    break;
+                case 'unpaid': app.innerHTML = renderUnpaid(); break;
+                case 'notes': app.innerHTML = renderNotes(); break;
+            }
+            renderNav();
         }
 
         // Initialize
