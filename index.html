@@ -1317,17 +1317,20 @@
             updateSyncIndicator('syncing');
 
             try {
-                // FIRST: Clear cloud data and push all local changes
+                console.log('🔄 Starting sync...');
+
+                // Push all local changes to cloud
                 await clearAndPushAllData();
 
-                // THEN: Pull from cloud (in case other devices made changes)
-                await pullDataFromSupabase();
+                // DON'T pull - we just pushed everything!
+                // The cloud now has exactly what we have locally
 
                 updateSyncIndicator('synced');
-                showToast('Data synced!', 'success');
+                showToast('Data synced successfully!', 'success');
+                console.log('✅ Sync complete');
                 render();
             } catch (error) {
-                console.error('Sync error:', error);
+                console.error('❌ Sync error:', error);
                 updateSyncIndicator('synced');
                 showToast('Sync failed: ' + error.message, 'error');
             } finally {
@@ -1339,21 +1342,31 @@
             if (!syncEnabled || !currentUser) return;
 
             try {
-                // Delete all existing data for this user
-                await supabase.from('products').delete().eq('user_id', currentUser.id);
-                await supabase.from('sales').delete().eq('user_id', currentUser.id);
-                await supabase.from('categories').delete().eq('user_id', currentUser.id);
-                await supabase.from('expenses').delete().eq('user_id', currentUser.id);
-                await supabase.from('customers').delete().eq('user_id', currentUser.id);
-                await supabase.from('invoices').delete().eq('user_id', currentUser.id);
-                await supabase.from('inventory').delete().eq('user_id', currentUser.id);
-                await supabase.from('notes').delete().eq('user_id', currentUser.id);
-                await supabase.from('transactions').delete().eq('user_id', currentUser.id);
-                await supabase.from('unpaid_entries').delete().eq('user_id', currentUser.id);
-                await supabase.from('transaction_floats').delete().eq('user_id', currentUser.id);
+                console.log('🗑️ Clearing cloud data...');
+
+                // Wait for ALL deletes to complete before proceeding
+                await Promise.all([
+                    supabase.from('products').delete().eq('user_id', currentUser.id),
+                    supabase.from('sales').delete().eq('user_id', currentUser.id),
+                    supabase.from('categories').delete().eq('user_id', currentUser.id),
+                    supabase.from('expenses').delete().eq('user_id', currentUser.id),
+                    supabase.from('customers').delete().eq('user_id', currentUser.id),
+                    supabase.from('invoices').delete().eq('user_id', currentUser.id),
+                    supabase.from('inventory').delete().eq('user_id', currentUser.id),
+                    supabase.from('notes').delete().eq('user_id', currentUser.id),
+                    supabase.from('transactions').delete().eq('user_id', currentUser.id),
+                    supabase.from('unpaid_entries').delete().eq('user_id', currentUser.id),
+                    supabase.from('transaction_floats').delete().eq('user_id', currentUser.id),
+                    supabase.from('settings').delete().eq('user_id', currentUser.id)
+                ]);
+
+                console.log('✅ Cloud data cleared');
+                console.log('⬆️ Pushing local data to cloud...');
 
                 // Now push all local data
                 await pushAllDataToSupabase();
+
+                console.log('✅ Local data pushed to cloud');
             } catch (error) {
                 console.error('Clear and push error:', error);
                 throw error;
@@ -1877,9 +1890,10 @@
             state.dailyTarget = value;
 
             if (syncEnabled) {
+                // Sync settings (use upsert to avoid conflicts)
                 await supabase.from('settings').upsert({
                     user_id: currentUser.id,
-                    daily_target: value,
+                    daily_target: state.dailyTarget || 0,
                     monthly_target: state.monthlyTarget || 0
                 }, { onConflict: 'user_id' });
             }
