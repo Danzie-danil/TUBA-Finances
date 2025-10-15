@@ -1282,54 +1282,7 @@
                 updateSyncIndicator('synced');
             }
         }
-        async function pushAllDataToSupabase() {
-            if (!syncEnabled || !currentUser) return;
 
-            updateSyncIndicator('syncing');
-
-            try {
-                // Sync all products
-                for (const product of state.products) {
-                    await pushToSupabase('products', {
-                        name: product.name,
-                        category: product.category,
-                        cost: product.cost,
-                        price: product.price
-                    });
-                }
-
-                // Sync all categories
-                for (const category of state.categories) {
-                    await pushToSupabase('categories', {
-                        name: category
-                    });
-                }
-
-                // Sync all sales
-                for (const sale of state.sales) {
-                    await pushToSupabase('sales', {
-                        date: sale.date,
-                        time: sale.time,
-                        timestamp: sale.timestamp,
-                        product_name: sale.productName,
-                        customer: sale.customer,
-                        quantity: sale.quantity,
-                        cost_per_unit: sale.costPerUnit,
-                        price_per_unit: sale.pricePerUnit,
-                        total_cost: sale.totalCost,
-                        total_price: sale.totalPrice,
-                        profit: sale.profit,
-                        payment: sale.payment
-                    });
-                }
-
-                updateSyncIndicator('synced');
-                showToast('All data synced!', 'success');
-            } catch (error) {
-                console.error('Sync error:', error);
-                showToast('Sync failed', 'error');
-            }
-        }
 
         async function syncAllData() {
             if (!syncEnabled || !currentUser) return;
@@ -3459,7 +3412,7 @@
             showToast(`Invoice status changed to ${inv.status}`, 'success');
         }
 
-        function createInvoice(e) {
+        async function createInvoice(e) {
             e.preventDefault();
             const customerSelect = document.getElementById('invoiceCustomer').value;
             let customer;
@@ -3480,7 +3433,7 @@
             }
 
             const now = new Date();
-            state.invoices.push({
+            const invoice = {
                 number: 'INV-' + Date.now().toString().slice(-6),
                 customer: customer.name,
                 date: now.toLocaleDateString(),
@@ -3488,7 +3441,23 @@
                 items: document.getElementById('invoiceItems').value.trim(),
                 amount: amount,
                 status: document.getElementById('invoiceStatus').value
-            });
+            };
+
+            state.invoices.push(invoice);
+
+            // ADD THIS SYNC CODE:
+            if (syncEnabled) {
+                await pushToSupabase('invoices', {
+                    number: invoice.number,
+                    customer: invoice.customer,
+                    date: invoice.date,
+                    due_date: invoice.dueDate,
+                    items: invoice.items,
+                    amount: invoice.amount,
+                    status: invoice.status
+                });
+            }
+
             saveData();
             render();
             showToast("Invoice created", "success");
