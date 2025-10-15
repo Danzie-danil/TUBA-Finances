@@ -1153,48 +1153,207 @@
         }
 
         async function pullDataFromSupabase() {
-            // Products
-            const { data: products } = await supabase
-                .from('products')
-                .select('*')
-                .eq('user_id', currentUser.id);
-            if (products) state.products = products.map(p => ({
-                name: p.name,
-                category: p.category,
-                cost: parseFloat(p.cost),
-                price: parseFloat(p.price)
-            }));
+            try {
+                // Products
+                const { data: products } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (products) state.products = products.map(p => ({
+                    name: p.name,
+                    category: p.category,
+                    cost: parseFloat(p.cost),
+                    price: parseFloat(p.price)
+                }));
 
-            // Sales
-            const { data: sales } = await supabase
-                .from('sales')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .order('timestamp', { ascending: false });
-            if (sales) state.sales = sales.map(s => ({
-                date: s.date,
-                time: s.time,
-                timestamp: s.timestamp,
-                productName: s.product_name,
-                customer: s.customer,
-                quantity: s.quantity,
-                costPerUnit: parseFloat(s.cost_per_unit),
-                pricePerUnit: parseFloat(s.price_per_unit),
-                totalCost: parseFloat(s.total_cost),
-                totalPrice: parseFloat(s.total_price),
-                profit: parseFloat(s.profit),
-                payment: s.payment
-            }));
+                // Sales
+                const { data: sales } = await supabase
+                    .from('sales')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('timestamp', { ascending: false });
+                if (sales) state.sales = sales.map(s => ({
+                    date: s.date,
+                    time: s.time,
+                    timestamp: s.timestamp,
+                    productName: s.product_name,
+                    customer: s.customer,
+                    quantity: s.quantity,
+                    costPerUnit: parseFloat(s.cost_per_unit),
+                    pricePerUnit: parseFloat(s.price_per_unit),
+                    totalCost: parseFloat(s.total_cost),
+                    totalPrice: parseFloat(s.total_price),
+                    profit: parseFloat(s.profit),
+                    payment: s.payment
+                }));
 
-            // Categories
-            const { data: categories } = await supabase
-                .from('categories')
-                .select('*')
-                .eq('user_id', currentUser.id);
-            if (categories) state.categories = categories.map(c => c.name);
+                // Expenses
+                const { data: expenses } = await supabase
+                    .from('expenses')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('timestamp', { ascending: false });
+                if (expenses) state.expenses = expenses.map(e => ({
+                    date: e.date,
+                    time: e.time,
+                    timestamp: e.timestamp,
+                    description: e.description,
+                    category: e.category,
+                    amount: parseFloat(e.amount),
+                    payment: e.payment,
+                    comment: e.comment
+                }));
 
-            saveData();
+                // Customers
+                const { data: customers } = await supabase
+                    .from('customers')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (customers) state.customers = customers.map(c => ({
+                    name: c.name,
+                    email: c.email,
+                    phone: c.phone,
+                    address: c.address,
+                    totalPurchases: parseFloat(c.total_purchases || 0)
+                }));
+
+                // Categories
+                const { data: categories } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (categories) state.categories = categories.map(c => c.name);
+
+                // Inventory
+                const { data: inventory } = await supabase
+                    .from('inventory')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (inventory) {
+                    state.inventory = {};
+                    inventory.forEach(i => {
+                        state.inventory[i.product_name] = {
+                            stock: i.stock,
+                            minAlert: i.min_alert
+                        };
+                    });
+                }
+
+                // Transactions
+                const { data: transactions } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('timestamp', { ascending: false });
+                if (transactions) state.transactions = transactions.map(t => ({
+                    channel: t.channel,
+                    customerName: t.customer_name,
+                    type: t.type,
+                    amount: parseFloat(t.amount),
+                    date: t.date,
+                    time: t.time,
+                    timestamp: t.timestamp
+                }));
+
+                // Invoices
+                const { data: invoices } = await supabase
+                    .from('invoices')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (invoices) state.invoices = invoices.map(inv => ({
+                    number: inv.number,
+                    customer: inv.customer,
+                    date: inv.date,
+                    dueDate: inv.due_date,
+                    items: inv.items,
+                    amount: parseFloat(inv.amount),
+                    status: inv.status
+                }));
+
+                // Notes
+                const { data: notes } = await supabase
+                    .from('notes')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('timestamp', { ascending: false });
+                if (notes) state.notes = notes.map(n => ({
+                    title: n.title,
+                    content: n.content,
+                    date: n.date,
+                    time: n.time,
+                    timestamp: n.timestamp
+                }));
+
+                // Unpaid Entries
+                const { data: unpaidEntries } = await supabase
+                    .from('unpaid_entries')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (unpaidEntries) state.unpaidEntries = unpaidEntries.map(u => ({
+                    name: u.name,
+                    type: u.type,
+                    amount: parseFloat(u.amount),
+                    date: u.date,
+                    time: u.time,
+                    timestamp: u.timestamp,
+                    paid: u.paid
+                }));
+
+                // Settings (targets and floats)
+                const { data: settings } = await supabase
+                    .from('settings')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .single();
+                if (settings) {
+                    state.dailyTarget = parseFloat(settings.daily_target) || 0;
+                    state.monthlyTarget = parseFloat(settings.monthly_target) || 0;
+                    state.transactionFloats = settings.transaction_floats || state.transactionFloats;
+                }
+
+                // Recalculate float balances
+                calculateFloatBalances();
+
+                // Save to localStorage as backup
+                saveData();
+
+                console.log('✅ All data pulled from Supabase');
+            } catch (error) {
+                console.error('Pull error:', error);
+                throw error;
+            }
         }
+
+        // Sales
+        const { data: sales } = await supabase
+            .from('sales')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .order('timestamp', { ascending: false });
+        if (sales) state.sales = sales.map(s => ({
+            date: s.date,
+            time: s.time,
+            timestamp: s.timestamp,
+            productName: s.product_name,
+            customer: s.customer,
+            quantity: s.quantity,
+            costPerUnit: parseFloat(s.cost_per_unit),
+            pricePerUnit: parseFloat(s.price_per_unit),
+            totalCost: parseFloat(s.total_cost),
+            totalPrice: parseFloat(s.total_price),
+            profit: parseFloat(s.profit),
+            payment: s.payment
+        }));
+
+        // Categories
+        const { data: categories } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('user_id', currentUser.id);
+        if (categories) state.categories = categories.map(c => c.name);
+
+        saveData();
+
 
         async function pushToSupabase(table, data) {
             if (!syncEnabled || !currentUser) return;
@@ -1520,6 +1679,14 @@
         function setDailyTarget() {
             const value = parseFloat(document.getElementById('dailyTarget').value) || 0;
             state.dailyTarget = value;
+            if (syncEnabled) {
+                supabase.from('settings').upsert({
+                    user_id: currentUser.id,
+                    daily_target: value,
+                    monthly_target: state.monthlyTarget,
+                    transaction_floats: state.transactionFloats
+                });
+            }
             saveData();
             render();
             showToast('Daily target updated', 'success');
@@ -1528,6 +1695,14 @@
         function setMonthlyTarget() {
             const value = parseFloat(document.getElementById('monthlyTarget').value) || 0;
             state.monthlyTarget = value;
+            if (syncEnabled) {
+                supabase.from('settings').upsert({
+                    user_id: currentUser.id,
+                    daily_target: state.dailyTarget,
+                    monthly_target: value,
+                    transaction_floats: state.transactionFloats
+                });
+            }
             saveData();
             render();
             showToast('Monthly target updated', 'success');
@@ -2266,6 +2441,17 @@
             };
             state.transactions = state.transactions || [];
             state.transactions.push(transaction);
+            if (syncEnabled) {
+                pushToSupabase('transactions', {
+                    channel: transaction.channel,
+                    customer_name: transaction.customerName,
+                    type: transaction.type,
+                    amount: transaction.amount,
+                    date: transaction.date,
+                    time: transaction.time,
+                    timestamp: transaction.timestamp
+                });
+            }
 
             // Update float balance
             calculateFloatBalances();
@@ -2722,6 +2908,21 @@
                 payment: document.getElementById('expensePayment').value,
                 comment: document.getElementById('expenseComment').value.trim()
             });
+            state.expenses.push(expense);
+
+            // ADD THIS SYNC:
+            if (syncEnabled) {
+                pushToSupabase('expenses', {
+                    date: expense.date,
+                    time: expense.time,
+                    timestamp: expense.timestamp,
+                    description: expense.description,
+                    category: expense.category,
+                    amount: expense.amount,
+                    payment: expense.payment,
+                    comment: expense.comment
+                });
+            }
             saveData();
             render();
             showToast("Expense added", "success");
@@ -2816,6 +3017,13 @@
             if (!state.inventory) state.inventory = {};
             state.inventory[productName] = state.inventory[productName] || { stock: 0, minAlert: 5 };
             state.inventory[productName].stock = v;
+            if (syncEnabled) {
+                pushToSupabase('inventory', {
+                    product_name: productName,
+                    stock: v,
+                    min_alert: state.inventory[productName].minAlert
+                });
+            }
             saveData(); render(); showToast("Stock updated", "success");
         }
 
@@ -2994,6 +3202,18 @@
                 address: document.getElementById('customerAddress').value.trim(),
                 totalPurchases: 0
             });
+            state.customers.push(customer);
+
+            // ADD THIS SYNC:
+            if (syncEnabled) {
+                pushToSupabase('customers', {
+                    name: customer.name,
+                    email: customer.email,
+                    phone: customer.phone,
+                    address: customer.address,
+                    total_purchases: 0
+                });
+            }
             saveData();
             render();
             showToast("Customer added", "success");
