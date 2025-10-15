@@ -755,6 +755,24 @@
             background: linear-gradient(145deg, #ffebee, #ffcdd2);
             border-left: 4px solid #d32f2f;
             box-shadow: 0 4px 15px rgba(211, 47, 47, 0.2);
+
+            .alert-success {
+                background: linear-gradient(145deg, #e8f5e9, #c8e6c9);
+                border-left: 4px solid #2e7d32;
+                padding: 12px 16px;
+                border-radius: 8px;
+                margin-bottom: 16px;
+                box-shadow: 0 4px 15px rgba(46, 125, 50, 0.2);
+            }
+
+            .alert-info {
+                background: linear-gradient(145deg, #e3f2fd, #bbdefb);
+                border-left: 4px solid #1976d2;
+                padding: 12px 16px;
+                border-radius: 8px;
+                margin-top: 16px;
+                box-shadow: 0 4px 15px rgba(25, 118, 210, 0.2);
+            }
         }
 
         .float-balance-container {
@@ -1319,11 +1337,21 @@
             try {
                 console.log('🔄 Starting sync...');
 
-                // Push all local changes to cloud
-                await clearAndPushAllData();
+                // Check if local data is essentially empty
+                const localIsEmpty =
+                    state.sales.length === 0 &&
+                    state.products.length === 0 &&
+                    state.expenses.length === 0;
 
-                // DON'T pull - we just pushed everything!
-                // The cloud now has exactly what we have locally
+                if (localIsEmpty) {
+                    // Pull from cloud if local is empty
+                    console.log('⬇️ Local data is empty, pulling from cloud...');
+                    await pullDataFromSupabase();
+                } else {
+                    // Push local data to cloud
+                    console.log('⬆️ Pushing local data to cloud...');
+                    await clearAndPushAllData();
+                }
 
                 updateSyncIndicator('synced');
                 showToast('Data synced successfully!', 'success');
@@ -1981,6 +2009,7 @@
 
             // Signed in view
             // Signed in view
+            // Signed in view
             return `
     <div class="card">
         <h2>☁️ Account</h2>
@@ -1993,12 +2022,21 @@
             </div>
         </div>
 
-        <button onclick="syncAllData()" class="btn-success" style="margin-bottom: 12px;">
-            🔄 Sync Now
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <button onclick="pullFromCloud()" class="btn-success">
+                ⬇️ Pull from Cloud
+            </button>
+            <button onclick="pushToCloud()" class="btn-success">
+                ⬆️ Push to Cloud
+            </button>
+        </div>
+
+        <button onclick="syncAllData()" class="btn" style="margin-bottom: 12px;">
+            🔄 Smart Sync
         </button>
         
-        <button onclick="forceRefresh()" class="btn" style="margin-bottom: 12px;">
-            🔃 Force Refresh Dashboard
+        <button onclick="forceRefresh()" class="btn-secondary" style="margin-bottom: 12px;">
+            🔃 Refresh Dashboard
         </button>
 
         <button onclick="signOut()" class="btn-danger">
@@ -2006,8 +2044,10 @@
         </button>
 
         <div class="alert-info">
-            <strong>Sync Status:</strong><br>
-            Your data is automatically synced across all your devices. Any changes you make will appear everywhere instantly!
+            <strong>Sync Options:</strong><br>
+            • <strong>Pull from Cloud:</strong> Download cloud data (overwrites local)<br>
+            • <strong>Push to Cloud:</strong> Upload local data (overwrites cloud)<br>
+            • <strong>Smart Sync:</strong> Auto-detect which direction to sync
         </div>
     </div>
 `;
@@ -2024,6 +2064,58 @@
                 document.getElementById('signupForm').style.display = 'block';
                 document.getElementById('loginTab').classList.remove('active');
                 document.getElementById('signupTab').classList.add('active');
+            }
+        }
+        async function pullFromCloud() {
+            if (!syncEnabled || !currentUser) {
+                return showToast('Not signed in', 'error');
+            }
+
+            if (!confirm('This will replace ALL local data with cloud data. Continue?')) {
+                return;
+            }
+
+            updateSyncIndicator('syncing');
+
+            try {
+                console.log('⬇️ Pulling data from cloud...');
+
+                // Clear local storage first
+                localStorage.removeItem('financeManagerData');
+
+                // Pull everything from cloud
+                await pullDataFromSupabase();
+
+                updateSyncIndicator('synced');
+                showToast('Data pulled from cloud successfully!', 'success');
+                render();
+            } catch (error) {
+                console.error('Pull error:', error);
+                showToast('Pull failed: ' + error.message, 'error');
+                updateSyncIndicator('synced');
+            }
+        }
+
+        async function pushToCloud() {
+            if (!syncEnabled || !currentUser) {
+                return showToast('Not signed in', 'error');
+            }
+
+            if (!confirm('This will replace ALL cloud data with local data. Continue?')) {
+                return;
+            }
+
+            updateSyncIndicator('syncing');
+
+            try {
+                console.log('⬆️ Pushing data to cloud...');
+                await clearAndPushAllData();
+                updateSyncIndicator('synced');
+                showToast('Data pushed to cloud successfully!', 'success');
+            } catch (error) {
+                console.error('Push error:', error);
+                showToast('Push failed: ' + error.message, 'error');
+                updateSyncIndicator('synced');
             }
         }
         async function forceRefresh() {
@@ -2048,15 +2140,42 @@
             }
         }
 
-        async function handleSignIn() {
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
+        async function signIn(email, password) {
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                currentUser = data.user;
+                syncEnabled = true;
 
-            if (!email || !password) {
-                return showToast('Please fill in all fields', 'error');
+                // Check if local data exists
+                const localHasData = state.sales.length > 0 || state.products.length > 0;
+
+                if (localHasData) {
+                    // Ask user what to do with existing local data
+                    const choice = confirm(
+                        'You have local data. Click OK to KEEP LOCAL data (push to cloud), or Cancel to LOAD CLOUD data (replace local).'
+                    );
+
+                    if (choice) {
+                        // Keep local, push to cloud
+                        await clearAndPushAllData();
+                        showToast('Local data pushed to cloud', 'success');
+                    } else {
+                        // Load from cloud, replace local
+                        localStorage.removeItem('financeManagerData');
+                        await pullDataFromSupabase();
+                        showToast('Cloud data loaded', 'success');
+                    }
+                } else {
+                    // No local data, just pull from cloud
+                    await pullDataFromSupabase();
+                }
+
+                return data;
+            } catch (error) {
+                showToast('Sign in error: ' + error.message, 'error');
+                return null;
             }
-
-            await signIn(email, password);
         }
 
         async function handleSignUp() {
