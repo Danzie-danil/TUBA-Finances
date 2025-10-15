@@ -1483,6 +1483,9 @@
 
                 calculateFloatBalances();
                 saveData();
+                setTimeout(() => {
+                    render();
+                }, 100);
             } catch (error) {
                 console.error('Pull error:', error);
             }
@@ -1904,32 +1907,37 @@
             }
 
             // Signed in view
+            // Signed in view
             return `
-        <div class="card">
-            <h2>☁️ Account</h2>
-            <div class="alert-success">
-                <div style="font-size: 14px; margin-bottom: 8px;">
-                    ✓ Connected to Cloud
-                </div>
-                <div style="font-size: 13px;">
-                    📧 ${currentUser.email}
-                </div>
+    <div class="card">
+        <h2>☁️ Account</h2>
+        <div class="alert-success">
+            <div style="font-size: 14px; margin-bottom: 8px;">
+                ✓ Connected to Cloud
             </div>
-
-            <button onclick="syncAllData()" class="btn-success" style="margin-bottom: 12px;">
-                🔄 Sync Now
-            </button>
-
-            <button onclick="signOut()" class="btn-danger">
-                Sign Out
-            </button>
-
-            <div class="alert-info">
-                <strong>Sync Status:</strong><br>
-                Your data is automatically synced across all your devices. Any changes you make will appear everywhere instantly!
+            <div style="font-size: 13px;">
+                📧 ${currentUser.email}
             </div>
         </div>
-    `;
+
+        <button onclick="syncAllData()" class="btn-success" style="margin-bottom: 12px;">
+            🔄 Sync Now
+        </button>
+        
+        <button onclick="forceRefresh()" class="btn" style="margin-bottom: 12px;">
+            🔃 Force Refresh Dashboard
+        </button>
+
+        <button onclick="signOut()" class="btn-danger">
+            Sign Out
+        </button>
+
+        <div class="alert-info">
+            <strong>Sync Status:</strong><br>
+            Your data is automatically synced across all your devices. Any changes you make will appear everywhere instantly!
+        </div>
+    </div>
+`;
         }
 
         function switchAuthTab(tab) {
@@ -1943,6 +1951,27 @@
                 document.getElementById('signupForm').style.display = 'block';
                 document.getElementById('loginTab').classList.remove('active');
                 document.getElementById('signupTab').classList.add('active');
+            }
+        }
+        async function forceRefresh() {
+            updateSyncIndicator('syncing');
+
+            try {
+                // Clear local storage
+                localStorage.removeItem('financeManagerData');
+
+                // Pull fresh data from cloud
+                await pullDataFromSupabase();
+
+                // Re-render everything
+                render();
+
+                updateSyncIndicator('synced');
+                showToast('Dashboard refreshed!', 'success');
+            } catch (error) {
+                console.error('Refresh error:', error);
+                showToast('Refresh failed: ' + error.message, 'error');
+                updateSyncIndicator('synced');
             }
         }
 
@@ -4387,9 +4416,16 @@
         }
 
         // Initialize
-        loadData();
-        initSupabase();  // ADD THIS LINE
+        initSupabase(); // Start Supabase first
         render();
+
+        // Only load local data if NOT signed in
+        setTimeout(() => {
+            if (!syncEnabled || !currentUser) {
+                loadData();
+                render();
+            }
+        }, 1000);
 
         // Service Worker
         if ('serviceWorker' in navigator) {
