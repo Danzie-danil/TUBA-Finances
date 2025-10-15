@@ -1140,6 +1140,154 @@
             updateSyncIndicator('syncing');
 
             try {
+                // Sync products
+                for (const product of state.products) {
+                    await pushToSupabase('products', {
+                        name: product.name,
+                        category: product.category,
+                        cost: product.cost,
+                        price: product.price
+                    });
+                }
+
+                // Sync categories
+                for (const category of state.categories) {
+                    await pushToSupabase('categories', { name: category });
+                }
+
+                // Sync sales
+                for (const sale of state.sales) {
+                    await pushToSupabase('sales', {
+                        date: sale.date,
+                        time: sale.time,
+                        timestamp: sale.timestamp,
+                        product_name: sale.productName,
+                        customer: sale.customer,
+                        quantity: sale.quantity,
+                        cost_per_unit: sale.costPerUnit,
+                        price_per_unit: sale.pricePerUnit,
+                        total_cost: sale.totalCost,
+                        total_price: sale.totalPrice,
+                        profit: sale.profit,
+                        payment: sale.payment
+                    });
+                }
+
+                // Sync expenses
+                for (const expense of state.expenses) {
+                    await pushToSupabase('expenses', {
+                        date: expense.date,
+                        time: expense.time,
+                        timestamp: expense.timestamp,
+                        description: expense.description,
+                        category: expense.category,
+                        amount: expense.amount,
+                        payment: expense.payment,
+                        comment: expense.comment || ''
+                    });
+                }
+
+                // Sync customers
+                for (const customer of state.customers) {
+                    await pushToSupabase('customers', {
+                        name: customer.name,
+                        email: customer.email || '',
+                        phone: customer.phone || '',
+                        address: customer.address || '',
+                        total_purchases: customer.totalPurchases || 0
+                    });
+                }
+
+                // Sync invoices
+                for (const invoice of state.invoices) {
+                    await pushToSupabase('invoices', {
+                        number: invoice.number,
+                        customer: invoice.customer,
+                        date: invoice.date,
+                        due_date: invoice.dueDate,
+                        items: invoice.items,
+                        amount: invoice.amount,
+                        status: invoice.status
+                    });
+                }
+
+                // Sync inventory
+                for (const [productName, inv] of Object.entries(state.inventory)) {
+                    await supabase.from('inventory').upsert({
+                        user_id: currentUser.id,
+                        product_name: productName,
+                        stock: inv.stock,
+                        min_alert: inv.minAlert
+                    }, { onConflict: 'user_id,product_name' });
+                }
+
+                // Sync notes
+                for (const note of state.notes) {
+                    await pushToSupabase('notes', {
+                        title: note.title || '',
+                        content: note.content,
+                        date: note.date,
+                        time: note.time,
+                        timestamp: note.timestamp
+                    });
+                }
+
+                // Sync transactions
+                for (const transaction of state.transactions) {
+                    await pushToSupabase('transactions', {
+                        channel: transaction.channel,
+                        customer_name: transaction.customerName,
+                        type: transaction.type,
+                        amount: transaction.amount,
+                        date: transaction.date,
+                        time: transaction.time,
+                        timestamp: transaction.timestamp
+                    });
+                }
+
+                // Sync unpaid entries
+                for (const entry of state.unpaidEntries) {
+                    await pushToSupabase('unpaid_entries', {
+                        name: entry.name,
+                        type: entry.type,
+                        amount: entry.amount,
+                        date: entry.date,
+                        time: entry.time,
+                        timestamp: entry.timestamp,
+                        paid: entry.paid
+                    });
+                }
+
+                // Sync transaction floats
+                for (const [channel, floatData] of Object.entries(state.transactionFloats)) {
+                    await supabase.from('transaction_floats').upsert({
+                        user_id: currentUser.id,
+                        channel: channel,
+                        initial_float: floatData.initial
+                    }, { onConflict: 'user_id,channel' });
+                }
+
+                // Sync settings
+                await supabase.from('settings').upsert({
+                    user_id: currentUser.id,
+                    daily_target: state.dailyTarget || 0,
+                    monthly_target: state.monthlyTarget || 0
+                }, { onConflict: 'user_id' });
+
+                updateSyncIndicator('synced');
+                showToast('All data synced!', 'success');
+            } catch (error) {
+                console.error('Sync error:', error);
+                showToast('Sync failed: ' + error.message, 'error');
+                updateSyncIndicator('synced');
+            }
+        }
+        async function pushAllDataToSupabase() {
+            if (!syncEnabled || !currentUser) return;
+
+            updateSyncIndicator('syncing');
+
+            try {
                 // Sync all products
                 for (const product of state.products) {
                     await pushToSupabase('products', {
@@ -1201,47 +1349,180 @@
         }
 
         async function pullDataFromSupabase() {
-            // Products
-            const { data: products } = await supabase
-                .from('products')
-                .select('*')
-                .eq('user_id', currentUser.id);
-            if (products) state.products = products.map(p => ({
-                name: p.name,
-                category: p.category,
-                cost: parseFloat(p.cost),
-                price: parseFloat(p.price)
-            }));
+            if (!syncEnabled || !currentUser) return;
 
-            // Sales
-            const { data: sales } = await supabase
-                .from('sales')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .order('timestamp', { ascending: false });
-            if (sales) state.sales = sales.map(s => ({
-                date: s.date,
-                time: s.time,
-                timestamp: s.timestamp,
-                productName: s.product_name,
-                customer: s.customer,
-                quantity: s.quantity,
-                costPerUnit: parseFloat(s.cost_per_unit),
-                pricePerUnit: parseFloat(s.price_per_unit),
-                totalCost: parseFloat(s.total_cost),
-                totalPrice: parseFloat(s.total_price),
-                profit: parseFloat(s.profit),
-                payment: s.payment
-            }));
+            try {
+                // Products
+                const { data: products } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (products) state.products = products.map(p => ({
+                    name: p.name,
+                    category: p.category,
+                    cost: parseFloat(p.cost),
+                    price: parseFloat(p.price)
+                }));
 
-            // Categories
-            const { data: categories } = await supabase
-                .from('categories')
-                .select('*')
-                .eq('user_id', currentUser.id);
-            if (categories) state.categories = categories.map(c => c.name);
+                // Sales
+                const { data: sales } = await supabase
+                    .from('sales')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('timestamp', { ascending: false });
+                if (sales) state.sales = sales.map(s => ({
+                    date: s.date,
+                    time: s.time,
+                    timestamp: s.timestamp,
+                    productName: s.product_name,
+                    customer: s.customer,
+                    quantity: s.quantity,
+                    costPerUnit: parseFloat(s.cost_per_unit),
+                    pricePerUnit: parseFloat(s.price_per_unit),
+                    totalCost: parseFloat(s.total_cost),
+                    totalPrice: parseFloat(s.total_price),
+                    profit: parseFloat(s.profit),
+                    payment: s.payment
+                }));
 
-            saveData();
+                // Categories
+                const { data: categories } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (categories) state.categories = categories.map(c => c.name);
+
+                // Expenses
+                const { data: expenses } = await supabase
+                    .from('expenses')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (expenses) state.expenses = expenses.map(e => ({
+                    date: e.date,
+                    time: e.time,
+                    timestamp: e.timestamp,
+                    description: e.description,
+                    category: e.category,
+                    amount: parseFloat(e.amount),
+                    payment: e.payment,
+                    comment: e.comment
+                }));
+
+                // Customers
+                const { data: customers } = await supabase
+                    .from('customers')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (customers) state.customers = customers.map(c => ({
+                    name: c.name,
+                    email: c.email || '',
+                    phone: c.phone || '',
+                    address: c.address || '',
+                    totalPurchases: parseFloat(c.total_purchases || 0)
+                }));
+
+                // Invoices
+                const { data: invoices } = await supabase
+                    .from('invoices')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (invoices) state.invoices = invoices.map(i => ({
+                    number: i.number,
+                    customer: i.customer,
+                    date: i.date,
+                    dueDate: i.due_date,
+                    items: i.items,
+                    amount: parseFloat(i.amount),
+                    status: i.status
+                }));
+
+                // Inventory
+                const { data: inventory } = await supabase
+                    .from('inventory')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (inventory) {
+                    state.inventory = {};
+                    inventory.forEach(item => {
+                        state.inventory[item.product_name] = {
+                            stock: item.stock,
+                            minAlert: item.min_alert
+                        };
+                    });
+                }
+
+                // Notes
+                const { data: notes } = await supabase
+                    .from('notes')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (notes) state.notes = notes.map(n => ({
+                    title: n.title || '',
+                    content: n.content,
+                    date: n.date,
+                    time: n.time,
+                    timestamp: n.timestamp
+                }));
+
+                // Transactions
+                const { data: transactions } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (transactions) state.transactions = transactions.map(t => ({
+                    channel: t.channel,
+                    customerName: t.customer_name,
+                    type: t.type,
+                    amount: parseFloat(t.amount),
+                    date: t.date,
+                    time: t.time,
+                    timestamp: t.timestamp
+                }));
+
+                // Unpaid entries
+                const { data: unpaidEntries } = await supabase
+                    .from('unpaid_entries')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (unpaidEntries) state.unpaidEntries = unpaidEntries.map(u => ({
+                    name: u.name,
+                    type: u.type,
+                    amount: parseFloat(u.amount),
+                    date: u.date,
+                    time: u.time,
+                    timestamp: u.timestamp,
+                    paid: u.paid
+                }));
+
+                // Transaction floats
+                const { data: floats } = await supabase
+                    .from('transaction_floats')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (floats) {
+                    floats.forEach(f => {
+                        if (state.transactionFloats[f.channel]) {
+                            state.transactionFloats[f.channel].initial = parseFloat(f.initial_float);
+                        }
+                    });
+                }
+
+                // Settings
+                const { data: settings } = await supabase
+                    .from('settings')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .single();
+                if (settings) {
+                    state.dailyTarget = parseFloat(settings.daily_target || 0);
+                    state.monthlyTarget = parseFloat(settings.monthly_target || 0);
+                }
+
+                calculateFloatBalances();
+                saveData();
+            } catch (error) {
+                console.error('Pull error:', error);
+            }
         }
 
         async function pushToSupabase(table, data) {
@@ -1565,17 +1846,35 @@
             `;
         }
 
-        function setDailyTarget() {
+        async function setDailyTarget() {
             const value = parseFloat(document.getElementById('dailyTarget').value) || 0;
             state.dailyTarget = value;
+
+            if (syncEnabled) {
+                await supabase.from('settings').upsert({
+                    user_id: currentUser.id,
+                    daily_target: value,
+                    monthly_target: state.monthlyTarget || 0
+                }, { onConflict: 'user_id' });
+            }
+
             saveData();
             render();
             showToast('Daily target updated', 'success');
         }
 
-        function setMonthlyTarget() {
+        async function setMonthlyTarget() {
             const value = parseFloat(document.getElementById('monthlyTarget').value) || 0;
             state.monthlyTarget = value;
+
+            if (syncEnabled) {
+                await supabase.from('settings').upsert({
+                    user_id: currentUser.id,
+                    daily_target: state.dailyTarget || 0,
+                    monthly_target: value
+                }, { onConflict: 'user_id' });
+            }
+
             saveData();
             render();
             showToast('Monthly target updated', 'success');
@@ -2242,13 +2541,22 @@
             `;
         }
 
-        function editInitialFloat(channel) {
+        async function editInitialFloat(channel) {
             const current = state.transactionFloats[channel].initial;
             const newValue = prompt(`Set initial float for ${channel.toUpperCase()}:`, current);
             if (newValue !== null) {
                 const val = parseFloat(newValue);
                 if (!isNaN(val) && val >= 0) {
                     state.transactionFloats[channel].initial = val;
+
+                    if (syncEnabled) {
+                        await supabase.from('transaction_floats').upsert({
+                            user_id: currentUser.id,
+                            channel: channel,
+                            initial_float: val
+                        }, { onConflict: 'user_id,channel' });
+                    }
+
                     calculateFloatBalances();
                     saveData();
                     render();
@@ -2264,7 +2572,7 @@
             render();
         }
 
-        function addTransaction(e) {
+        async function addTransaction(e) {
             e.preventDefault();
             const now = new Date();
             const amount = parseFloat(document.getElementById('transactionAmount').value);
@@ -2282,12 +2590,23 @@
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime()
             };
+
             state.transactions = state.transactions || [];
             state.transactions.push(transaction);
 
-            // Update float balance
-            calculateFloatBalances();
+            if (syncEnabled) {
+                await pushToSupabase('transactions', {
+                    channel: transaction.channel,
+                    customer_name: transaction.customerName,
+                    type: transaction.type,
+                    amount: transaction.amount,
+                    date: transaction.date,
+                    time: transaction.time,
+                    timestamp: transaction.timestamp
+                });
+            }
 
+            calculateFloatBalances();
             saveData();
             render();
             showToast("Transaction recorded", "success");
@@ -2441,7 +2760,6 @@
             state.products.push(product);
             state.inventory[name] = { stock: stock, minAlert: 5 };
 
-            // SYNC TO SUPABASE
             if (syncEnabled) {
                 await pushToSupabase('products', {
                     name: product.name,
@@ -2449,12 +2767,19 @@
                     cost: product.cost,
                     price: product.price
                 });
+                await supabase.from('inventory').upsert({
+                    user_id: currentUser.id,
+                    product_name: name,
+                    stock: stock,
+                    min_alert: 5
+                }, { onConflict: 'user_id,product_name' });
             }
 
             saveData();
             render();
             showToast("Product added successfully!", "success");
         }
+
         function editProductIndex(i) {
             const p = state.products[i];
             if (!p) return showToast("Product not found", "error");
@@ -2536,11 +2861,8 @@
 
             state.categories.push(name);
 
-            // SYNC TO SUPABASE
             if (syncEnabled) {
-                await pushToSupabase('categories', {
-                    name: name
-                });
+                await pushToSupabase('categories', { name: name });
             }
 
             saveData();
@@ -2707,7 +3029,7 @@
             render();
         }
 
-        function addExpense(e) {
+        async function addExpense(e) {
             e.preventDefault();
             const amount = parseFloat(document.getElementById('expenseAmount').value);
             if (isNaN(amount) || amount <= 0) {
@@ -2715,7 +3037,7 @@
             }
 
             const now = new Date();
-            state.expenses.push({
+            const expense = {
                 date: now.toLocaleDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
@@ -2724,7 +3046,23 @@
                 amount: amount,
                 payment: document.getElementById('expensePayment').value,
                 comment: document.getElementById('expenseComment').value.trim()
-            });
+            };
+
+            state.expenses.push(expense);
+
+            if (syncEnabled) {
+                await pushToSupabase('expenses', {
+                    date: expense.date,
+                    time: expense.time,
+                    timestamp: expense.timestamp,
+                    description: expense.description,
+                    category: expense.category,
+                    amount: expense.amount,
+                    payment: expense.payment,
+                    comment: expense.comment
+                });
+            }
+
             saveData();
             render();
             showToast("Expense added", "success");
@@ -2811,7 +3149,7 @@
             showToast(`Stock ${amount > 0 ? 'increased' : 'decreased'}`, 'success');
         }
 
-        function saveStockFor(productName) {
+        async function saveStockFor(productName) {
             const el = document.getElementById('inv_input_' + encodeURIComponent(productName));
             if (!el) return showToast("Input not found", "error");
             const v = parseInt(el.value);
@@ -2819,7 +3157,19 @@
             if (!state.inventory) state.inventory = {};
             state.inventory[productName] = state.inventory[productName] || { stock: 0, minAlert: 5 };
             state.inventory[productName].stock = v;
-            saveData(); render(); showToast("Stock updated", "success");
+
+            if (syncEnabled) {
+                await supabase.from('inventory').upsert({
+                    user_id: currentUser.id,
+                    product_name: productName,
+                    stock: v,
+                    min_alert: state.inventory[productName].minAlert
+                }, { onConflict: 'user_id,product_name' });
+            }
+
+            saveData();
+            render();
+            showToast("Stock updated", "success");
         }
 
         function setMinAlert(productName) {
@@ -2946,22 +3296,34 @@
             alert(history);
         }
 
-        function addCustomer(e) {
+        async function addCustomer(e) {
             e.preventDefault();
             const name = document.getElementById('customerName').value.trim();
 
-            // Check for duplicate
             if (state.customers.some(c => c.name.toLowerCase() === name.toLowerCase())) {
                 return showToast('Customer already exists', 'error');
             }
 
-            state.customers.push({
+            const customer = {
                 name: name,
                 email: document.getElementById('customerEmail').value.trim(),
                 phone: document.getElementById('customerPhone').value.trim(),
                 address: document.getElementById('customerAddress').value.trim(),
                 totalPurchases: 0
-            });
+            };
+
+            state.customers.push(customer);
+
+            if (syncEnabled) {
+                await pushToSupabase('customers', {
+                    name: customer.name,
+                    email: customer.email,
+                    phone: customer.phone,
+                    address: customer.address,
+                    total_purchases: 0
+                });
+            }
+
             saveData();
             render();
             showToast("Customer added", "success");
@@ -3252,7 +3614,7 @@
             }
         }
 
-        function addUnpaidEntry(e) {
+        async function addUnpaidEntry(e) {
             e.preventDefault();
             const now = new Date();
             state.unpaidEntries = state.unpaidEntries || [];
@@ -3282,7 +3644,7 @@
                 return showToast("Please enter a valid amount", "error");
             }
 
-            state.unpaidEntries.push({
+            const entry = {
                 name: customerName,
                 type: transactionType,
                 amount: amount,
@@ -3290,7 +3652,22 @@
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
                 paid: false
-            });
+            };
+
+            state.unpaidEntries.push(entry);
+
+            if (syncEnabled) {
+                await pushToSupabase('unpaid_entries', {
+                    name: entry.name,
+                    type: entry.type,
+                    amount: entry.amount,
+                    date: entry.date,
+                    time: entry.time,
+                    timestamp: entry.timestamp,
+                    paid: false
+                });
+            }
+
             saveData();
             render();
             showToast("Unpaid entry added", "success");
@@ -3399,7 +3776,7 @@
             document.getElementById('notesList').innerHTML = renderNotesList(term);
         }
 
-        function addNote(e) {
+        async function addNote(e) {
             e.preventDefault();
             const now = new Date();
             const content = document.getElementById('noteContent').value.trim();
@@ -3409,13 +3786,26 @@
                 return showToast('Please enter note content', 'error');
             }
 
-            state.notes.push({
+            const note = {
                 title: title || '',
                 content: content,
                 date: now.toLocaleDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime()
-            });
+            };
+
+            state.notes.push(note);
+
+            if (syncEnabled) {
+                await pushToSupabase('notes', {
+                    title: note.title,
+                    content: note.content,
+                    date: note.date,
+                    time: note.time,
+                    timestamp: note.timestamp
+                });
+            }
+
             saveData();
             render();
             showToast("Note saved", "success");
