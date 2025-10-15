@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -154,17 +155,17 @@
             border-radius: 20px;
             padding: 20px;
             margin-bottom: 16px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 
-                        0 1px 3px rgba(0, 0, 0, 0.1),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15),
+                0 1px 3px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
             border: 1px solid rgba(255, 255, 255, 0.5);
             position: relative;
         }
 
         .card:hover {
-            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2), 
-                        0 1px 3px rgba(0, 0, 0, 0.1),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2),
+                0 1px 3px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
         }
 
         .card h2 {
@@ -229,7 +230,9 @@
             text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8);
         }
 
-        input, select, textarea {
+        input,
+        select,
+        textarea {
             width: 100%;
             padding: 12px;
             border: 2px solid rgba(0, 0, 0, 0.1);
@@ -239,7 +242,9 @@
             box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.05);
         }
 
-        input:focus, select:focus, textarea:focus {
+        input:focus,
+        select:focus,
+        textarea:focus {
             outline: none;
             border-color: #667eea;
             background: white;
@@ -251,7 +256,8 @@
             min-height: 80px;
         }
 
-        button, .btn {
+        button,
+        .btn {
             width: 100%;
             padding: 14px;
             background: linear-gradient(145deg, #1a1a1a, #000000);
@@ -300,13 +306,13 @@
             border-radius: 16px;
             padding: 16px;
             margin-bottom: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
         }
 
         .item:hover {
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
         }
 
         .item-header {
@@ -497,9 +503,9 @@
             width: 100%;
             max-height: 80vh;
             overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 
-                        0 0 0 1px rgba(255, 255, 255, 0.5),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
             border: 1px solid rgba(255, 255, 255, 0.5);
         }
 
@@ -639,6 +645,7 @@
             text-overflow: ellipsis;
             display: -webkit-box;
             -webkit-line-clamp: 4;
+            line-clamp: 4;
             -webkit-box-orient: vertical;
             line-height: 1.5;
             background: linear-gradient(145deg, #ffffff, #f5f5f5);
@@ -646,13 +653,13 @@
             padding: 16px;
             border-radius: 16px;
             margin-bottom: 12px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
 
         .note-preview:hover {
-            box-shadow: 0 12px 30px rgba(102, 126, 234, 0.2), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            box-shadow: 0 12px 30px rgba(102, 126, 234, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
             border-color: rgba(102, 126, 234, 0.4);
         }
 
@@ -706,6 +713,7 @@
                 background: rgba(102, 126, 234, 0.3);
                 box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
             }
+
             100% {
                 background: transparent;
                 box-shadow: none;
@@ -728,7 +736,8 @@
             flex-wrap: wrap;
         }
 
-        .filter-row input, .filter-row select {
+        .filter-row input,
+        .filter-row select {
             flex: 1;
             min-width: 120px;
         }
@@ -851,8 +860,15 @@
         }
 
         @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-20px);
+            }
         }
 
         .welcome-title {
@@ -868,6 +884,7 @@
                 opacity: 0;
                 transform: translateY(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -914,7 +931,7 @@
             .stat-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .transaction-tabs {
                 grid-template-columns: repeat(2, 1fr);
             }
@@ -923,11 +940,51 @@
                 flex-direction: column;
             }
 
-            .filter-row input, .filter-row select {
+            .filter-row input,
+            .filter-row select {
                 width: 100%;
             }
         }
+
+        .sync-indicator {
+            position: absolute;
+            left: 70px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: linear-gradient(145deg, #2e7d32, #1b5e20);
+            color: white;
+            display: none;
+        }
+
+        .sync-indicator.show {
+            display: block;
+        }
+
+        .sync-indicator.syncing {
+            background: linear-gradient(145deg, #1976d2, #0d47a1);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
     </style>
+    <!-- Add this line -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Your existing scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -942,9 +999,10 @@
 
     <div class="app-container">
         <div class="header">
-            <button class="header-btn-left" onclick="importData()" title="Import Data">📥</button>
+            <button class="header-btn-left" onclick="importData()">📥</button>
+            <div class="sync-indicator" id="syncIndicator">☁️ Synced</div>
             <h1>💼 Daniel's Pro</h1>
-            <button class="header-btn" onclick="exportData()" title="Export Data">💾</button>
+            <button class="header-btn" onclick="exportData()">💾</button>
         </div>
 
         <div class="content" id="app"></div>
@@ -971,11 +1029,182 @@
     </div>
 
     <script>
+        // ========================================
+        // SUPABASE CONFIGURATION
+        // ========================================
+        const SUPABASE_URL = 'https://mjxklwonzrpawerfopdj.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qeGtsd29uenJwYXdlcmZvcGRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA0NjY0MzYsImV4cCI6MjA3NjA0MjQzNn0.cWLOALsj1iwxgFsSlWMTcMwf4Zfm8pIY5z1ICNNcsdk';
+
+        let supabase;
+        let currentUser = null;
+        let syncEnabled = false;
+
+        // Your existing code continues below...
         const SHOP_NAME = "Daniel's Finance Manager";
         const SHOP_ADDRESS = "Arusha";
         const SHOP_PHONE = "+255618721563";
         const SHOP_EMAIL = "eastwindstationery12@gmail.com";
 
+        // ========================================
+        // SUPABASE FUNCTIONS
+        // ========================================
+
+        function initSupabase() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                console.log('✅ Supabase initialized');
+
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                    if (session) {
+                        currentUser = session.user;
+                        syncEnabled = true;
+                        updateSyncIndicator('synced');
+                        syncAllData();
+                    }
+                });
+
+                supabase.auth.onAuthStateChange((event, session) => {
+                    if (event === 'SIGNED_IN') {
+                        currentUser = session.user;
+                        syncEnabled = true;
+                        showToast('Signed in! Syncing data...', 'success');
+                        syncAllData();
+                    } else if (event === 'SIGNED_OUT') {
+                        currentUser = null;
+                        syncEnabled = false;
+                        updateSyncIndicator('offline');
+                        render();
+                    }
+                });
+            } catch (error) {
+                console.error('Supabase init error:', error);
+                syncEnabled = false;
+            }
+        }
+
+        function updateSyncIndicator(status) {
+            const indicator = document.getElementById('syncIndicator');
+            if (!indicator) return;
+
+            if (status === 'synced' && syncEnabled) {
+                indicator.textContent = '☁️ Synced';
+                indicator.className = 'sync-indicator show';
+            } else if (status === 'syncing') {
+                indicator.textContent = '🔄 Syncing...';
+                indicator.className = 'sync-indicator show syncing';
+            } else {
+                indicator.className = 'sync-indicator';
+            }
+        }
+
+        async function signUp(email, password) {
+            try {
+                const { data, error } = await supabase.auth.signUp({ email, password });
+                if (error) throw error;
+                showToast('Account created! Check your email to confirm.', 'success');
+                return data;
+            } catch (error) {
+                showToast('Sign up error: ' + error.message, 'error');
+                return null;
+            }
+        }
+
+        async function signIn(email, password) {
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                currentUser = data.user;
+                syncEnabled = true;
+                return data;
+            } catch (error) {
+                showToast('Sign in error: ' + error.message, 'error');
+                return null;
+            }
+        }
+
+        async function signOut() {
+            try {
+                const { error } = await supabase.auth.signOut();
+                if (error) throw error;
+                currentUser = null;
+                syncEnabled = false;
+                showToast('Signed out successfully', 'info');
+                render();
+            } catch (error) {
+                showToast('Sign out error: ' + error.message, 'error');
+            }
+        }
+
+        async function syncAllData() {
+            if (!syncEnabled || !currentUser) return;
+
+            updateSyncIndicator('syncing');
+
+            try {
+                await pullDataFromSupabase();
+                updateSyncIndicator('synced');
+                showToast('Data synced!', 'success');
+                render();
+            } catch (error) {
+                console.error('Sync error:', error);
+                updateSyncIndicator('synced');
+                showToast('Sync failed', 'error');
+            }
+        }
+
+        async function pullDataFromSupabase() {
+            // Products
+            const { data: products } = await supabase
+                .from('products')
+                .select('*')
+                .eq('user_id', currentUser.id);
+            if (products) state.products = products.map(p => ({
+                name: p.name,
+                category: p.category,
+                cost: parseFloat(p.cost),
+                price: parseFloat(p.price)
+            }));
+
+            // Sales
+            const { data: sales } = await supabase
+                .from('sales')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('timestamp', { ascending: false });
+            if (sales) state.sales = sales.map(s => ({
+                date: s.date,
+                time: s.time,
+                timestamp: s.timestamp,
+                productName: s.product_name,
+                customer: s.customer,
+                quantity: s.quantity,
+                costPerUnit: parseFloat(s.cost_per_unit),
+                pricePerUnit: parseFloat(s.price_per_unit),
+                totalCost: parseFloat(s.total_cost),
+                totalPrice: parseFloat(s.total_price),
+                profit: parseFloat(s.profit),
+                payment: s.payment
+            }));
+
+            // Categories
+            const { data: categories } = await supabase
+                .from('categories')
+                .select('*')
+                .eq('user_id', currentUser.id);
+            if (categories) state.categories = categories.map(c => c.name);
+
+            saveData();
+        }
+
+        async function pushToSupabase(table, data) {
+            if (!syncEnabled || !currentUser) return;
+            try {
+                data.user_id = currentUser.id;
+                await supabase.from(table).insert(data);
+            } catch (error) {
+                console.error(`Error syncing to ${table}:`, error);
+            }
+        }
         let state = {
             activeTab: 'dashboard',
             activeTransactionChannel: 'mpesa',
@@ -1060,35 +1289,35 @@
             const totalCapital = state.sales.reduce((sum, s) => sum + (s.totalCost || 0), 0);
             const totalProfit = state.sales.reduce((sum, s) => sum + (s.profit || 0), 0);
             const totalRevenue = state.sales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-            
+
             const today = new Date().toLocaleDateString();
             const todaySales = state.sales.filter(s => s.date === today);
             const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0);
             const todayRevenue = todaySales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-            
+
             const yesterday = new Date(Date.now() - 86400000).toLocaleDateString();
             const yesterdayProfit = state.sales.filter(s => s.date === yesterday).reduce((sum, s) => sum + (s.profit || 0), 0);
-            
+
             const now = new Date();
             const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString();
             const monthSales = state.sales.filter(s => new Date(s.date) >= new Date(monthStart));
             const monthProfit = monthSales.reduce((sum, s) => sum + (s.profit || 0), 0);
             const monthRevenue = monthSales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-            
+
             const totalExpenses = state.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
             const monthExpenses = state.expenses.filter(e => new Date(e.date) >= new Date(monthStart)).reduce((sum, e) => sum + (e.amount || 0), 0);
-            
+
             const totalInvoiced = state.invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
             const totalPaid = state.invoices.filter(inv => inv.status === 'Paid').reduce((sum, inv) => sum + (inv.amount || 0), 0);
-            
+
             const netProfit = totalProfit - totalExpenses;
             const monthNetProfit = monthProfit - monthExpenses;
-            
-            return { 
-                totalCapital, 
-                totalProfit, 
+
+            return {
+                totalCapital,
+                totalProfit,
                 totalRevenue,
-                todayProfit, 
+                todayProfit,
                 todayRevenue,
                 yesterdayProfit,
                 monthProfit,
@@ -1096,7 +1325,7 @@
                 monthNetProfit,
                 totalExpenses,
                 monthExpenses,
-                totalInvoiced, 
+                totalInvoiced,
                 totalPaid,
                 netProfit,
                 totalSalesCount: state.sales.length,
@@ -1104,8 +1333,13 @@
             };
         }
 
+
         const tabs = [
             { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+            { id: 'account', label: 'Account', icon: '👤' },  // ADD THIS LINE
+            { id: 'sales', label: 'Sales', icon: '💰' },
+            // ... rest of your tabs
+
             { id: 'sales', label: 'Sales', icon: '💰' },
             { id: 'transactions', label: 'Money', icon: '💳' },
             { id: 'products', label: 'Products', icon: '🛍️' },
@@ -1190,8 +1424,8 @@
                         <div class="stat-label">YESTERDAY'S PROFIT</div>
                         <div class="stat-value">💱 ${formatNumber(stats.yesterdayProfit)} Tsh</div>
                         <div class="stat-subvalue">
-                            ${stats.todayProfit > stats.yesterdayProfit ? '📈 Better than yesterday!' : 
-                              stats.todayProfit < stats.yesterdayProfit ? '📉 Lower than yesterday' : '➡️ Same as yesterday'}
+                            ${stats.todayProfit > stats.yesterdayProfit ? '📈 Better than yesterday!' :
+                    stats.todayProfit < stats.yesterdayProfit ? '📉 Lower than yesterday' : '➡️ Same as yesterday'}
                         </div>
                     </div>
 
@@ -1302,29 +1536,162 @@
             showToast('Monthly target updated', 'success');
         }
 
+        function renderAccount() {
+            if (!currentUser) {
+                return `
+            <div class="card">
+                <h2>☁️ Cloud Sync</h2>
+                <p style="margin-bottom: 16px; color: #666;">
+                    Sign in to sync your data across all devices!
+                </p>
+                
+                <div class="transaction-tabs" style="margin-bottom: 20px;">
+                    <button class="transaction-tab mpesa active" id="loginTab" onclick="switchAuthTab('login')">
+                        Sign In
+                    </button>
+                    <button class="transaction-tab crdb" id="signupTab" onclick="switchAuthTab('signup')">
+                        Sign Up
+                    </button>
+                </div>
+
+                <div id="loginForm">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="loginEmail" placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="loginPassword" placeholder="••••••••">
+                    </div>
+                    <button onclick="handleSignIn()">Sign In</button>
+                </div>
+
+                <div id="signupForm" style="display: none;">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="signupEmail" placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Password (min 6 characters)</label>
+                        <input type="password" id="signupPassword" placeholder="••••••••">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" id="signupPasswordConfirm" placeholder="••••••••">
+                    </div>
+                    <button onclick="handleSignUp()">Create Account</button>
+                </div>
+
+                <div class="alert-info">
+                    <strong>Benefits of Cloud Sync:</strong>
+                    <ul style="margin-top: 8px; padding-left: 20px; font-size: 13px; color: #666;">
+                        <li>Access from any device</li>
+                        <li>Automatic backup</li>
+                        <li>Real-time updates</li>
+                        <li>Never lose data</li>
+                    </ul>
+                </div>
+            </div>
+        `;
+            }
+
+            // Signed in view
+            return `
+        <div class="card">
+            <h2>☁️ Account</h2>
+            <div class="alert-success">
+                <div style="font-size: 14px; margin-bottom: 8px;">
+                    ✓ Connected to Cloud
+                </div>
+                <div style="font-size: 13px;">
+                    📧 ${currentUser.email}
+                </div>
+            </div>
+
+            <button onclick="syncAllData()" class="btn-success" style="margin-bottom: 12px;">
+                🔄 Sync Now
+            </button>
+
+            <button onclick="signOut()" class="btn-danger">
+                Sign Out
+            </button>
+
+            <div class="alert-info">
+                <strong>Sync Status:</strong><br>
+                Your data is automatically synced across all your devices. Any changes you make will appear everywhere instantly!
+            </div>
+        </div>
+    `;
+        }
+
+        function switchAuthTab(tab) {
+            if (tab === 'login') {
+                document.getElementById('loginForm').style.display = 'block';
+                document.getElementById('signupForm').style.display = 'none';
+                document.getElementById('loginTab').classList.add('active');
+                document.getElementById('signupTab').classList.remove('active');
+            } else {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('signupForm').style.display = 'block';
+                document.getElementById('loginTab').classList.remove('active');
+                document.getElementById('signupTab').classList.add('active');
+            }
+        }
+
+        async function handleSignIn() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                return showToast('Please fill in all fields', 'error');
+            }
+
+            await signIn(email, password);
+        }
+
+        async function handleSignUp() {
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const confirm = document.getElementById('signupPasswordConfirm').value;
+
+            if (!email || !password || !confirm) {
+                return showToast('Please fill in all fields', 'error');
+            }
+
+            if (password !== confirm) {
+                return showToast('Passwords do not match', 'error');
+            }
+
+            if (password.length < 6) {
+                return showToast('Password must be at least 6 characters', 'error');
+            }
+
+            await signUp(email, password);
+        }
+
         function renderSales() {
             const stats = getStats();
-            
+
             // Filter sales based on search and filters
             let filteredSales = state.sales.slice();
-            
+
             if (state.searchTerm) {
                 const term = state.searchTerm.toLowerCase();
-                filteredSales = filteredSales.filter(s => 
+                filteredSales = filteredSales.filter(s =>
                     s.productName.toLowerCase().includes(term) ||
                     s.customer.toLowerCase().includes(term) ||
                     s.payment.toLowerCase().includes(term)
                 );
             }
-            
+
             if (state.filterDateFrom) {
                 filteredSales = filteredSales.filter(s => new Date(s.date) >= new Date(state.filterDateFrom));
             }
-            
+
             if (state.filterDateTo) {
                 filteredSales = filteredSales.filter(s => new Date(s.date) <= new Date(state.filterDateTo));
             }
-            
+
             if (state.filterCustomer) {
                 filteredSales = filteredSales.filter(s => s.customer === state.filterCustomer);
             }
@@ -1360,7 +1727,7 @@
                             <label>Product</label>
                             <select id="saleProduct" onchange="updateSaleTotal()" required>
                                 <option value="">-- Select Product --</option>
-                                ${state.products.map((p, i) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || {stock: 0}).stock})</option>`).join('')}
+                                ${state.products.map((p, i) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || { stock: 0 }).stock})</option>`).join('')}
                             </select>
                         </div>
                         <div class="form-group">
@@ -1412,9 +1779,9 @@
                         <input type="date" placeholder="To" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
                         <select onchange="updateFilterCustomer(this.value)">
                             <option value="">All Customers</option>
-                            ${[...new Set(state.sales.map(s => s.customer))].map(c => 
-                                `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
-                            ).join('')}
+                            ${[...new Set(state.sales.map(s => s.customer))].map(c =>
+                `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
+            ).join('')}
                         </select>
                         <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
                     </div>
@@ -1479,9 +1846,9 @@
                 const chunk = items.slice(i, i + chunkSize);
                 const chunkId = `${sectionKey}_chunk_${i}`;
                 const isCollapsed = state.collapsedSections[chunkId];
-                
+
                 html += chunk.map((item, idx) => renderItem(item, i + idx)).join('');
-                
+
                 if (i + chunkSize < items.length) {
                     html += `
                         <button class="collapse-btn" onclick="toggleCollapse('${chunkId}')">
@@ -1489,7 +1856,7 @@
                             <span>${isCollapsed ? 'Show More' : 'Show Less'}</span>
                         </button>
                     `;
-                    
+
                     if (isCollapsed) {
                         break;
                     }
@@ -1527,12 +1894,12 @@
                 const idx = state.sales.findIndex(s => s.timestamp === ts);
                 if (idx === -1) return showToast("Sale not found", "error");
                 const sale = state.sales[idx];
-                
+
                 // Return stock to inventory
                 if (state.inventory[sale.productName]) {
                     state.inventory[sale.productName].stock += sale.quantity;
                 }
-                
+
                 state.sales.splice(idx, 1);
                 saveData(); render(); showToast("Sale deleted", "success");
             });
@@ -1558,10 +1925,10 @@
             if (!productIndex && productIndex !== '0') { infoDiv.innerHTML = ''; return; }
             const product = state.products[productIndex];
             if (!product) { infoDiv.innerHTML = ''; return; }
-            
+
             const inventoryItem = state.inventory[product.name] || { stock: 0, minAlert: 5 };
             const availableStock = inventoryItem.stock;
-            
+
             if (quantity > availableStock) {
                 infoDiv.innerHTML = `
                     <div class="alert-box-danger">
@@ -1572,7 +1939,7 @@
                 `;
                 return;
             }
-            
+
             const totalCost = product.cost * quantity;
             const totalPrice = product.price * quantity;
             infoDiv.innerHTML = `
@@ -1610,10 +1977,10 @@
             if (productIndex === null || productIndex === '' || productIndex === undefined) return showToast('Please select a product', 'error');
             const product = state.products[productIndex];
             if (!product) return showToast('Product not found', 'error');
-            
+
             const customerSelect = document.getElementById('saleCustomer')?.value;
             let customer;
-            
+
             if (customerSelect === 'new') {
                 const newName = document.getElementById('newCustomerName')?.value.trim();
                 if (!newName) return showToast('Please enter customer name', 'error');
@@ -1625,18 +1992,18 @@
             } else {
                 customer = { name: 'WALK IN' };
             }
-            
+
             const quantity = parseInt(document.getElementById('saleQuantity')?.value) || 1;
             const payment = document.getElementById('salePayment')?.value || 'Cash';
             const manualPriceInput = document.getElementById('manualPrice');
             const pricePerUnit = manualPriceInput ? parseFloat(manualPriceInput.value) : product.price;
-            
+
             // Check stock
             const inventoryItem = state.inventory[product.name] || { stock: 0, minAlert: 5 };
             if (quantity > inventoryItem.stock) {
                 return showToast(`Insufficient stock! Available: ${inventoryItem.stock}`, 'error');
             }
-            
+
             const now = new Date();
             const totalCost = product.cost * quantity;
             const totalPrice = +(pricePerUnit * quantity).toFixed(2);
@@ -1656,7 +2023,23 @@
             };
             state.sales = state.sales || [];
             state.sales.push(sale);
-            
+            if (syncEnabled) {
+                pushToSupabase('sales', {
+                    date: sale.date,
+                    time: sale.time,
+                    timestamp: sale.timestamp,
+                    product_name: sale.productName,
+                    customer: sale.customer,
+                    quantity: sale.quantity,
+                    cost_per_unit: sale.costPerUnit,
+                    price_per_unit: sale.pricePerUnit,
+                    total_cost: sale.totalCost,
+                    total_price: sale.totalPrice,
+                    profit: sale.profit,
+                    payment: sale.payment
+                });
+            }
+
             // Update customer total purchases
             if (customer && customer.name !== 'WALK IN') {
                 const custIndex = state.customers.findIndex(c => c.name === customer.name);
@@ -1664,12 +2047,12 @@
                     state.customers[custIndex].totalPurchases = (state.customers[custIndex].totalPurchases || 0) + totalPrice;
                 }
             }
-            
+
             // Update inventory
             if (state.inventory && state.inventory[product.name]) {
                 state.inventory[product.name].stock = Math.max(0, (state.inventory[product.name].stock || 0) - quantity);
             }
-            
+
             saveData(); render();
             showToast("Sale recorded successfully!", "success");
         }
@@ -1685,7 +2068,7 @@
             ];
             const currentChannel = state.activeTransactionChannel || 'mpesa';
             const channelTransactions = (state.transactions || []).filter(t => t.channel === currentChannel);
-            
+
             const floatData = state.transactionFloats[currentChannel];
             const floatDifference = floatData.current - floatData.initial;
 
@@ -1793,11 +2176,11 @@
             e.preventDefault();
             const now = new Date();
             const amount = parseFloat(document.getElementById('transactionAmount').value);
-            
+
             if (isNaN(amount) || amount <= 0) {
                 return showToast('Please enter a valid amount', 'error');
             }
-            
+
             const transaction = {
                 channel: state.activeTransactionChannel,
                 customerName: document.getElementById('transactionCustomer').value.trim() || 'N/A',
@@ -1809,10 +2192,10 @@
             };
             state.transactions = state.transactions || [];
             state.transactions.push(transaction);
-            
+
             // Update float balance
             calculateFloatBalances();
-            
+
             saveData();
             render();
             showToast("Transaction recorded", "success");
@@ -1901,16 +2284,16 @@
             let products = state.products;
             if (searchTerm) {
                 const term = searchTerm.toLowerCase();
-                products = products.filter(p => 
+                products = products.filter(p =>
                     p.name.toLowerCase().includes(term) ||
                     p.category.toLowerCase().includes(term)
                 );
             }
-            
+
             if (products.length === 0) {
                 return '<p style="text-align: center; color: #666;">No products found</p>';
             }
-            
+
             return products.map((p, i) => {
                 const actualIndex = state.products.indexOf(p);
                 const inv = state.inventory[p.name] || { stock: 0 };
@@ -1947,22 +2330,22 @@
             const cost = parseFloat(document.getElementById('productCost').value);
             const price = parseFloat(document.getElementById('productPrice').value);
             const stock = parseInt(document.getElementById('productStock').value) || 0;
-            
+
             if (cost < 0 || price < 0) {
                 return showToast('Cost and price must be positive', 'error');
             }
-            
+
             if (price < cost) {
                 if (!confirm('Warning: Selling price is less than cost. Continue?')) {
                     return;
                 }
             }
-            
+
             // Check for duplicate
             if (state.products.some(p => p.name.toLowerCase() === name.toLowerCase())) {
                 return showToast('Product already exists', 'error');
             }
-            
+
             state.products.push({ name, category, cost, price });
             state.inventory[name] = { stock: stock, minAlert: 5 };
             saveData();
@@ -1979,16 +2362,16 @@
             if (name && cost && price && !isNaN(cost) && !isNaN(price)) {
                 const costNum = parseFloat(cost);
                 const priceNum = parseFloat(price);
-                
+
                 if (costNum < 0 || priceNum < 0) {
                     return showToast('Cost and price must be positive', 'error');
                 }
-                
+
                 const oldName = p.name;
                 p.name = name.trim();
                 p.cost = costNum;
                 p.price = priceNum;
-                
+
                 if (state.inventory && oldName !== p.name) {
                     state.inventory[p.name] = state.inventory[oldName] || { stock: 0, minAlert: 5 };
                     delete state.inventory[oldName];
@@ -2024,8 +2407,8 @@
                 <div class="card">
                     <h2>All Categories (${state.categories.length})</h2>
                     ${state.categories.map((cat, i) => {
-                        const productCount = state.products.filter(p => p.category === cat).length;
-                        return `
+                const productCount = state.products.filter(p => p.category === cat).length;
+                return `
                             <div class="item">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
                                     <div>
@@ -2039,7 +2422,7 @@
                                 </div>
                             </div>
                         `;
-                    }).join('') || '<p style="text-align: center; color: #666;">No categories yet</p>'}
+            }).join('') || '<p style="text-align: center; color: #666;">No categories yet</p>'}
                 </div>
             `;
         }
@@ -2087,25 +2470,25 @@
 
         function renderExpenses() {
             const stats = getStats();
-            
+
             let filteredExpenses = state.expenses.slice();
-            
+
             if (state.searchTerm) {
                 const term = state.searchTerm.toLowerCase();
-                filteredExpenses = filteredExpenses.filter(e => 
+                filteredExpenses = filteredExpenses.filter(e =>
                     e.description.toLowerCase().includes(term) ||
                     e.category.toLowerCase().includes(term)
                 );
             }
-            
+
             if (state.filterDateFrom) {
                 filteredExpenses = filteredExpenses.filter(e => new Date(e.date) >= new Date(state.filterDateFrom));
             }
-            
+
             if (state.filterDateTo) {
                 filteredExpenses = filteredExpenses.filter(e => new Date(e.date) <= new Date(state.filterDateTo));
             }
-            
+
             if (state.filterCategory) {
                 filteredExpenses = filteredExpenses.filter(e => e.category === state.filterCategory);
             }
@@ -2181,9 +2564,9 @@
                         <input type="date" placeholder="To" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
                         <select onchange="updateFilterCategory(this.value)">
                             <option value="">All Categories</option>
-                            ${[...new Set(state.expenses.map(e => e.category))].map(c => 
-                                `<option value="${c}" ${state.filterCategory === c ? 'selected' : ''}>${c}</option>`
-                            ).join('')}
+                            ${[...new Set(state.expenses.map(e => e.category))].map(c =>
+                `<option value="${c}" ${state.filterCategory === c ? 'selected' : ''}>${c}</option>`
+            ).join('')}
                         </select>
                         <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
                     </div>
@@ -2219,7 +2602,7 @@
             if (isNaN(amount) || amount <= 0) {
                 return showToast('Please enter a valid amount', 'error');
             }
-            
+
             const now = new Date();
             state.expenses.push({
                 date: now.toLocaleDateString(),
@@ -2277,10 +2660,10 @@
                 <div class="card">
                     <h2>Stock Levels (${state.products.length} Products)</h2>
                     ${state.products.map(p => {
-                        const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
-                        const isLow = inv.stock <= inv.minAlert;
-                        const stockValue = inv.stock * p.cost;
-                        return `
+                const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
+                const isLow = inv.stock <= inv.minAlert;
+                const stockValue = inv.stock * p.cost;
+                return `
                             <div class="item" style="${isLow ? 'border-left: 4px solid #d32f2f;' : ''}">
                                 <div class="item-header">
                                     <span class="item-title">${p.name}</span>
@@ -2302,7 +2685,7 @@
                                 </div>
                             </div>
                         `;
-                    }).join('') || '<p style="text-align: center; color: #666;">No products yet</p>'}
+            }).join('') || '<p style="text-align: center; color: #666;">No products yet</p>'}
                 </div>
             `;
         }
@@ -2349,7 +2732,7 @@
 
         function renderCustomers() {
             // Sort customers by total purchases
-            const sortedCustomers = [...state.customers].sort((a, b) => 
+            const sortedCustomers = [...state.customers].sort((a, b) =>
                 (b.totalPurchases || 0) - (a.totalPurchases || 0)
             );
 
@@ -2393,17 +2776,17 @@
             let customers = state.customers;
             if (searchTerm) {
                 const term = searchTerm.toLowerCase();
-                customers = customers.filter(c => 
+                customers = customers.filter(c =>
                     c.name.toLowerCase().includes(term) ||
                     (c.email && c.email.toLowerCase().includes(term)) ||
                     (c.phone && c.phone.includes(term))
                 );
             }
-            
+
             if (customers.length === 0) {
                 return '<p style="text-align: center; color: #666;">No customers found</p>';
             }
-            
+
             return customers.map((c, i) => {
                 const actualIndex = state.customers.indexOf(c);
                 const purchaseCount = state.sales.filter(s => s.customer === c.name).length;
@@ -2436,31 +2819,31 @@
         function viewCustomerHistory(i) {
             const customer = state.customers[i];
             if (!customer) return showToast("Customer not found", "error");
-            
+
             const sales = state.sales.filter(s => s.customer === customer.name);
-            
+
             if (sales.length === 0) {
                 showToast("No purchase history", "info");
                 return;
             }
-            
+
             let history = `${customer.name}'s Purchase History:\n\n`;
             sales.slice(-10).reverse().forEach(s => {
                 history += `${s.date}: ${s.productName} - ${formatNumber(s.totalPrice)} Tsh\n`;
             });
-            
+
             alert(history);
         }
 
         function addCustomer(e) {
             e.preventDefault();
             const name = document.getElementById('customerName').value.trim();
-            
+
             // Check for duplicate
             if (state.customers.some(c => c.name.toLowerCase() === name.toLowerCase())) {
                 return showToast('Customer already exists', 'error');
             }
-            
+
             state.customers.push({
                 name: name,
                 email: document.getElementById('customerEmail').value.trim(),
@@ -2593,11 +2976,11 @@
         function toggleInvoiceStatus(idx) {
             const inv = state.invoices[idx];
             if (!inv) return;
-            
+
             const statuses = ['Pending', 'Paid', 'Overdue'];
             const currentIdx = statuses.indexOf(inv.status);
             inv.status = statuses[(currentIdx + 1) % statuses.length];
-            
+
             saveData();
             render();
             showToast(`Invoice status changed to ${inv.status}`, 'success');
@@ -2607,7 +2990,7 @@
             e.preventDefault();
             const customerSelect = document.getElementById('invoiceCustomer').value;
             let customer;
-            
+
             if (customerSelect === 'new') {
                 const newName = document.getElementById('newInvoiceCustomerName')?.value.trim();
                 if (!newName) return showToast('Please enter customer name', 'error');
@@ -2617,12 +3000,12 @@
             } else {
                 customer = state.customers[customerSelect];
             }
-            
+
             const amount = parseFloat(document.getElementById('invoiceAmount').value);
             if (isNaN(amount) || amount <= 0) {
                 return showToast('Please enter a valid amount', 'error');
             }
-            
+
             const now = new Date();
             state.invoices.push({
                 number: 'INV-' + Date.now().toString().slice(-6),
@@ -2662,7 +3045,7 @@
         function renderUnpaid() {
             const unpaidList = state.unpaidEntries.filter(e => !e.paid);
             const unpaidTotal = unpaidList.reduce((sum, e) => sum + (e.amount || 0), 0);
-            
+
             return `
                 <div class="stat-grid">
                     <div class="stat-card">
@@ -2762,7 +3145,7 @@
             e.preventDefault();
             const now = new Date();
             state.unpaidEntries = state.unpaidEntries || [];
-            
+
             const customerIndex = document.getElementById('unpaidCustomer')?.value;
             const manualName = document.getElementById('unpaidName')?.value.trim();
             let customerName = manualName;
@@ -2782,12 +3165,12 @@
             if (!transactionType) {
                 return showToast("Please select product or enter transaction type", "error");
             }
-            
+
             const amount = parseFloat(document.getElementById('unpaidAmount').value);
             if (isNaN(amount) || amount <= 0) {
                 return showToast("Please enter a valid amount", "error");
             }
-            
+
             state.unpaidEntries.push({
                 name: customerName,
                 type: transactionType,
@@ -2805,7 +3188,7 @@
         function markAsPaid(timestamp) {
             const entry = state.unpaidEntries.find(e => e.timestamp === timestamp);
             if (!entry) return showToast("Entry not found", "error");
-            
+
             entry.paid = true;
             const now = new Date();
             state.sales.push({
@@ -2822,13 +3205,13 @@
                 profit: entry.amount,
                 payment: 'Unpaid Entry - Now Paid'
             });
-            
+
             // Update customer total
             const customer = state.customers.find(c => c.name === entry.name);
             if (customer) {
                 customer.totalPurchases = (customer.totalPurchases || 0) + entry.amount;
             }
-            
+
             saveData();
             render();
             showToast("Marked as paid and added to sales", "success");
@@ -2876,19 +3259,19 @@
 
         function renderNotesList(searchTerm = '') {
             let notes = state.notes.slice().reverse();
-            
+
             if (searchTerm) {
                 const term = searchTerm.toLowerCase();
-                notes = notes.filter(n => 
+                notes = notes.filter(n =>
                     n.content.toLowerCase().includes(term) ||
                     (n.title && n.title.toLowerCase().includes(term))
                 );
             }
-            
+
             if (notes.length === 0) {
                 return '<p style="text-align: center; color: #666;">No notes found</p>';
             }
-            
+
             return notes.map((note, idx) => {
                 const actualIndex = state.notes.length - 1 - idx;
                 return `
@@ -2910,11 +3293,11 @@
             const now = new Date();
             const content = document.getElementById('noteContent').value.trim();
             const title = document.getElementById('noteTitle')?.value.trim();
-            
+
             if (!content) {
                 return showToast('Please enter note content', 'error');
             }
-            
+
             state.notes.push({
                 title: title || '',
                 content: content,
@@ -3044,7 +3427,7 @@
             });
 
             const entries = Object.entries(categoryStats).sort((a, b) => b[1].profit - a[1].profit);
-            
+
             if (entries.length === 0) {
                 return '<p style="text-align: center; color: #666;">No category data yet</p>';
             }
@@ -3074,7 +3457,7 @@
             });
 
             const entries = Object.entries(productStats).sort((a, b) => b[1].profit - a[1].profit).slice(0, 10);
-            
+
             if (entries.length === 0) {
                 return '<p style="text-align: center; color: #666;">No product data yet</p>';
             }
@@ -3100,7 +3483,7 @@
             if (Object.keys(paymentTotals).length === 0) {
                 return '<p style="text-align: center; color: #666;">No payment data yet</p>';
             }
-            
+
             const entries = Object.entries(paymentTotals).sort((a, b) => b[1] - a[1]);
             return entries.map(([method, total]) => `
                 <div class="item">
@@ -3121,7 +3504,7 @@
                 halopesa: { deposit: 0, withdrawal: 0 },
                 yas: { deposit: 0, withdrawal: 0 }
             };
-            
+
             (state.transactions || []).forEach(t => {
                 if (transactionTotals[t.channel]) {
                     transactionTotals[t.channel][t.type] += t.amount || 0;
@@ -3147,12 +3530,12 @@
             };
 
             const hasTransactions = Object.values(transactionTotals).some(val => val.deposit > 0 || val.withdrawal > 0);
-            
+
             if (!hasTransactions) {
                 return '<p style="text-align: center; color: #666;">No transaction data yet</p>';
             }
 
-            const entries = Object.entries(transactionTotals).filter(([channel, amounts]) => 
+            const entries = Object.entries(transactionTotals).filter(([channel, amounts]) =>
                 amounts.deposit > 0 || amounts.withdrawal > 0
             );
 
@@ -3258,26 +3641,26 @@
             // Header
             doc.setFillColor(26, 26, 26);
             doc.rect(0, 0, pageWidth, 100, 'F');
-            
+
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(24);
             doc.setFont(undefined, 'bold');
             doc.text(SHOP_NAME, margin, 45);
-            
+
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
             doc.text(`${SHOP_ADDRESS} | ${SHOP_PHONE} | ${SHOP_EMAIL}`, margin, 70);
-            
+
             doc.setDrawColor(102, 126, 234);
             doc.setLineWidth(3);
             doc.line(margin, 85, pageWidth - margin, 85);
-            
+
             y = 120;
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(18);
             doc.setFont(undefined, 'bold');
             doc.text("Financial Report", margin, y);
-            
+
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
             doc.setTextColor(100, 100, 100);
@@ -3289,10 +3672,10 @@
                 const colWidth = usableWidth / colCount;
                 let curY = startY;
                 const rowHeight = 22;
-                
+
                 doc.setFillColor(102, 126, 234);
                 doc.roundedRect(margin, curY, usableWidth, rowHeight, 3, 3, 'F');
-                
+
                 doc.setTextColor(255, 255, 255);
                 doc.setFont(undefined, 'bold');
                 doc.setFontSize(10);
@@ -3305,16 +3688,16 @@
                 doc.setFont(undefined, 'normal');
                 doc.setFontSize(9);
                 for (let r = 0; r < rows.length; r++) {
-                    if (curY + rowHeight > 750) { 
-                        doc.addPage(); 
+                    if (curY + rowHeight > 750) {
+                        doc.addPage();
                         curY = margin;
                     }
-                    
+
                     if (r % 2 === 0) {
                         doc.setFillColor(248, 249, 250);
                         doc.roundedRect(margin, curY, usableWidth, rowHeight, 2, 2, 'F');
                     }
-                    
+
                     doc.setTextColor(40, 40, 40);
                     for (let c = 0; c < colCount; c++) {
                         const txt = rows[r][c] === null || rows[r][c] === undefined ? '' : String(rows[r][c]);
@@ -3374,7 +3757,7 @@
                 doc.setFontSize(16);
                 doc.setFont(undefined, 'bold');
                 doc.text("Analytics Overview", margin, 50);
-                
+
                 const chartImage = chartInstance.toBase64Image();
                 doc.addImage(chartImage, 'PNG', margin, 70, usableWidth, 250);
             }
@@ -3413,14 +3796,14 @@
                 ["Type", "Date", "Customer", "Amount (Tsh)"],
                 ...((state.transactions || []).map(t => [t.channel.toUpperCase(), t.date, t.customerName || 'N/A', t.amount]))
             ];
-            
+
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.aoa_to_sheet(rows);
-            
+
             ws['!cols'] = [
                 { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 15 }
             ];
-            
+
             XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
             XLSX.writeFile(wb, `Financial_Report_${new Date().toLocaleDateString()}.xlsx`);
             showToast("Excel downloaded successfully!", "success");
@@ -3503,6 +3886,7 @@
             const app = document.getElementById('app');
             switch (state.activeTab) {
                 case 'dashboard': app.innerHTML = renderDashboard(); break;
+                case 'account': app.innerHTML = renderAccount(); break;  // ADD THIS LINE
                 case 'sales': app.innerHTML = renderSales(); break;
                 case 'transactions': app.innerHTML = renderTransactions(); break;
                 case 'products': app.innerHTML = renderProducts(); break;
@@ -3511,7 +3895,7 @@
                 case 'inventory': app.innerHTML = renderInventory(); break;
                 case 'customers': app.innerHTML = renderCustomers(); break;
                 case 'invoices': app.innerHTML = renderInvoices(); break;
-                case 'analytics': 
+                case 'analytics':
                     app.innerHTML = renderAnalytics();
                     createAnalyticsChart();
                     break;
@@ -3523,11 +3907,12 @@
 
         // Initialize
         loadData();
+        initSupabase();  // ADD THIS LINE
         render();
 
         // Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(() => {});
+            navigator.serviceWorker.register('sw.js').catch(() => { });
         }
 
         // Auto-save every 30 seconds
@@ -3555,4 +3940,5 @@
         document.querySelector('link[rel="manifest"]').setAttribute('href', manifestURL);
     </script>
 </body>
+
 </html>
