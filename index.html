@@ -1134,6 +1134,54 @@
                 showToast('Sign out error: ' + error.message, 'error');
             }
         }
+        async function pushAllDataToSupabase() {
+            if (!syncEnabled || !currentUser) return;
+
+            updateSyncIndicator('syncing');
+
+            try {
+                // Sync all products
+                for (const product of state.products) {
+                    await pushToSupabase('products', {
+                        name: product.name,
+                        category: product.category,
+                        cost: product.cost,
+                        price: product.price
+                    });
+                }
+
+                // Sync all categories
+                for (const category of state.categories) {
+                    await pushToSupabase('categories', {
+                        name: category
+                    });
+                }
+
+                // Sync all sales
+                for (const sale of state.sales) {
+                    await pushToSupabase('sales', {
+                        date: sale.date,
+                        time: sale.time,
+                        timestamp: sale.timestamp,
+                        product_name: sale.productName,
+                        customer: sale.customer,
+                        quantity: sale.quantity,
+                        cost_per_unit: sale.costPerUnit,
+                        price_per_unit: sale.pricePerUnit,
+                        total_cost: sale.totalCost,
+                        total_price: sale.totalPrice,
+                        profit: sale.profit,
+                        payment: sale.payment
+                    });
+                }
+
+                updateSyncIndicator('synced');
+                showToast('All data synced!', 'success');
+            } catch (error) {
+                console.error('Sync error:', error);
+                showToast('Sync failed', 'error');
+            }
+        }
 
         async function syncAllData() {
             if (!syncEnabled || !currentUser) return;
@@ -2367,7 +2415,7 @@
             document.getElementById('productsList').innerHTML = renderProductsList(term);
         }
 
-        function addProduct(e) {
+        async function addProduct(e) {
             e.preventDefault();
             const name = document.getElementById('productName').value.trim();
             const category = document.getElementById('productCategory').value;
@@ -2385,18 +2433,28 @@
                 }
             }
 
-            // Check for duplicate
             if (state.products.some(p => p.name.toLowerCase() === name.toLowerCase())) {
                 return showToast('Product already exists', 'error');
             }
 
-            state.products.push({ name, category, cost, price });
+            const product = { name, category, cost, price };
+            state.products.push(product);
             state.inventory[name] = { stock: stock, minAlert: 5 };
+
+            // SYNC TO SUPABASE
+            if (syncEnabled) {
+                await pushToSupabase('products', {
+                    name: product.name,
+                    category: product.category,
+                    cost: product.cost,
+                    price: product.price
+                });
+            }
+
             saveData();
             render();
             showToast("Product added successfully!", "success");
         }
-
         function editProductIndex(i) {
             const p = state.products[i];
             if (!p) return showToast("Product not found", "error");
@@ -2471,11 +2529,20 @@
             `;
         }
 
-        function addCategory(e) {
+        async function addCategory(e) {
             e.preventDefault();
             const name = document.getElementById('categoryName').value.trim();
             if (state.categories.includes(name)) return showToast('Category already exists', 'error');
+
             state.categories.push(name);
+
+            // SYNC TO SUPABASE
+            if (syncEnabled) {
+                await pushToSupabase('categories', {
+                    name: name
+                });
+            }
+
             saveData();
             render();
             showToast("Category added", "success");
