@@ -2259,13 +2259,13 @@
             <form onsubmit="updateUserProfile(event)">
                 <div class="form-group">
                     <label>Business Name</label>
-                    <input 
-                        type="text" 
-                        id="profileBusinessName" 
-                        value="${profile.businessName}" 
-                        placeholder="Your Wonderful business" 
-                        ${state.profileEditMode ? '' : 'readonly'}
-                        required>
+                   <input 
+                    type="text"
+                    id="profileBusinessName"
+                    value="${profile.businessName}"
+                    placeholder="Enter business name"
+                    ${state.profileEditMode ? '' : 'readonly'}
+                    required>
                 </div>
                 <div class="form-group">
                     <label>Email</label>
