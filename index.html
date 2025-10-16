@@ -4104,7 +4104,7 @@
             const items = inv.items.split(',').map(s => s.trim()).filter(Boolean);
             items.forEach(it => { doc.text(it, left, y); y += 14; });
             y += 6;
-            doc.setFontSize(12); doc.text(`Total: ${formatNumber(inv.amount)} Tsh`, 420, y); doc.text(`${formatNumber(inv.amount * 0.1)} Tsh`, 500, y);
+            doc.setFontSize(12); doc.text(`Total: ${formatNumber(inv.amount)} Tsh`, 420, y);
             y += 40; doc.setFontSize(10); doc.text("Thank you for your business.", left, y);
             doc.save(`${inv.number}.pdf`);
             showToast("Invoice PDF downloaded", "success");
