@@ -1211,10 +1211,10 @@
 
         function getUserProfileData() {
             return {
-                businessName: state.userProfile?.businessName || "Your Wonderful business",
-                email: state.userProfile?.email || currentUser?.email || "youremail@domain.com",
-                phone: state.userProfile?.phone || "+00000000000",
-                address: state.userProfile?.address || "your Address"
+                businessName: state.userProfile?.businessName || "",
+                email: state.userProfile?.email || currentUser?.email || "",
+                phone: state.userProfile?.phone || "",
+                address: state.userProfile?.address || ""
             };
         }
 
