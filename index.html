@@ -17,6 +17,12 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        input[readonly] {
+            background: rgba(0, 0, 0, 0.05);
+            cursor: not-allowed;
+            color: #666;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
@@ -1111,6 +1117,107 @@
             }
         }
 
+        async function loadUserProfile() {
+            if (!syncEnabled || !currentUser) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('user_profiles')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .single();
+
+                if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+                    console.error('Error loading profile:', error);
+                    return;
+                }
+
+                if (data) {
+                    state.userProfile = {
+                        businessName: data.business_name || "",
+                        email: data.email || currentUser.email || "",
+                        phone: data.phone || "",
+                        address: data.address || ""
+                    };
+                    // Set edit mode to false if profile has data
+                    state.profileEditMode = false;
+                    saveData();
+                } else {
+                    // Create default profile for new user
+                    state.profileEditMode = true; // Enable edit mode for new users
+                    await createDefaultProfile();
+                }
+            } catch (error) {
+                console.error('Load profile error:', error);
+            }
+        }
+        async function createDefaultProfile() {
+            if (!syncEnabled || !currentUser) return;
+
+            try {
+                const { error } = await supabase
+                    .from('user_profiles')
+                    .insert({
+                        user_id: currentUser.id,
+                        business_name: state.userProfile.businessName,
+                        email: currentUser.email,
+                        phone: state.userProfile.phone,
+                        address: state.userProfile.address
+                    });
+
+                if (error) {
+                    console.error('Error creating profile:', error);
+                }
+            } catch (error) {
+                console.error('Create profile error:', error);
+            }
+        }
+
+        async function saveUserProfile(profileData) {
+            if (!syncEnabled || !currentUser) {
+                showToast('Please sign in to save profile', 'error');
+                return false;
+            }
+
+            try {
+                updateSyncIndicator('syncing');
+
+                const { error } = await supabase
+                    .from('user_profiles')
+                    .upsert({
+                        user_id: currentUser.id,
+                        business_name: profileData.businessName,
+                        email: profileData.email,
+                        phone: profileData.phone,
+                        address: profileData.address,
+                        updated_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'user_id'
+                    });
+
+                if (error) throw error;
+
+                state.userProfile = { ...profileData };
+                saveData();
+                updateSyncIndicator('synced');
+                return true;
+            } catch (error) {
+                console.error('Save profile error:', error);
+                updateSyncIndicator('synced');
+                showToast('Error saving profile: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        function getUserProfileData() {
+            return {
+                businessName: state.userProfile?.businessName || "Your Wonderful business",
+                email: state.userProfile?.email || currentUser?.email || "youremail@domain.com",
+                phone: state.userProfile?.phone || "+00000000000",
+                address: state.userProfile?.address || "your Address"
+            };
+        }
+
         function updateSyncIndicator(status) {
             const indicator = document.getElementById('syncIndicator');
             if (!indicator) return;
@@ -1142,15 +1249,55 @@
             try {
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
+
                 currentUser = data.user;
                 syncEnabled = true;
 
-                // Pull data from cloud (don't push to avoid duplicates)
-                await syncAllData();
+                showToast('Signed in successfully!', 'success');
+
+                // Load user profile first
+                await loadUserProfile();
+
+                // Check if local data exists
+                const localHasData = state.sales.length > 0 || state.products.length > 0;
+
+                if (localHasData) {
+                    // Ask user what to do with existing local data
+                    const choice = confirm(
+                        'You have local data. Click OK to KEEP LOCAL data (push to cloud), or Cancel to LOAD CLOUD data (replace local).'
+                    );
+
+                    try {
+                        if (choice) {
+                            // Keep local, push to cloud
+                            await clearAndPushAllData();
+                            showToast('Local data pushed to cloud', 'success');
+                        } else {
+                            // Load from cloud, replace local
+                            localStorage.removeItem('financeManagerData');
+                            await pullDataFromSupabase();
+                            showToast('Cloud data loaded', 'success');
+                        }
+                    } catch (syncError) {
+                        console.error('Sync error after sign in:', syncError);
+                        showToast('Signed in but sync failed. Try manual sync.', 'error');
+                    }
+                } else {
+                    // No local data, just pull from cloud
+                    try {
+                        await pullDataFromSupabase();
+                    } catch (syncError) {
+                        console.error('Pull error after sign in:', syncError);
+                        showToast('Signed in but data pull failed. Try manual pull.', 'error');
+                    }
+                }
 
                 return data;
             } catch (error) {
+                console.error('Sign in error:', error);
                 showToast('Sign in error: ' + error.message, 'error');
+                currentUser = null;
+                syncEnabled = false;
                 return null;
             }
         }
@@ -1652,7 +1799,14 @@
             filterCategory: '',
             filterCustomer: '',
             dailyTarget: 0,
-            monthlyTarget: 0
+            monthlyTarget: 0,
+            userProfile: {
+                businessName: "",
+                email: "",
+                phone: "",
+                address: ""
+            },
+            profileEditMode: false  // ADD THIS LINE
         };
 
         let chartInstance = null;
@@ -1677,6 +1831,22 @@
                 try {
                     const parsed = JSON.parse(saved);
                     state = { ...state, ...parsed };
+
+                    // Ensure userProfile exists
+                    if (!state.userProfile) {
+                        state.userProfile = {
+                            businessName: "",
+                            email: "",
+                            phone: "",
+                            address: ""
+                        };
+                    }
+
+                    // Ensure profileEditMode exists
+                    if (state.profileEditMode === undefined) {
+                        state.profileEditMode = false;
+                    }
+
                     // Calculate current float balances
                     calculateFloatBalances();
                 } catch (e) {
@@ -2028,51 +2198,204 @@
             }
 
             // Signed in view
-            // Signed in view
-            // Signed in view
+            const profile = getUserProfileData();
+
+            // Check if profile is incomplete (empty values)
+            const isProfileIncomplete =
+                !profile.businessName ||
+                !profile.phone ||
+                !profile.address;
+
             return `
-    <div class="card">
-        <h2>☁️ Account</h2>
-        <div class="alert-success">
-            <div style="font-size: 14px; margin-bottom: 8px;">
-                ✓ Connected to Cloud
+        <div class="card">
+            <h2>☁️ Account</h2>
+            <div class="alert-success">
+                <div style="font-size: 14px; margin-bottom: 8px;">
+                    ✓ Connected to Cloud
+                </div>
+                <div style="font-size: 13px;">
+                    📧 ${currentUser.email}
+                </div>
             </div>
-            <div style="font-size: 13px;">
-                📧 ${currentUser.email}
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <button onclick="pullFromCloud()" class="btn-success">
+                    ⬇️ Pull from Cloud
+                </button>
+                <button onclick="pushToCloud()" class="btn-success">
+                    ⬆️ Push to Cloud
+                </button>
+            </div>
+
+            <button onclick="syncAllData()" class="btn" style="margin-bottom: 12px;">
+                🔄 Smart Sync
+            </button>
+            
+            <button onclick="forceRefresh()" class="btn-secondary" style="margin-bottom: 12px;">
+                🔃 Refresh Dashboard
+            </button>
+
+            <button onclick="signOut()" class="btn-danger">
+                Sign Out
+            </button>
+
+            <div class="alert-info">
+                <strong>Sync Options:</strong><br>
+                • <strong>Pull from Cloud:</strong> Download cloud data (overwrites local)<br>
+                • <strong>Push to Cloud:</strong> Upload local data (overwrites cloud)<br>
+                • <strong>Smart Sync:</strong> Auto-detect which direction to sync
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-            <button onclick="pullFromCloud()" class="btn-success">
-                ⬇️ Pull from Cloud
-            </button>
-            <button onclick="pushToCloud()" class="btn-success">
-                ⬆️ Push to Cloud
-            </button>
+        ${isProfileIncomplete && state.profileEditMode ? `
+            <div class="alert-box" style="animation: highlightFade 2s ease-out;">
+                <strong>📋 Complete Your Profile!</strong><br>
+                Please fill in your business information below for personalized invoices and reports.
+            </div>
+        ` : ''}
+
+        <div class="card" id="userProfileCard">
+            <h2>👤 User Profile</h2>
+            <form onsubmit="updateUserProfile(event)">
+                <div class="form-group">
+                    <label>Business Name</label>
+                    <input 
+                        type="text" 
+                        id="profileBusinessName" 
+                        value="${profile.businessName}" 
+                        placeholder="Your Wonderful business" 
+                        ${state.profileEditMode ? '' : 'readonly'}
+                        required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input 
+                        type="email" 
+                        id="profileEmail" 
+                        value="${profile.email}" 
+                        placeholder="youremail@domain.com" 
+                        ${state.profileEditMode ? '' : 'readonly'}
+                        required>
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input 
+                        type="tel" 
+                        id="profilePhone" 
+                        value="${profile.phone}" 
+                        placeholder="+00000000000" 
+                        ${state.profileEditMode ? '' : 'readonly'}
+                        required>
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <input 
+                        type="text" 
+                        id="profileAddress" 
+                        value="${profile.address}" 
+                        placeholder="your Address" 
+                        ${state.profileEditMode ? '' : 'readonly'}
+                        required>
+                </div>
+                
+                <div style="display: flex; gap: 12px;">
+                    <button 
+                        type="submit" 
+                        class="btn-success" 
+                        style="flex: 1; ${state.profileEditMode ? '' : 'opacity: 0.5; cursor: not-allowed;'}"
+                        ${state.profileEditMode ? '' : 'disabled'}>
+                        💾 Save Profile
+                    </button>
+                    
+                    ${!state.profileEditMode ? `
+                        <button 
+                            type="button" 
+                            class="btn" 
+                            style="flex: 1;"
+                            onclick="enableProfileEdit()">
+                            ✏️ Edit
+                        </button>
+                    ` : ''}
+                </div>
+            </form>
+            
+            <div class="alert-info" style="margin-top: 16px;">
+                <strong>📝 Note:</strong> This information will be used in invoices, reports, and other documents throughout the app.
+            </div>
         </div>
-
-        <button onclick="syncAllData()" class="btn" style="margin-bottom: 12px;">
-            🔄 Smart Sync
-        </button>
-        
-        <button onclick="forceRefresh()" class="btn-secondary" style="margin-bottom: 12px;">
-            🔃 Refresh Dashboard
-        </button>
-
-        <button onclick="signOut()" class="btn-danger">
-            Sign Out
-        </button>
-
-        <div class="alert-info">
-            <strong>Sync Options:</strong><br>
-            • <strong>Pull from Cloud:</strong> Download cloud data (overwrites local)<br>
-            • <strong>Push to Cloud:</strong> Upload local data (overwrites cloud)<br>
-            • <strong>Smart Sync:</strong> Auto-detect which direction to sync
-        </div>
-    </div>
-`;
+    `;
         }
 
+        async function updateUserProfile(e) {
+            e.preventDefault();
+
+            const profileData = {
+                businessName: document.getElementById('profileBusinessName').value.trim(),
+                email: document.getElementById('profileEmail').value.trim(),
+                phone: document.getElementById('profilePhone').value.trim(),
+                address: document.getElementById('profileAddress').value.trim()
+            };
+
+            const success = await saveUserProfile(profileData);
+
+            if (success) {
+                showToast('Profile updated successfully!', 'success');
+                render();
+            }
+        }
+
+        function enableProfileEdit() {
+            state.profileEditMode = true;
+            saveData();
+            render();
+        }
+
+        async function updateUserProfile(e) {
+            e.preventDefault();
+
+            const profileData = {
+                businessName: document.getElementById('profileBusinessName').value.trim(),
+                email: document.getElementById('profileEmail').value.trim(),
+                phone: document.getElementById('profilePhone').value.trim(),
+                address: document.getElementById('profileAddress').value.trim()
+            };
+
+            const success = await saveUserProfile(profileData);
+
+            if (success) {
+                state.profileEditMode = false; // Disable edit mode after saving
+                saveData();
+                showToast('Profile updated successfully!', 'success');
+                render();
+            }
+        }
+
+        function scrollToUserProfile() {
+            // Switch to account tab
+            state.activeTab = 'account';
+            render();
+
+            // Wait for render to complete, then scroll
+            setTimeout(() => {
+                const profileCard = document.getElementById('userProfileCard');
+                if (profileCard) {
+                    profileCard.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+
+                    // Add a highlight animation
+                    profileCard.style.transition = 'all 0.5s ease';
+                    profileCard.style.boxShadow = '0 0 0 4px rgba(102, 126, 234, 0.4), 0 15px 50px rgba(0, 0, 0, 0.2)';
+                    profileCard.style.transform = 'scale(1.01)';
+
+                    setTimeout(() => {
+                        profileCard.style.boxShadow = '';
+                        profileCard.style.transform = '';
+                    }, 2000);
+                }
+            }, 300);
+        }
         function switchAuthTab(tab) {
             if (tab === 'login') {
                 document.getElementById('loginForm').style.display = 'block';
@@ -2232,7 +2555,8 @@
             try {
                 const result = await signIn(email, password);
                 if (result) {
-                    // Success - form will disappear on render
+                    // Success - scroll to profile section
+                    scrollToUserProfile();
                 } else {
                     // Failed - re-enable buttons
                     if (loginForm) {
@@ -3770,8 +4094,9 @@
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
             const left = 40; let y = 40;
-            doc.setFontSize(20); doc.text(SHOP_NAME, left, y);
-            doc.setFontSize(11); doc.text(`${SHOP_ADDRESS} | ${SHOP_PHONE} | ${SHOP_EMAIL}`, left, y + 18);
+            const profile = getUserProfileData();
+            doc.setFontSize(20); doc.text(profile.businessName, left, y);
+            doc.setFontSize(11); doc.text(`${profile.address} | ${profile.phone} | ${profile.email}`, left, y + 18);
             doc.setFontSize(12); doc.text(`Invoice: ${inv.number}`, 420, y); doc.text(`Date: ${inv.date}`, 420, y + 16); doc.text(`Due: ${inv.dueDate}`, 420, y + 32);
             y += 64;
             doc.setDrawColor(200); doc.line(left, y, 555, y); y += 18;
@@ -4408,11 +4733,12 @@
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(24);
             doc.setFont(undefined, 'bold');
-            doc.text(SHOP_NAME, margin, 45);
+            const profile = getUserProfileData();
+            doc.text(profile.businessName, margin, 45);
 
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
-            doc.text(`${SHOP_ADDRESS} | ${SHOP_PHONE} | ${SHOP_EMAIL}`, margin, 70);
+            doc.text(`${profile.address} | ${profile.phone} | ${profile.email}`, margin, 70);
 
             doc.setDrawColor(102, 126, 234);
             doc.setLineWidth(3);
@@ -4567,11 +4893,13 @@
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(24);
             doc.setFont(undefined, 'bold');
-            doc.text(SHOP_NAME, margin, 45);
+
+            const profile = getUserProfileData();
+            doc.text(profile.businessName, margin, 45);
 
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
-            doc.text(`${SHOP_ADDRESS} | ${SHOP_PHONE} | ${SHOP_EMAIL}`, margin, 70);
+            doc.text(`${profile.address} | ${profile.phone} | ${profile.email}`, margin, 70);
 
             doc.setDrawColor(102, 126, 234);
             doc.setLineWidth(3);
@@ -4854,18 +5182,18 @@
             if (!syncEnabled || !currentUser) {
                 loadData();
                 render();
+            } else {
+                // If signed in, load profile
+                loadUserProfile().then(() => {
+                    render();
+                });
             }
         }, 1000);
 
-        // Service Worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(() => { });
-        }
-
-        // Auto-save every 30 seconds
+        // Auto-save every 15 seconds
         setInterval(() => {
             saveData();
-        }, 30000);
+        }, 15000);
 
         // PWA Manifest
         const manifestData = {
