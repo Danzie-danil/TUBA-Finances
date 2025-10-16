@@ -1013,6 +1013,40 @@
             50% {
                 opacity: 0.6;
             }
+
+        }
+
+        .checkbox-select {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            margin-right: 8px;
+            accent-color: #1976d2;
+        }
+
+        .bulk-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: linear-gradient(145deg, #f5f5f5, #e8e8e8);
+            border-radius: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .bulk-actions label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
         }
     </style>
     <!-- Add this line -->
@@ -1845,6 +1879,8 @@
             unpaidEntries: [],
             currentNoteIndex: null,
             collapsedSections: {},
+            listExpanded: {},           // ADD THIS
+            selectedItems: {},          // ADD THIS
             transactionFloats: {
                 mpesa: { initial: 0, current: 0 },
                 crdb: { initial: 0, current: 0 },
@@ -1866,11 +1902,23 @@
                 phone: "",
                 address: ""
             },
-            profileEditMode: false  // ADD THIS LINE
+            profileEditMode: false,
+            profileLoaded: false        // ADD THIS
         };
 
         let chartInstance = null;
-        let isSyncing = false; // ADD THIS LINE
+        let isSyncing = false;
+        let idCounters = {              // ADD THIS ENTIRE OBJECT
+            sales: 0,
+            products: 0,
+            expenses: 0,
+            customers: 0,
+            invoices: 0,
+            categories: 0,
+            notes: 0,
+            transactions: 0,
+            unpaid: 0
+        };
 
         function getTodayDateString() {
             const now = new Date();
@@ -1882,31 +1930,29 @@
 
         // ID Generation Functions
         function generateID(type) {
-            if (!idCounters[type]) idCounters[type] = 0;
+            const prefix = {
+                'sales': 'S',
+                'products': 'P',
+                'expenses': 'E',
+                'customers': 'C',
+                'transactions': 'T',
+                'unpaid': 'U',
+                'notes': 'N',
+                'categories': 'CAT',
+                'invoices': 'INV'
+            }[type] || 'X';
 
-            // Find max existing ID
             let maxId = 0;
-            const prefix = type.charAt(0).toUpperCase();
+            const items = type === 'unpaid' ? state.unpaidEntries : (state[type] || []);
 
-            if (type === 'sales') {
-                state.sales.forEach(s => {
-                    if (s.id && s.id.startsWith('S-')) {
-                        const num = parseInt(s.id.split('-')[1]);
-                        if (num > maxId) maxId = num;
-                    }
-                });
-            } else if (type === 'products') {
-                state.products.forEach(p => {
-                    if (p.id && p.id.startsWith('P-')) {
-                        const num = parseInt(p.id.split('-')[1]);
-                        if (num > maxId) maxId = num;
-                    }
-                });
-            }
-            // Add similar checks for other types
+            items.forEach(item => {
+                if (item.id && item.id.startsWith(prefix + '-')) {
+                    const num = parseInt(item.id.split('-')[1]);
+                    if (!isNaN(num) && num > maxId) maxId = num;
+                }
+            });
 
-            idCounters[type] = Math.max(idCounters[type], maxId + 1);
-            return `${prefix}-${String(idCounters[type]).padStart(6, '0')}`;
+            return `${prefix}-${String(maxId + 1).padStart(6, '0')}`;
         }
 
         function ensureIDs() {
@@ -2744,51 +2790,76 @@
         </div>
 
         <div class="card">
-            <h2>Recent Sales (${filteredSales.length})</h2>
-            
-            <div class="search-box">
-                <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
-            </div>
+                <h2>Recent Sales (${filteredSales.length})</h2>
+                
+                <div class="search-box">
+                    <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
+                </div>
 
-            <div class="filter-row">
-                <div class="form-group">
-                    <label>From...</label>
-                    <input type="date" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
-                </div>
-                <div class="form-group">
-                    <label>To...</label>
-                    <input type="date" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
-                </div>
-                <div class="form-group">
-                    <label>Customer</label>
-                    <select onchange="updateFilterCustomer(this.value)">
-                        <option value="">All Customers</option>
-                        ${[...new Set(state.sales.map(s => s.customer))].map(c =>
+                <div class="filter-row">
+                    <div class="form-group">
+                        <label>From...</label>
+                        <input type="date" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>To...</label>
+                        <input type="date" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>Customer</label>
+                        <select onchange="updateFilterCustomer(this.value)">
+                            <option value="">All Customers</option>
+                            ${[...new Set(state.sales.map(s => s.customer))].map(c =>
                 `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
             ).join('')}
-                    </select>
+                        </select>
+                    </div>
+                    <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
                 </div>
-                <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
-            </div>
 
-            ${renderCollapsibleList(filteredSales.slice().reverse(), 10, 'sales', (s, idx) => `
-                <div class="item">
-                    <div class="item-header">
-                        <span class="item-title">${s.productName}</span>
-                        <span style="color: #2e7d32; font-weight: 700;">💱 ${formatNumber(s.profit)} Tsh</span>
+                ${(state.listExpanded.sales || state.searchTerm || state.filterDateFrom || state.filterDateTo || state.filterCustomer) ? `
+                    <div class="bulk-actions">
+                        <input type="checkbox" id="selectAll_sales" onchange="toggleSelectAll('sales')" class="checkbox-select">
+                        <label for="selectAll_sales">Select All</label>
+                        <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                            ${getSelectedCount('sales')} selected
+                        </span>
+                        <button class="btn-small btn-danger" onclick="bulkDelete('sales')" ${!hasSelected('sales') ? 'disabled' : ''}>
+                            🗑️ Delete Selected
+                        </button>
                     </div>
-                    <div class="item-subtitle">
-                        ${s.date} ${s.time}<br>
-                        ${s.customer} | Qty: ${s.quantity} | ${s.payment}<br>
-                        Cost: ${formatNumber(s.totalCost)} | Price: ${formatNumber(s.totalPrice)}
-                    </div>
-                    <div class="flex-gap" style="margin-top:8px;">
-                        <button class="btn-small" onclick="editSaleByTimestamp(${s.timestamp})">Edit</button>
-                        <button class="btn-small btn-danger" onclick="deleteSaleByTimestamp(${s.timestamp})">Delete</button>
-                    </div>
-                </div>
-            `, 'No sales yet')}
-        </div>
+
+                    ${filteredSales.slice().reverse().map((s, idx) => `
+                        <div class="item">
+                            <div style="display: flex; gap: 12px; align-items: start;">
+                                <input type="checkbox" class="checkbox-select" 
+                                       ${state.selectedItems.sales && state.selectedItems.sales[s.id] ? 'checked' : ''}
+                                       onchange="toggleSelect('sales', '${s.id}')">
+                                <div style="flex: 1;">
+                                    <div class="item-header">
+                                        <span class="item-title">${s.productName}</span>
+                                        <span style="color: #2e7d32; font-weight: 700;">💰 ${formatNumber(s.profit)} Tsh</span>
+                                    </div>
+                                    <div class="item-subtitle">
+                                        ${s.date} ${s.time}<br>
+                                        ${s.customer} | Qty: ${s.quantity} | ${s.payment}<br>
+                                        Cost: ${formatNumber(s.totalCost)} | Price: ${formatNumber(s.totalPrice)}
+                                    </div>
+                                    <div class="flex-gap" style="margin-top:8px;">
+                                        <button class="btn-small" onclick="editSaleByTimestamp(${s.timestamp})">Edit</button>
+                                        <button class="btn-small btn-danger" onclick="deleteSaleByTimestamp(${s.timestamp})">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('') || '<p style="text-align: center; color: #666;">No sales found</p>'}
+                ` : ''}
+
+                <button class="collapse-btn" onclick="toggleListExpanded('sales')">
+                    <span class="collapse-icon ${state.listExpanded.sales ? 'expanded' : ''}">▼</span>
+                    <span>${state.listExpanded.sales ? 'Hide' : 'Show'} All Sales</span>
+                </button>
+            </div>
     `;
         }
 
@@ -2901,6 +2972,105 @@
         function toggleCollapse(chunkId) {
             state.collapsedSections[chunkId] = !state.collapsedSections[chunkId];
             render();
+        }
+
+        function toggleListExpanded(key) {
+            if (!state.listExpanded) state.listExpanded = {};
+            state.listExpanded[key] = !state.listExpanded[key];
+            render();
+        }
+
+        function toggleSelectAll(type) {
+            if (!state.selectedItems[type]) state.selectedItems[type] = {};
+            const checkbox = document.getElementById(`selectAll_${type}`);
+            const checked = checkbox ? checkbox.checked : false;
+
+            const items = type === 'unpaidEntries' ? state.unpaidEntries : state[type];
+            items.forEach(item => {
+                if (item.id) {
+                    state.selectedItems[type][item.id] = checked;
+                }
+            });
+            saveData();
+            render();
+        }
+
+        function toggleSelect(type, id) {
+            if (!state.selectedItems[type]) state.selectedItems[type] = {};
+            state.selectedItems[type][id] = !state.selectedItems[type][id];
+            saveData();
+        }
+
+        function hasSelected(type) {
+            return state.selectedItems[type] && Object.values(state.selectedItems[type]).some(v => v);
+        }
+
+        function getSelectedCount(type) {
+            if (!state.selectedItems[type]) return 0;
+            return Object.values(state.selectedItems[type]).filter(v => v).length;
+        }
+
+        function bulkDelete(type) {
+            const selected = Object.keys(state.selectedItems[type] || {}).filter(id => state.selectedItems[type][id]);
+
+            if (selected.length === 0) return showToast('No items selected', 'info');
+
+            showConfirm(`Delete ${selected.length} selected items?`, async function () {
+                const items = type === 'unpaidEntries' ? state.unpaidEntries : state[type];
+                const filtered = items.filter(item => !selected.includes(item.id));
+
+                if (type === 'unpaidEntries') {
+                    state.unpaidEntries = filtered;
+                } else {
+                    state[type] = filtered;
+                }
+
+                state.selectedItems[type] = {};
+                saveData();
+                render();
+                showToast(`${selected.length} items deleted`, 'success');
+
+                if (syncEnabled) syncInBackground();
+            });
+        }
+
+        function bulkMarkPaid() {
+            const selected = Object.keys(state.selectedItems.unpaidEntries || {})
+                .filter(id => state.selectedItems.unpaidEntries[id]);
+
+            if (selected.length === 0) return showToast('No items selected', 'info');
+
+            showConfirm(`Mark ${selected.length} entries as paid?`, function () {
+                selected.forEach(id => {
+                    const entry = state.unpaidEntries.find(e => e.id === id);
+                    if (entry) {
+                        entry.paid = true;
+                        const now = new Date();
+                        state.sales.push({
+                            id: generateID('sales'),
+                            date: getTodayDateString(),
+                            time: now.toLocaleTimeString(),
+                            timestamp: now.getTime(),
+                            productName: entry.type,
+                            customer: entry.name,
+                            quantity: 1,
+                            costPerUnit: 0,
+                            pricePerUnit: entry.amount,
+                            totalCost: 0,
+                            totalPrice: entry.amount,
+                            profit: entry.amount,
+                            payment: 'Unpaid Entry - Now Paid'
+                        });
+                    }
+                });
+
+                state.selectedItems.unpaidEntries = {};
+                saveData();
+                render();
+                showToast(`${selected.length} entries marked as paid`, 'success');
+
+                if (syncEnabled) syncInBackground();
+            });
         }
 
         function editSaleByTimestamp(ts) {
@@ -3160,24 +3330,50 @@
 
                 <div class="card">
                     <h2>${channels.find(c => c.id === currentChannel).label} Transactions (${channelTransactions.length})</h2>
-                    ${renderCollapsibleList(channelTransactions.slice().reverse(), 10, 'transactions_' + currentChannel, (t, idx) => `
-                        <div class="item">
-                            <div class="item-header">
-                                <span class="item-title">${t.customerName || 'N/A'}</span>
-                                <span class="badge badge-${t.channel}">${t.type.toUpperCase()}</span>
-                            </div>
-                            <div class="item-subtitle">
-                                ${t.date} ${t.time}<br>
-                                Amount: <strong style="color: ${t.type === 'deposit' ? '#2e7d32' : '#d32f2f'};">
-                                    ${t.type === 'deposit' ? '+' : '-'}💱 ${formatNumber(t.amount)} Tsh
-                                </strong>
-                            </div>
-                            <div class="flex-gap" style="margin-top:8px;">
-                                <button class="btn-small" onclick="editTransactionByTimestamp(${t.timestamp})">Edit</button>
-                                <button class="btn-small btn-danger" onclick="deleteTransactionByTimestamp(${t.timestamp})">Delete</button>
-                            </div>
+                    
+                    ${state.listExpanded.transactions ? `
+                        <div class="bulk-actions">
+                            <input type="checkbox" id="selectAll_transactions" onchange="toggleSelectAll('transactions')" class="checkbox-select">
+                            <label for="selectAll_transactions">Select All</label>
+                            <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                                ${getSelectedCount('transactions')} selected
+                            </span>
+                            <button class="btn-small btn-danger" onclick="bulkDelete('transactions')" ${!hasSelected('transactions') ? 'disabled' : ''}>
+                                🗑️ Delete Selected
+                            </button>
                         </div>
-                    `, 'No transactions yet')}
+
+                        ${channelTransactions.slice().reverse().map((t, idx) => `
+                            <div class="item">
+                                <div style="display: flex; gap: 12px; align-items: start;">
+                                    <input type="checkbox" class="checkbox-select" 
+                                           ${state.selectedItems.transactions && state.selectedItems.transactions[t.id] ? 'checked' : ''}
+                                           onchange="toggleSelect('transactions', '${t.id}')">
+                                    <div style="flex: 1;">
+                                        <div class="item-header">
+                                            <span class="item-title">${t.customerName || 'N/A'}</span>
+                                            <span class="badge badge-${t.channel}">${t.type.toUpperCase()}</span>
+                                        </div>
+                                        <div class="item-subtitle">
+                                            ${t.date} ${t.time}<br>
+                                            Amount: <strong style="color: ${t.type === 'deposit' ? '#2e7d32' : '#d32f2f'};">
+                                                ${t.type === 'deposit' ? '+' : '-'}💰 ${formatNumber(t.amount)} Tsh
+                                            </strong>
+                                        </div>
+                                        <div class="flex-gap" style="margin-top:8px;">
+                                            <button class="btn-small" onclick="editTransactionByTimestamp(${t.timestamp})">Edit</button>
+                                            <button class="btn-small btn-danger" onclick="deleteTransactionByTimestamp(${t.timestamp})">Delete</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('') || '<p style="text-align: center; color: #666;">No transactions yet</p>'}
+                    ` : ''}
+
+                    <button class="collapse-btn" onclick="toggleListExpanded('transactions')">
+                        <span class="collapse-icon ${state.listExpanded.transactions ? 'expanded' : ''}">▼</span>
+                        <span>${state.listExpanded.transactions ? 'Hide' : 'Show'} All Transactions</span>
+                    </button>
                 </div>
             `;
         }
@@ -3683,6 +3879,8 @@
                 return showToast('Please enter a valid amount', 'error');
             }
 
+            const now = new Date();  // ✅ ADD THIS LINE
+
             const expense = {
                 id: generateID('expenses'),
                 date: getTodayDateString(),
@@ -4166,7 +4364,11 @@
             const items = inv.items.split(',').map(s => s.trim()).filter(Boolean);
             items.forEach(it => { doc.text(it, left, y); y += 14; });
             y += 6;
-            doc.setFontSize(12); doc.text(`Total: ${formatNumber(inv.amount)} Tsh`, 420, y); doc.text(`${formatNumber(inv.amount * 0.1)} Tsh`, 500, y);
+            y += 6;
+            doc.line(left, y, 555, y); y += 18;
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(`Total: ${formatNumber(inv.amount)} Tsh`, 420, y);
             y += 40; doc.setFontSize(10); doc.text("Thank you for your business.", left, y);
             doc.save(`${inv.number}.pdf`);
             showToast("Invoice PDF downloaded", "success");
@@ -4223,20 +4425,42 @@
 
                 <div class="card">
                     <h2>Unpaid Entries (${unpaidList.length})</h2>
+                    
+                    <div class="bulk-actions">
+                        <input type="checkbox" id="selectAll_unpaidEntries" onchange="toggleSelectAll('unpaidEntries')" class="checkbox-select">
+                        <label for="selectAll_unpaidEntries">Select All</label>
+                        <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                            ${getSelectedCount('unpaidEntries')} selected
+                        </span>
+                        <button class="btn-small btn-success" onclick="bulkMarkPaid()" ${!hasSelected('unpaidEntries') ? 'disabled' : ''}>
+                            ✓ Mark Selected as Paid
+                        </button>
+                        <button class="btn-small btn-danger" onclick="bulkDelete('unpaidEntries')" ${!hasSelected('unpaidEntries') ? 'disabled' : ''}>
+                            🗑️ Delete Selected
+                        </button>
+                    </div>
+
                     ${unpaidList.map((entry, idx) => `
                         <div class="item" style="border-left: 4px solid #d32f2f;">
-                            <div class="item-header">
-                                <span class="item-title">${entry.name}</span>
-                                <span class="badge badge-unpaid">UNPAID</span>
-                            </div>
-                            <div class="item-subtitle">
-                                ${entry.date} ${entry.time}<br>
-                                Type: ${entry.type}<br>
-                                Amount: <strong style="color: #d32f2f;">💱 ${formatNumber(entry.amount)} Tsh</strong>
-                            </div>
-                            <div class="flex-gap" style="margin-top:8px;">
-                                <button class="btn-success btn-small" onclick="markAsPaid(${entry.timestamp})">✓ Mark Paid</button>
-                                <button class="btn-small btn-danger" onclick="deleteUnpaidEntry(${entry.timestamp})">Delete</button>
+                            <div style="display: flex; gap: 12px; align-items: start;">
+                                <input type="checkbox" class="checkbox-select" 
+                                       ${state.selectedItems.unpaidEntries && state.selectedItems.unpaidEntries[entry.id] ? 'checked' : ''}
+                                       onchange="toggleSelect('unpaidEntries', '${entry.id}')">
+                                <div style="flex: 1;">
+                                    <div class="item-header">
+                                        <span class="item-title">${entry.name}</span>
+                                        <span class="badge badge-unpaid">UNPAID</span>
+                                    </div>
+                                    <div class="item-subtitle">
+                                        ${entry.date} ${entry.time}<br>
+                                        Type: ${entry.type}<br>
+                                        Amount: <strong style="color: #d32f2f;">💰 ${formatNumber(entry.amount)} Tsh</strong>
+                                    </div>
+                                    <div class="flex-gap" style="margin-top:8px;">
+                                        <button class="btn-success btn-small" onclick="markAsPaid(${entry.timestamp})">✓ Mark Paid</button>
+                                        <button class="btn-small btn-danger" onclick="deleteUnpaidEntry(${entry.timestamp})">Delete</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     `).join('') || '<p style="text-align: center; color: #666;">No unpaid entries</p>'}
@@ -4413,10 +4637,22 @@
             return notes.map((note, idx) => {
                 const actualIndex = state.notes.length - 1 - idx;
                 return `
-                    <div class="item note-preview" onclick="openNoteModal(${actualIndex})">
-                        ${note.title ? `<div class="item-title" style="margin-bottom: 8px;">${note.title}</div>` : ''}
-                        <div class="item-subtitle" style="margin-bottom: 8px;">${note.date} ${note.time}</div>
-                        <div style="white-space: pre-wrap;">${note.content}</div>
+                    <div class="item" style="display: flex; gap: 12px; align-items: start;">
+                        <div class="note-preview" onclick="openNoteModal(${actualIndex})" style="flex: 1; cursor: pointer;">
+                            ${note.title ? `<div class="item-title" style="margin-bottom: 8px;">${note.title}</div>` : ''}
+                            <div class="item-subtitle" style="margin-bottom: 8px;">${note.date} ${note.time}</div>
+                            <div style="white-space: pre-wrap;">${note.content}</div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <button class="btn-small" onclick="event.stopPropagation(); editNoteByIndex(${actualIndex})" 
+                                    style="padding: 8px; width: 40px; height: 40px;">
+                                ✏️
+                            </button>
+                            <button class="btn-small btn-danger" onclick="event.stopPropagation(); deleteNoteByIndex(${actualIndex})"
+                                    style="padding: 8px; width: 40px; height: 40px;">
+                                🗑️
+                            </button>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -4499,6 +4735,54 @@
                 showToast("Note deleted", "success");
 
                 // Sync in background
+                if (syncEnabled) syncInBackground();
+            });
+        }
+
+        function deleteNoteFromModal() {
+            if (state.currentNoteIndex === null) return;
+            showConfirm("Delete this note?", function () {
+                state.notes.splice(state.currentNoteIndex, 1);
+                saveData();
+                closeNoteModal();
+                render();
+                showToast("Note deleted", "success");
+
+                // Sync in background
+                if (syncEnabled) syncInBackground();
+            });
+        }
+
+        function editNoteByIndex(index) {
+            const note = state.notes[index];
+            if (!note) return showToast("Note not found", "error");
+
+            const newTitle = prompt("Edit title:", note.title || "");
+            if (newTitle === null) return; // User cancelled
+
+            const newContent = prompt("Edit note content:", note.content);
+            if (newContent === null) return; // User cancelled
+
+            if (newContent.trim()) {
+                note.title = newTitle.trim();
+                note.content = newContent.trim();
+                saveData();
+                render();
+                showToast("Note updated", "success");
+
+                if (syncEnabled) syncInBackground();
+            } else {
+                showToast("Note content cannot be empty", "error");
+            }
+        }
+
+        function deleteNoteByIndex(index) {
+            showConfirm("Delete this note?", function () {
+                state.notes.splice(index, 1);
+                saveData();
+                render();
+                showToast("Note deleted", "success");
+
                 if (syncEnabled) syncInBackground();
             });
         }
