@@ -1127,7 +1127,7 @@
                     .eq('user_id', currentUser.id)
                     .single();
 
-                if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+                if (error && error.code !== 'PGRST116') {
                     console.error('Error loading profile:', error);
                     return;
                 }
@@ -1139,18 +1139,19 @@
                         phone: data.phone || "",
                         address: data.address || ""
                     };
-                    // Set edit mode to false if profile has data
                     state.profileEditMode = false;
+                    state.profileLoaded = true; // Mark as loaded
                     saveData();
                 } else {
-                    // Create default profile for new user
-                    state.profileEditMode = true; // Enable edit mode for new users
-                    await createDefaultProfile();
+                    // New user - show edit mode ONCE
+                    state.profileEditMode = true;
+                    state.profileLoaded = false;
                 }
             } catch (error) {
                 console.error('Load profile error:', error);
             }
         }
+
         async function createDefaultProfile() {
             if (!syncEnabled || !currentUser) return;
 
@@ -1195,12 +1196,20 @@
                         onConflict: 'user_id'
                     });
 
+
                 if (error) throw error;
 
                 state.userProfile = { ...profileData };
                 saveData();
                 updateSyncIndicator('synced');
+
+                // Mark profile as loaded after first save
+                if (!state.profileLoaded) {
+                    state.profileLoaded = true;
+                    saveData();
+                }
                 return true;
+
             } catch (error) {
                 console.error('Save profile error:', error);
                 updateSyncIndicator('synced');
@@ -1261,35 +1270,19 @@
                 // Check if local data exists
                 const localHasData = state.sales.length > 0 || state.products.length > 0;
 
-                if (localHasData) {
-                    // Ask user what to do with existing local data
-                    const choice = confirm(
-                        'You have local data. Click OK to KEEP LOCAL data (push to cloud), or Cancel to LOAD CLOUD data (replace local).'
-                    );
-
-                    try {
-                        if (choice) {
-                            // Keep local, push to cloud
-                            await clearAndPushAllData();
-                            showToast('Local data pushed to cloud', 'success');
-                        } else {
-                            // Load from cloud, replace local
-                            localStorage.removeItem('financeManagerData');
-                            await pullDataFromSupabase();
-                            showToast('Cloud data loaded', 'success');
-                        }
-                    } catch (syncError) {
-                        console.error('Sync error after sign in:', syncError);
-                        showToast('Signed in but sync failed. Try manual sync.', 'error');
-                    }
-                } else {
-                    // No local data, just pull from cloud
-                    try {
+                try {
+                    if (localHasData) {
+                        // Smart merge - combine unique items by ID
+                        await smartMergeData();
+                        showToast('Local and cloud data merged successfully', 'success');
+                    } else {
+                        // No local data, just pull from cloud
                         await pullDataFromSupabase();
-                    } catch (syncError) {
-                        console.error('Pull error after sign in:', syncError);
-                        showToast('Signed in but data pull failed. Try manual pull.', 'error');
+                        showToast('Cloud data loaded', 'success');
                     }
+                } catch (syncError) {
+                    console.error('Sync error after sign in:', syncError);
+                    showToast('Signed in but sync failed. Try manual sync.', 'error');
                 }
 
                 return data;
@@ -1300,6 +1293,73 @@
                 syncEnabled = false;
                 return null;
             }
+        }
+
+        async function smartMergeData() {
+            try {
+                updateSyncIndicator('syncing');
+
+                // Pull cloud data first
+                await pullDataFromSupabase();
+                const cloudData = {
+                    sales: [...state.sales],
+                    products: [...state.products],
+                    expenses: [...state.expenses],
+                    customers: [...state.customers],
+                    transactions: [...state.transactions],
+                    unpaidEntries: [...state.unpaidEntries],
+                    notes: [...state.notes]
+                };
+
+                // Reload local data
+                const saved = localStorage.getItem('financeManagerData');
+                if (saved) {
+                    const localData = JSON.parse(saved);
+
+                    // Merge function - combine by ID
+                    const mergeByID = (local, cloud) => {
+                        const idMap = new Map();
+                        cloud.forEach(item => {
+                            if (item.id) idMap.set(item.id, item);
+                        });
+                        local.forEach(item => {
+                            if (!item.id) item.id = generateID(getTypeFromItem(item));
+                            if (!idMap.has(item.id)) {
+                                idMap.set(item.id, item);
+                            }
+                        });
+                        return Array.from(idMap.values());
+                    };
+
+                    // Merge each array
+                    state.sales = mergeByID(localData.sales || [], cloudData.sales);
+                    state.products = mergeByID(localData.products || [], cloudData.products);
+                    state.expenses = mergeByID(localData.expenses || [], cloudData.expenses);
+                    state.customers = mergeByID(localData.customers || [], cloudData.customers);
+                    state.transactions = mergeByID(localData.transactions || [], cloudData.transactions);
+                    state.unpaidEntries = mergeByID(localData.unpaidEntries || [], cloudData.unpaidEntries);
+                    state.notes = mergeByID(localData.notes || [], cloudData.notes);
+                }
+
+                // Push merged data back to cloud
+                await clearAndPushAllData();
+                updateSyncIndicator('synced');
+            } catch (error) {
+                console.error('Smart merge error:', error);
+                updateSyncIndicator('synced');
+                throw error;
+            }
+        }
+
+        function getTypeFromItem(item) {
+            if (item.productName) return 'sales';
+            if (item.cost !== undefined && item.price !== undefined) return 'products';
+            if (item.description && item.category) return 'expenses';
+            if (item.email !== undefined) return 'customers';
+            if (item.channel) return 'transactions';
+            if (item.paid !== undefined) return 'unpaid';
+            if (item.content) return 'notes';
+            return 'unknown';
         }
 
         async function signOut() {
@@ -1820,6 +1880,46 @@
             return `${year}-${month}-${day}`; // Returns: 2025-01-15
         }
 
+        // ID Generation Functions
+        function generateID(type) {
+            if (!idCounters[type]) idCounters[type] = 0;
+
+            // Find max existing ID
+            let maxId = 0;
+            const prefix = type.charAt(0).toUpperCase();
+
+            if (type === 'sales') {
+                state.sales.forEach(s => {
+                    if (s.id && s.id.startsWith('S-')) {
+                        const num = parseInt(s.id.split('-')[1]);
+                        if (num > maxId) maxId = num;
+                    }
+                });
+            } else if (type === 'products') {
+                state.products.forEach(p => {
+                    if (p.id && p.id.startsWith('P-')) {
+                        const num = parseInt(p.id.split('-')[1]);
+                        if (num > maxId) maxId = num;
+                    }
+                });
+            }
+            // Add similar checks for other types
+
+            idCounters[type] = Math.max(idCounters[type], maxId + 1);
+            return `${prefix}-${String(idCounters[type]).padStart(6, '0')}`;
+        }
+
+        function ensureIDs() {
+            // Add IDs to existing data
+            state.sales.forEach(s => { if (!s.id) s.id = generateID('sales'); });
+            state.products.forEach(p => { if (!p.id) p.id = generateID('products'); });
+            state.expenses.forEach(e => { if (!e.id) e.id = generateID('expenses'); });
+            state.customers.forEach(c => { if (!c.id) c.id = generateID('customers'); });
+            state.transactions.forEach(t => { if (!t.id) t.id = generateID('transactions'); });
+            state.unpaidEntries.forEach(u => { if (!u.id) u.id = generateID('unpaid'); });
+            state.notes.forEach(n => { if (!n.id) n.id = generateID('notes'); });
+        }
+
         function formatNumber(num) {
             if (num === null || num === undefined || isNaN(num)) return '0.00';
             return parseFloat(num).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -1849,10 +1949,16 @@
 
                     // Calculate current float balances
                     calculateFloatBalances();
+
+                    // Ensure all items have IDs
+                    ensureIDs();
                 } catch (e) {
                     console.error('Error loading data:', e);
                 }
             }
+
+            // Always ensure IDs exist
+            if (state.sales) ensureIDs();
         }
 
         function saveData() {
@@ -2483,59 +2589,6 @@
             }
         }
 
-        async function signIn(email, password) {
-            try {
-                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-                if (error) throw error;
-
-                currentUser = data.user;
-                syncEnabled = true;
-
-                showToast('Signed in successfully!', 'success');
-
-                // Check if local data exists
-                const localHasData = state.sales.length > 0 || state.products.length > 0;
-
-                if (localHasData) {
-                    // Ask user what to do with existing local data
-                    const choice = confirm(
-                        'You have local data. Click OK to KEEP LOCAL data (push to cloud), or Cancel to LOAD CLOUD data (replace local).'
-                    );
-
-                    try {
-                        if (choice) {
-                            // Keep local, push to cloud
-                            await clearAndPushAllData();
-                            showToast('Local data pushed to cloud', 'success');
-                        } else {
-                            // Load from cloud, replace local
-                            localStorage.removeItem('financeManagerData');
-                            await pullDataFromSupabase();
-                            showToast('Cloud data loaded', 'success');
-                        }
-                    } catch (syncError) {
-                        console.error('Sync error after sign in:', syncError);
-                        showToast('Signed in but sync failed. Try manual sync.', 'error');
-                    }
-                } else {
-                    // No local data, just pull from cloud
-                    try {
-                        await pullDataFromSupabase();
-                    } catch (syncError) {
-                        console.error('Pull error after sign in:', syncError);
-                        showToast('Signed in but data pull failed. Try manual pull.', 'error');
-                    }
-                }
-
-                return data;
-            } catch (error) {
-                console.error('Sign in error:', error);
-                showToast('Sign in error: ' + error.message, 'error');
-                currentUser = null;
-                syncEnabled = false;
-                return null;
-            }
-        }
 
         async function handleSignIn() {
             const email = document.getElementById('loginEmail')?.value;
@@ -2998,6 +3051,7 @@
             const totalCost = product.cost * quantity;
             const totalPrice = +(pricePerUnit * quantity).toFixed(2);
             const sale = {
+                id: generateID('sales'),
                 date: getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
@@ -3162,6 +3216,7 @@
             }
 
             const transaction = {
+                id: generateID('transactions'),
                 channel: state.activeTransactionChannel,
                 customerName: document.getElementById('transactionCustomer').value.trim() || 'N/A',
                 type: document.getElementById('transactionType').value,
@@ -3337,7 +3392,13 @@
                 return showToast('Product already exists', 'error');
             }
 
-            const product = { name, category, cost, price };
+            const product = {
+                id: generateID('products'),
+                name,
+                category,
+                cost,
+                price
+            };
             state.products.push(product);
             state.inventory[name] = { stock: stock, minAlert: 5 };
 
@@ -3622,8 +3683,8 @@
                 return showToast('Please enter a valid amount', 'error');
             }
 
-            const now = new Date();
             const expense = {
+                id: generateID('expenses'),
                 date: getTodayDateString(),
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
@@ -3890,6 +3951,7 @@
             }
 
             const customer = {
+                id: generateID('customers'),
                 name: name,
                 email: document.getElementById('customerEmail').value.trim(),
                 phone: document.getElementById('customerPhone').value.trim(),
@@ -4104,7 +4166,7 @@
             const items = inv.items.split(',').map(s => s.trim()).filter(Boolean);
             items.forEach(it => { doc.text(it, left, y); y += 14; });
             y += 6;
-            doc.setFontSize(12); doc.text(`Total: ${formatNumber(inv.amount)} Tsh`, 420, y);
+            doc.setFontSize(12); doc.text(`Total: ${formatNumber(inv.amount)} Tsh`, 420, y); doc.text(`${formatNumber(inv.amount * 0.1)} Tsh`, 500, y);
             y += 40; doc.setFontSize(10); doc.text("Thank you for your business.", left, y);
             doc.save(`${inv.number}.pdf`);
             showToast("Invoice PDF downloaded", "success");
