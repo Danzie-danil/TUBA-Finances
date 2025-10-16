@@ -4717,32 +4717,6 @@
                 });
             }, 100);
         }
-
-        // 🔧 Prevent duplicate entries in PDF reports
-        function uniqueByTimestamp(arr) {
-            if (!Array.isArray(arr)) return [];
-            const seen = new Set();
-            const out = [];
-            for (let i = 0; i < arr.length; i++) {
-                const item = arr[i];
-                // if item missing timestamp, try to fallback to a composite key
-                const ts = item && item.timestamp ? String(item.timestamp) : null;
-                if (!ts) {
-                    // fallback: use JSON string as key (less ideal but prevents total duplication)
-                    const key = JSON.stringify(item || {});
-                    if (seen.has(key)) continue;
-                    seen.add(key);
-                    out.push(item);
-                } else {
-                    if (seen.has(ts)) continue;
-                    seen.add(ts);
-                    out.push(item);
-                }
-            }
-            return out;
-        }
-
-
         function downloadSalesReportPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -4750,11 +4724,6 @@
             const margin = 50;
             const usableWidth = pageWidth - margin * 2;
             let y = 50;
-
-            // Deduplicate arrays for the report
-            const uniqueSales = uniqueByTimestamp(state.sales || []);
-            const uniqueExpenses = uniqueByTimestamp(state.expenses || []);
-            const uniqueTransactions = uniqueByTimestamp(state.transactions || []);
 
             // Header
             doc.setFillColor(26, 26, 26);
@@ -4830,7 +4799,7 @@
 
             // Sales
             const salesHeaders = ["Date", "Product", "Customer", "Qty", "Price", "Profit"];
-            const salesRows = uniqueSales.map(s => [
+            const salesRows = (state.sales || []).map(s => [
                 s.date, s.productName, s.customer, s.quantity, formatNumber(s.totalPrice) + ' Tsh', formatNumber(s.profit) + ' Tsh'
             ]);
             if (salesRows.length > 0) {
@@ -4844,7 +4813,7 @@
 
             // Expenses
             const expHeaders = ["Date", "Description", "Category", "Amount"];
-            const expRows = uniqueExpenses.map(e => [
+            const expRows = (state.expenses || []).map(e => [
                 e.date, e.description, e.category, formatNumber(e.amount || 0) + ' Tsh'
             ]);
             if (expRows.length > 0) {
@@ -4858,17 +4827,27 @@
 
             // Transactions
             const transHeaders = ["Type", "Date", "Customer", "Amount"];
-            const transRows = uniqueTransactions.map(t => [
-                (t.channel || '').toUpperCase(), t.date, t.customerName || 'N/A',
-                formatNumber(t.amount || 0) + ' Tsh'
+            const transRows = (state.transactions || []).map(t => [
+                t.channel.toUpperCase(), t.date, t.customerName || 'N/A', formatNumber(t.amount || 0) + ' Tsh'
             ]);
             if (transRows.length > 0) {
                 if (y > 650) { doc.addPage(); y = margin; }
                 doc.setFontSize(14);
                 doc.setFont(undefined, 'bold');
-                doc.text("Transactions", margin, y);
+                doc.text("Money Transactions", margin, y);
                 y += 15;
                 y = drawTable(transHeaders, transRows, y);
+            }
+
+            // Chart
+            if (chartInstance) {
+                doc.addPage();
+                doc.setFontSize(16);
+                doc.setFont(undefined, 'bold');
+                doc.text("Analytics Overview", margin, 50);
+
+                const chartImage = chartInstance.toBase64Image();
+                doc.addImage(chartImage, 'PNG', margin, 70, usableWidth, 250);
             }
 
             // Footer
@@ -4887,7 +4866,6 @@
             showToast("PDF downloaded successfully!", "success");
         }
 
-
         function downloadDailyReportPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -4897,11 +4875,9 @@
             let y = 50;
 
             const today = getTodayDateString();
-
-            // Deduplicate today's entries
-            const todaySales = uniqueByTimestamp((state.sales || []).filter(s => s.date === today));
-            const todayExpenses = uniqueByTimestamp((state.expenses || []).filter(e => e.date === today));
-            const todayTransactions = uniqueByTimestamp((state.transactions || []).filter(t => t.date === today));
+            const todaySales = state.sales.filter(s => s.date === today);
+            const todayExpenses = state.expenses.filter(e => e.date === today);
+            const todayTransactions = state.transactions.filter(t => t.date === today);
 
             // Calculate today's stats
             const todayRevenue = todaySales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
@@ -5068,7 +5044,6 @@
             doc.save(`Daily_Report_${today}.pdf`);
             showToast("Daily report downloaded successfully!", "success");
         }
-
 
         function downloadSalesReportExcel() {
             const rows = [
