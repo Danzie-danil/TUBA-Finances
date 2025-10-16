@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#000000">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <title>💼 Daniel's Pro</title>
+    <title>💼 TUBA</title>
     <link rel="manifest" href="manifest.json">
     <style>
         * {
@@ -1028,15 +1028,16 @@
 <body>
     <div class="welcome-screen">
         <div class="welcome-logo">💼</div>
-        <div class="welcome-title">Daniel's Pro</div>
-        <div class="welcome-subtitle">Advanced Finance Manager</div>
+        <div class="welcome-title">TUBA</div>
+        <div class="welcome-subtitle">The Ultimate Business Manager</div>
     </div>
 
     <div class="app-container">
         <div class="header">
             <button class="header-btn-left" onclick="importData()">📥</button>
             <div class="sync-indicator" id="syncIndicator">☁️ Synced</div>
-            <h1>💼 Daniel's Pro</h1>
+            <h1>💼 TUBA</h1>
+            <h2> The Ultimate Business manager</h2>
             <button class="header-btn" onclick="exportData()">💾</button>
         </div>
 
@@ -1075,10 +1076,10 @@
         let syncEnabled = false;
 
         // Your existing code continues below...
-        const SHOP_NAME = "Daniel's Finance Manager";
-        const SHOP_ADDRESS = "Arusha";
-        const SHOP_PHONE = "+255618721563";
-        const SHOP_EMAIL = "eastwindstationery12@gmail.com";
+        const SHOP_NAME = "";
+        const SHOP_ADDRESS = "";
+        const SHOP_PHONE = "";
+        const SHOP_EMAIL = "";
 
         // ========================================
         // SUPABASE FUNCTIONS
@@ -4859,7 +4860,7 @@
                 doc.setTextColor(100, 100, 100);
                 doc.setFontSize(9);
                 doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 12);
-                doc.text(`Daniel's Finance Manager © ${new Date().getFullYear()}`, pageWidth - margin - 150, 792 - 12);
+                doc.text(`The Ultimate Business Manager (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin - 150, 792 - 12);
             }
 
             doc.save(`Financial_Report_${getTodayDateString()}.pdf`);
@@ -5038,7 +5039,7 @@
                 doc.setTextColor(100, 100, 100);
                 doc.setFontSize(9);
                 doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 12);
-                doc.text(`Daniel's Finance Manager © ${new Date().getFullYear()}`, pageWidth - margin - 150, 792 - 12);
+                doc.text(`TUBA © ${new Date().getFullYear()}`, pageWidth - margin - 150, 792 - 12);
             }
 
             doc.save(`Daily_Report_${today}.pdf`);
@@ -5047,7 +5048,7 @@
 
         function downloadSalesReportExcel() {
             const rows = [
-                ["DANIEL'S FINANCE MANAGER"],
+                ["TUBA - The Ultimate Business Manager"],
                 ["Financial Report"],
                 [`Generated: ${getTodayDateString()}`],
                 [],
@@ -5102,7 +5103,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `daniels_finance_backup_${Date.now()}.json`;
+            a.download = `TUBA_finance_backup_${Date.now()}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -5196,8 +5197,8 @@
 
         // PWA Manifest
         const manifestData = {
-            "name": "Daniel's Finance Manager Pro",
-            "short_name": "Daniel's Pro",
+            "name": "TUBA",
+            "short_name": "TUBA",
             "start_url": ".",
             "display": "standalone",
             "background_color": "#000000",
