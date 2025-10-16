@@ -519,23 +519,25 @@
 
         .toast {
             position: fixed;
-            bottom: 80px;
+            bottom: 70px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.9);
             backdrop-filter: blur(10px);
             color: #fff;
-            padding: 12px 24px;
-            border-radius: 30px;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 11px;
             opacity: 0;
             transition: opacity 0.3s, bottom 0.3s;
             z-index: 9999;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            text-align: center;
         }
 
         .toast.show {
             opacity: 1;
-            bottom: 100px;
+            bottom: 75px;
         }
 
         .toast-success {
@@ -1419,6 +1421,19 @@
             }
         }
 
+        async function syncInBackground() {
+            if (!syncEnabled || !currentUser) return;
+
+            try {
+                // Silent background sync - no loading indicators
+                await clearAndPushAllData();
+                console.log('✅ Background sync complete');
+            } catch (error) {
+                console.error('❌ Background sync error:', error);
+                // Don't show error toast for background operations
+            }
+        }
+
         async function pullDataFromSupabase() {
             if (!syncEnabled || !currentUser) return;
 
@@ -1642,8 +1657,6 @@
 
         let chartInstance = null;
         let isSyncing = false; // ADD THIS LINE
-        let isOperationInProgress = false; // ADD THIS
-        let operationTimeouts = {}; // ADD THIS
 
         function getTodayDateString() {
             const now = new Date();
@@ -1678,34 +1691,6 @@
             } catch (e) {
                 console.error('Error saving data:', e);
                 showToast('Error saving data!', 'error');
-            }
-        }
-
-        // ADD THESE TWO FUNCTIONS BELOW:
-
-        function lockOperation(operationName = 'default') {
-            if (isOperationInProgress) {
-                showToast('Please wait, processing...', 'info');
-                return false;
-            }
-            isOperationInProgress = true;
-
-            // Auto-unlock after 5 seconds as safety measure
-            if (operationTimeouts[operationName]) {
-                clearTimeout(operationTimeouts[operationName]);
-            }
-            operationTimeouts[operationName] = setTimeout(() => {
-                unlockOperation(operationName);
-            }, 5000);
-
-            return true;
-        }
-
-        function unlockOperation(operationName = 'default') {
-            isOperationInProgress = false;
-            if (operationTimeouts[operationName]) {
-                clearTimeout(operationTimeouts[operationName]);
-                delete operationTimeouts[operationName];
             }
         }
 
@@ -1964,36 +1949,23 @@
         async function setDailyTarget() {
             const value = parseFloat(document.getElementById('dailyTarget').value) || 0;
             state.dailyTarget = value;
-
-            if (syncEnabled) {
-                // Sync settings (use upsert to avoid conflicts)
-                await supabase.from('settings').upsert({
-                    user_id: currentUser.id,
-                    daily_target: state.dailyTarget || 0,
-                    monthly_target: state.monthlyTarget || 0
-                }, { onConflict: 'user_id' });
-            }
-
             saveData();
             render();
             showToast('Daily target updated', 'success');
+
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
 
         async function setMonthlyTarget() {
             const value = parseFloat(document.getElementById('monthlyTarget').value) || 0;
             state.monthlyTarget = value;
-
-            if (syncEnabled) {
-                await supabase.from('settings').upsert({
-                    user_id: currentUser.id,
-                    daily_target: state.dailyTarget || 0,
-                    monthly_target: value
-                }, { onConflict: 'user_id' });
-            }
-
             saveData();
             render();
             showToast('Monthly target updated', 'success');
+
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
 
         function renderAccount() {
@@ -2324,115 +2296,125 @@
             }
 
             return `
-                <div class="stat-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">TOTAL CAPITAL</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.totalCapital)} Tsh</div>
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-label">TOTAL CAPITAL</div>
+                <div class="stat-value">💱 ${formatNumber(stats.totalCapital)} Tsh</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">TOTAL PROFIT</div>
+                <div class="stat-value">💱 ${formatNumber(stats.totalProfit)} Tsh</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">TODAY'S PROFIT</div>
+                <div class="stat-value">💱 ${formatNumber(stats.todayProfit)} Tsh</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">10% TODAY</div>
+                <div class="stat-value">💱 ${formatNumber(stats.todayProfit * 0.1)} Tsh</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Add Sale</h2>
+            <div class="card-header-buttons">
+                <button class="quick-nav-btn products" onclick="switchTab('products')">Products</button>
+                <button class="quick-nav-btn categories" onclick="switchTab('categories')">Categories</button>
+            </div>
+            <form onsubmit="addSale(event)">
+                <div class="form-group">
+                    <label>Product</label>
+                    <select id="saleProduct" onchange="updateSaleTotal()" required>
+                        <option value="">-- Select Product --</option>
+                        ${state.products.map((p, i) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || { stock: 0 }).stock})</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Customer</label>
+                    <select id="saleCustomer" onchange="toggleCustomerInput()">
+                        <option value="">-- Walk-in --</option>
+                        ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+                        <option value="new">+ Add New Customer</option>
+                    </select>
+                </div>
+                <div id="newCustomerFields" style="display:none;">
+                    <div class="form-group">
+                        <label>New Customer Name</label>
+                        <input type="text" id="newCustomerName" placeholder="Enter customer name">
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-label">TOTAL PROFIT</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.totalProfit)} Tsh</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">TODAY'S PROFIT</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.todayProfit)} Tsh</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">10% TODAY</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.todayProfit * 0.1)} Tsh</div>
+                    <div class="form-group">
+                        <label>Phone (Optional)</label>
+                        <input type="tel" id="newCustomerPhone" placeholder="+255...">
                     </div>
                 </div>
-
-                <div class="card">
-                    <h2>Add Sale</h2>
-                    <div class="card-header-buttons">
-                        <button class="quick-nav-btn products" onclick="switchTab('products')">Products</button>
-                        <button class="quick-nav-btn categories" onclick="switchTab('categories')">Categories</button>
-                    </div>
-                    <form onsubmit="addSale(event)">
-                        <div class="form-group">
-                            <label>Product</label>
-                            <select id="saleProduct" onchange="updateSaleTotal()" required>
-                                <option value="">-- Select Product --</option>
-                                ${state.products.map((p, i) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || { stock: 0 }).stock})</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Customer</label>
-                            <select id="saleCustomer" onchange="toggleCustomerInput()">
-                                <option value="">-- Walk-in --</option>
-                                ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
-                                <option value="new">+ Add New Customer</option>
-                            </select>
-                        </div>
-                        <div id="newCustomerFields" style="display:none;">
-                            <div class="form-group">
-                                <label>New Customer Name</label>
-                                <input type="text" id="newCustomerName" placeholder="Enter customer name">
-                            </div>
-                            <div class="form-group">
-                                <label>Phone (Optional)</label>
-                                <input type="tel" id="newCustomerPhone" placeholder="+255...">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Quantity</label>
-                            <input type="number" id="saleQuantity" value="1" min="1" onchange="updateSaleTotal()" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Payment Method</label>
-                            <select id="salePayment">
-                                <option>Cash</option>
-                                <option>Card</option>
-                                <option>Mobile Money</option>
-                                <option>M-Pesa Lipa Number</option>
-                                <option>Bank Transfer</option>
-                            </select>
-                        </div>
-                        <div id="saleInfo"></div>
-                        <button type="submit">Record Sale</button>
-                    </form>
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input type="number" id="saleQuantity" value="1" min="1" onchange="updateSaleTotal()" required>
                 </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="salePayment">
+                        <option>Cash</option>
+                        <option>Card</option>
+                        <option>Mobile Money</option>
+                        <option>M-Pesa Lipa Number</option>
+                        <option>Bank Transfer</option>
+                    </select>
+                </div>
+                <div id="saleInfo"></div>
+                <button type="submit">Record Sale</button>
+            </form>
+        </div>
 
-                <div class="card">
-                    <h2>Recent Sales (${filteredSales.length})</h2>
-                    
-                    <div class="search-box">
-                        <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
-                    </div>
+        <div class="card">
+            <h2>Recent Sales (${filteredSales.length})</h2>
+            
+            <div class="search-box">
+                <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
+            </div>
 
-                    <div class="filter-row">
-                        <input type="date" placeholder="From" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
-                        <input type="date" placeholder="To" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
-                        <select onchange="updateFilterCustomer(this.value)">
-                            <option value="">All Customers</option>
-                            ${[...new Set(state.sales.map(s => s.customer))].map(c =>
+            <div class="filter-row">
+                <div class="form-group">
+                    <label>From...</label>
+                    <input type="date" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
+                </div>
+                <div class="form-group">
+                    <label>To...</label>
+                    <input type="date" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Customer</label>
+                    <select onchange="updateFilterCustomer(this.value)">
+                        <option value="">All Customers</option>
+                        ${[...new Set(state.sales.map(s => s.customer))].map(c =>
                 `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
             ).join('')}
-                        </select>
-                        <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
-                    </div>
-
-                    ${renderCollapsibleList(filteredSales.slice().reverse(), 10, 'sales', (s, idx) => `
-                        <div class="item">
-                            <div class="item-header">
-                                <span class="item-title">${s.productName}</span>
-                                <span style="color: #2e7d32; font-weight: 700;">💱 ${formatNumber(s.profit)} Tsh</span>
-                            </div>
-                            <div class="item-subtitle">
-                                ${s.date} ${s.time}<br>
-                                ${s.customer} | Qty: ${s.quantity} | ${s.payment}<br>
-                                Cost: ${formatNumber(s.totalCost)} | Price: ${formatNumber(s.totalPrice)}
-                            </div>
-                            <div class="flex-gap" style="margin-top:8px;">
-                                <button class="btn-small" onclick="editSaleByTimestamp(${s.timestamp})">Edit</button>
-                                <button class="btn-small btn-danger" onclick="deleteSaleByTimestamp(${s.timestamp})">Delete</button>
-                            </div>
-                        </div>
-                    `, 'No sales yet')}
+                    </select>
                 </div>
-            `;
+                <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
+            </div>
+
+            ${renderCollapsibleList(filteredSales.slice().reverse(), 10, 'sales', (s, idx) => `
+                <div class="item">
+                    <div class="item-header">
+                        <span class="item-title">${s.productName}</span>
+                        <span style="color: #2e7d32; font-weight: 700;">💱 ${formatNumber(s.profit)} Tsh</span>
+                    </div>
+                    <div class="item-subtitle">
+                        ${s.date} ${s.time}<br>
+                        ${s.customer} | Qty: ${s.quantity} | ${s.payment}<br>
+                        Cost: ${formatNumber(s.totalCost)} | Price: ${formatNumber(s.totalPrice)}
+                    </div>
+                    <div class="flex-gap" style="margin-top:8px;">
+                        <button class="btn-small" onclick="editSaleByTimestamp(${s.timestamp})">Edit</button>
+                        <button class="btn-small btn-danger" onclick="deleteSaleByTimestamp(${s.timestamp})">Delete</button>
+                    </div>
+                </div>
+            `, 'No sales yet')}
+        </div>
+    `;
         }
+
 
         function updateSearchTerm(value) {
             state.searchTerm = value;
@@ -2544,20 +2526,12 @@
             render();
         }
 
-        async function editSaleByTimestamp(ts) {
-            // Prevent duplicate operations
-            if (!lockOperation('editSale')) return;
-
+        function editSaleByTimestamp(ts) {
             const idx = state.sales.findIndex(s => s.timestamp === ts);
-            if (idx === -1) {
-                unlockOperation('editSale');
-                return showToast("Sale not found", "error");
-            }
-
+            if (idx === -1) return showToast("Sale not found", "error");
             const s = state.sales[idx];
             const qty = prompt("Quantity:", s.quantity);
             const price = prompt("Price per unit:", s.pricePerUnit);
-
             if (qty && price && !isNaN(qty) && !isNaN(price)) {
                 const qtyNum = parseInt(qty);
                 const priceNum = parseFloat(price);
@@ -2567,7 +2541,6 @@
                 s.totalCost = s.costPerUnit * qtyNum;
                 s.profit = +(s.totalPrice - s.totalCost).toFixed(2);
                 s.timestamp = Date.now();
-
                 saveData();
                 render();
                 showToast("Sale updated", "success");
@@ -2575,21 +2548,12 @@
                 // Sync in background
                 if (syncEnabled) syncInBackground();
             }
-
-            unlockOperation('editSale');
         }
 
         function deleteSaleByTimestamp(ts) {
             showConfirm("Delete this sale?", async function () {
-                // Prevent duplicate operations
-                if (!lockOperation('deleteSale')) return;
-
                 const idx = state.sales.findIndex(s => s.timestamp === ts);
-                if (idx === -1) {
-                    unlockOperation('deleteSale');
-                    return showToast("Sale not found", "error");
-                }
-
+                if (idx === -1) return showToast("Sale not found", "error");
                 const sale = state.sales[idx];
 
                 // Return stock to inventory
@@ -2604,8 +2568,6 @@
 
                 // Sync in background
                 if (syncEnabled) syncInBackground();
-
-                unlockOperation('deleteSale');
             });
         }
 
@@ -2675,12 +2637,8 @@
             }, 100);
         }
 
-        async function addSale(e) {
+        function addSale(e) {
             e && e.preventDefault && e.preventDefault();
-
-            // Prevent duplicate operations
-            if (!lockOperation('addSale')) return;
-
             const productIndex = document.getElementById('saleProduct')?.value;
             if (productIndex === null || productIndex === '' || productIndex === undefined) return showToast('Please select a product', 'error');
             const product = state.products[productIndex];
@@ -2731,22 +2689,6 @@
             };
             state.sales = state.sales || [];
             state.sales.push(sale);
-            if (syncEnabled) {
-                pushToSupabase('sales', {
-                    date: sale.date,
-                    time: sale.time,
-                    timestamp: sale.timestamp,
-                    product_name: sale.productName,
-                    customer: sale.customer,
-                    quantity: sale.quantity,
-                    cost_per_unit: sale.costPerUnit,
-                    price_per_unit: sale.pricePerUnit,
-                    total_cost: sale.totalCost,
-                    total_price: sale.totalPrice,
-                    profit: sale.profit,
-                    payment: sale.payment
-                });
-            }
 
             // Update customer total purchases
             if (customer && customer.name !== 'WALK IN') {
@@ -2767,9 +2709,6 @@
 
             // Sync in background
             if (syncEnabled) syncInBackground();
-
-            // Unlock operation
-            unlockOperation('addSale');
         }
 
         function renderTransactions() {
@@ -2866,33 +2805,23 @@
         }
 
         async function editInitialFloat(channel) {
-            // Prevent duplicate operations
-            if (!lockOperation('editFloat')) return;
-
             const current = state.transactionFloats[channel].initial;
             const newValue = prompt(`Set initial float for ${channel.toUpperCase()}:`, current);
             if (newValue !== null) {
                 const val = parseFloat(newValue);
                 if (!isNaN(val) && val >= 0) {
                     state.transactionFloats[channel].initial = val;
-
-                    if (syncEnabled) {
-                        await supabase.from('transaction_floats').upsert({
-                            user_id: currentUser.id,
-                            channel: channel,
-                            initial_float: val
-                        }, { onConflict: 'user_id,channel' });
-                    }
-
                     calculateFloatBalances();
                     saveData();
                     render();
                     showToast('Float updated', 'success');
+
+                    // Sync in background
+                    if (syncEnabled) syncInBackground();
                 } else {
                     showToast('Invalid amount', 'error');
                 }
             }
-            unlockOperation('editFloat');
         }
         function switchTransactionChannel(channel) {
             state.activeTransactionChannel = channel;
@@ -2901,15 +2830,10 @@
 
         async function addTransaction(e) {
             e.preventDefault();
-
-            // Prevent duplicate operations
-            if (!lockOperation('addTransaction')) return;
-
             const now = new Date();
             const amount = parseFloat(document.getElementById('transactionAmount').value);
 
             if (isNaN(amount) || amount <= 0) {
-                unlockOperation('addTransaction');
                 return showToast('Please enter a valid amount', 'error');
             }
 
@@ -2926,41 +2850,22 @@
             state.transactions = state.transactions || [];
             state.transactions.push(transaction);
 
-            if (syncEnabled) {
-                await pushToSupabase('transactions', {
-                    channel: transaction.channel,
-                    customer_name: transaction.customerName,
-                    type: transaction.type,
-                    amount: transaction.amount,
-                    date: transaction.date,
-                    time: transaction.time,
-                    timestamp: transaction.timestamp
-                });
-            }
-
             calculateFloatBalances();
             saveData();
             render();
             showToast("Transaction recorded", "success");
 
-            unlockOperation('addTransaction');
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
 
-        async function editTransactionByTimestamp(ts) {
-            // Prevent duplicate operations
-            if (!lockOperation('editTransaction')) return;
-
+        function editTransactionByTimestamp(ts) {
             const idx = state.transactions.findIndex(t => t.timestamp === ts);
-            if (idx === -1) {
-                unlockOperation('editTransaction');
-                return showToast("Transaction not found", "error");
-            }
-
+            if (idx === -1) return showToast("Transaction not found", "error");
             const t = state.transactions[idx];
             const customer = prompt("Customer Name:", t.customerName);
             const type = confirm("Is this a DEPOSIT? (Cancel for Withdrawal)") ? 'deposit' : 'withdrawal';
             const amount = prompt("Amount:", t.amount);
-
             if (customer !== null && amount) {
                 const amountNum = parseFloat(amount);
                 if (!isNaN(amountNum) && amountNum > 0) {
@@ -2968,7 +2873,6 @@
                     t.type = type;
                     t.amount = amountNum;
                     t.timestamp = Date.now();
-
                     calculateFloatBalances();
                     saveData();
                     render();
@@ -2980,21 +2884,12 @@
                     showToast("Invalid amount", "error");
                 }
             }
-
-            unlockOperation('editTransaction');
         }
 
         function deleteTransactionByTimestamp(ts) {
             showConfirm("Delete this transaction?", async function () {
-                // Prevent duplicate operations
-                if (!lockOperation('deleteTransaction')) return;
-
                 const idx = state.transactions.findIndex(t => t.timestamp === ts);
-                if (idx === -1) {
-                    unlockOperation('deleteTransaction');
-                    return showToast("Transaction not found", "error");
-                }
-
+                if (idx === -1) return showToast("Transaction not found", "error");
                 state.transactions.splice(idx, 1);
                 calculateFloatBalances();
                 saveData();
@@ -3003,8 +2898,6 @@
 
                 // Sync in background
                 if (syncEnabled) syncInBackground();
-
-                unlockOperation('deleteTransaction');
             });
         }
 
@@ -3100,10 +2993,6 @@
 
         async function addProduct(e) {
             e.preventDefault();
-
-            // Prevent duplicate operations
-            if (!lockOperation('addProduct')) return;
-
             const name = document.getElementById('productName').value.trim();
             const category = document.getElementById('productCategory').value;
             const cost = parseFloat(document.getElementById('productCost').value);
@@ -3111,19 +3000,16 @@
             const stock = parseInt(document.getElementById('productStock').value) || 0;
 
             if (cost < 0 || price < 0) {
-                unlockOperation('addProduct');
                 return showToast('Cost and price must be positive', 'error');
             }
 
             if (price < cost) {
                 if (!confirm('Warning: Selling price is less than cost. Continue?')) {
-                    unlockOperation('addProduct');
                     return;
                 }
             }
 
             if (state.products.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-                unlockOperation('addProduct');
                 return showToast('Product already exists', 'error');
             }
 
@@ -3131,48 +3017,25 @@
             state.products.push(product);
             state.inventory[name] = { stock: stock, minAlert: 5 };
 
-            if (syncEnabled) {
-                await pushToSupabase('products', {
-                    name: product.name,
-                    category: product.category,
-                    cost: product.cost,
-                    price: product.price
-                });
-                await supabase.from('inventory').upsert({
-                    user_id: currentUser.id,
-                    product_name: name,
-                    stock: stock,
-                    min_alert: 5
-                }, { onConflict: 'user_id,product_name' });
-            }
-
             saveData();
             render();
             showToast("Product added successfully!", "success");
 
-            unlockOperation('addProduct');
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
 
-        async function editProductIndex(i) {
-            // Prevent duplicate operations
-            if (!lockOperation('editProduct')) return;
-
+        function editProductIndex(i) {
             const p = state.products[i];
-            if (!p) {
-                unlockOperation('editProduct');
-                return showToast("Product not found", "error");
-            }
-
+            if (!p) return showToast("Product not found", "error");
             const name = prompt("Product name:", p.name);
             const cost = prompt("Cost:", p.cost);
             const price = prompt("Price:", p.price);
-
             if (name && cost && price && !isNaN(cost) && !isNaN(price)) {
                 const costNum = parseFloat(cost);
                 const priceNum = parseFloat(price);
 
                 if (costNum < 0 || priceNum < 0) {
-                    unlockOperation('editProduct');
                     return showToast('Cost and price must be positive', 'error');
                 }
 
@@ -3185,7 +3048,6 @@
                     state.inventory[p.name] = state.inventory[oldName] || { stock: 0, minAlert: 5 };
                     delete state.inventory[oldName];
                 }
-
                 saveData();
                 render();
                 showToast("Product updated", "success");
@@ -3193,20 +3055,12 @@
                 // Sync in background
                 if (syncEnabled) syncInBackground();
             }
-
-            unlockOperation('editProduct');
         }
 
         function deleteProductIndex(i) {
             showConfirm("Delete this product?", async function () {
-                // Prevent duplicate operations
-                if (!lockOperation('deleteProduct')) return;
-
                 const p = state.products[i];
-                if (p && p.name && state.inventory && state.inventory[p.name]) {
-                    delete state.inventory[p.name];
-                }
-
+                if (p && p.name && state.inventory && state.inventory[p.name]) delete state.inventory[p.name];
                 state.products.splice(i, 1);
                 saveData();
                 render();
@@ -3214,11 +3068,8 @@
 
                 // Sync in background
                 if (syncEnabled) syncInBackground();
-
-                unlockOperation('deleteProduct');
             });
         }
-
         function renderCategories() {
             return `
                 <div class="card">
@@ -3259,51 +3110,31 @@
 
         async function addCategory(e) {
             e.preventDefault();
-
-            // Prevent duplicate operations
-            if (!lockOperation('addCategory')) return;
-
             const name = document.getElementById('categoryName').value.trim();
-
-            if (state.categories.includes(name)) {
-                unlockOperation('addCategory');
-                return showToast('Category already exists', 'error');
-            }
+            if (state.categories.includes(name)) return showToast('Category already exists', 'error');
 
             state.categories.push(name);
-
-            if (syncEnabled) {
-                await pushToSupabase('categories', { name: name });
-            }
-
             saveData();
             render();
             showToast("Category added", "success");
 
-            unlockOperation('addCategory');
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
 
-        async function editCategoryIndex(i) {
-            // Prevent duplicate operations
-            if (!lockOperation('editCategory')) return;
-
+        function editCategoryIndex(i) {
             const oldName = state.categories[i];
             const name = prompt("Category name:", oldName);
-
             if (name && name.trim()) {
                 const newName = name.trim();
                 if (state.categories.includes(newName) && newName !== oldName) {
-                    unlockOperation('editCategory');
                     return showToast('Category already exists', 'error');
                 }
-
                 state.categories[i] = newName;
-
                 // Update products with this category
                 state.products.forEach(p => {
                     if (p.category === oldName) p.category = newName;
                 });
-
                 saveData();
                 render();
                 showToast("Category updated", "success");
@@ -3311,24 +3142,17 @@
                 // Sync in background
                 if (syncEnabled) syncInBackground();
             }
-
-            unlockOperation('editCategory');
         }
 
         function deleteCategoryIndex(i) {
             const cat = state.categories[i];
             const productsInCategory = state.products.filter(p => p.category === cat).length;
-
             if (productsInCategory > 0) {
                 if (!confirm(`This category has ${productsInCategory} products. Delete anyway?`)) {
                     return;
                 }
             }
-
             showConfirm("Delete this category?", async function () {
-                // Prevent duplicate operations
-                if (!lockOperation('deleteCategory')) return;
-
                 state.categories.splice(i, 1);
                 saveData();
                 render();
@@ -3336,8 +3160,6 @@
 
                 // Sync in background
                 if (syncEnabled) syncInBackground();
-
-                unlockOperation('deleteCategory');
             });
         }
 
@@ -3471,13 +3293,8 @@
 
         async function addExpense(e) {
             e.preventDefault();
-
-            // Prevent duplicate operations
-            if (!lockOperation('addExpense')) return;
-
             const amount = parseFloat(document.getElementById('expenseAmount').value);
             if (isNaN(amount) || amount <= 0) {
-                unlockOperation('addExpense');
                 return showToast('Please enter a valid amount', 'error');
             }
 
@@ -3494,28 +3311,15 @@
             };
 
             state.expenses.push(expense);
-
-            if (syncEnabled) {
-                await pushToSupabase('expenses', {
-                    date: expense.date,
-                    time: expense.time,
-                    timestamp: expense.timestamp,
-                    description: expense.description,
-                    category: expense.category,
-                    amount: expense.amount,
-                    payment: expense.payment,
-                    comment: expense.comment
-                });
-            }
-
             saveData();
             render();
             showToast("Expense added", "success");
 
-            unlockOperation('addExpense');
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
 
-        async function editExpenseIndex(i) {
+        function editExpenseIndex(i) {
             const e = state.expenses[i];
             if (!e) return showToast("Expense not found", "error");
             const desc = prompt("Description:", e.description);
@@ -3527,12 +3331,11 @@
                     e.amount = amtNum;
                     e.timestamp = Date.now();
                     saveData();
-
-                    // Auto-sync to cloud
-                    if (syncEnabled) await clearAndPushAllData();
-
                     render();
-                    showToast("Expense updated & synced", "success");
+                    showToast("Expense updated", "success");
+
+                    // Sync in background
+                    if (syncEnabled) syncInBackground();
                 } else {
                     showToast("Invalid amount", "error");
                 }
@@ -3541,9 +3344,6 @@
 
         function deleteExpenseIndex(i) {
             showConfirm("Delete this expense?", async function () {
-                // Prevent duplicate operations
-                if (!lockOperation('deleteExpense')) return;
-
                 state.expenses.splice(i, 1);
                 saveData();
                 render();
@@ -3551,8 +3351,6 @@
 
                 // Sync in background
                 if (syncEnabled) syncInBackground();
-
-                unlockOperation('deleteExpense');
             });
         }
 
@@ -3602,67 +3400,39 @@
             `;
         }
 
-        async function adjustStock(productName, amount) {
-            // Prevent duplicate operations
-            if (!lockOperation('adjustStock')) return;
-
+        function adjustStock(productName, amount) {
             if (!state.inventory[productName]) {
                 state.inventory[productName] = { stock: 0, minAlert: 5 };
             }
-
             state.inventory[productName].stock = Math.max(0, state.inventory[productName].stock + amount);
-
             saveData();
             render();
             showToast(`Stock ${amount > 0 ? 'increased' : 'decreased'}`, 'success');
 
             // Sync in background
             if (syncEnabled) syncInBackground();
-
-            unlockOperation('adjustStock');
         }
 
         async function saveStockFor(productName) {
-            // Prevent duplicate operations
-            if (!lockOperation('saveStock')) return;
-
             const el = document.getElementById('inv_input_' + encodeURIComponent(productName));
-            if (!el) {
-                unlockOperation('saveStock');
-                return showToast("Input not found", "error");
-            }
+            if (!el) return showToast("Input not found", "error");
             const v = parseInt(el.value);
-            if (isNaN(v) || v < 0) {
-                unlockOperation('saveStock');
-                return showToast("Invalid value", "error");
-            }
+            if (isNaN(v) || v < 0) return showToast("Invalid value", "error");
             if (!state.inventory) state.inventory = {};
             state.inventory[productName] = state.inventory[productName] || { stock: 0, minAlert: 5 };
             state.inventory[productName].stock = v;
-
-            if (syncEnabled) {
-                await supabase.from('inventory').upsert({
-                    user_id: currentUser.id,
-                    product_name: productName,
-                    stock: v,
-                    min_alert: state.inventory[productName].minAlert
-                }, { onConflict: 'user_id,product_name' });
-            }
 
             saveData();
             render();
             showToast("Stock updated", "success");
 
-            unlockOperation('saveStock');
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
 
-        async function setMinAlert(productName) {
-            // Prevent duplicate operations
-            if (!lockOperation('setMinAlert')) return;
-
+        function setMinAlert(productName) {
             const current = state.inventory[productName]?.minAlert || 5;
             const newValue = prompt(`Set minimum stock alert for ${productName}:`, current);
-
             if (newValue !== null) {
                 const val = parseInt(newValue);
                 if (!isNaN(val) && val >= 0) {
@@ -3670,7 +3440,6 @@
                         state.inventory[productName] = { stock: 0, minAlert: 5 };
                     }
                     state.inventory[productName].minAlert = val;
-
                     saveData();
                     render();
                     showToast('Min alert updated', 'success');
@@ -3681,8 +3450,6 @@
                     showToast('Invalid value', 'error');
                 }
             }
-
-            unlockOperation('setMinAlert');
         }
 
         function renderCustomers() {
@@ -3792,14 +3559,9 @@
 
         async function addCustomer(e) {
             e.preventDefault();
-
-            // Prevent duplicate operations
-            if (!lockOperation('addCustomer')) return;
-
             const name = document.getElementById('customerName').value.trim();
 
             if (state.customers.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-                unlockOperation('addCustomer');
                 return showToast('Customer already exists', 'error');
             }
 
@@ -3812,43 +3574,23 @@
             };
 
             state.customers.push(customer);
-
-            if (syncEnabled) {
-                await pushToSupabase('customers', {
-                    name: customer.name,
-                    email: customer.email,
-                    phone: customer.phone,
-                    address: customer.address,
-                    total_purchases: 0
-                });
-            }
-
             saveData();
             render();
             showToast("Customer added", "success");
 
-            unlockOperation('addCustomer');
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
-
-        async function editCustomerIndex(i) {
-            // Prevent duplicate operations
-            if (!lockOperation('editCustomer')) return;
-
+        function editCustomerIndex(i) {
             const c = state.customers[i];
-            if (!c) {
-                unlockOperation('editCustomer');
-                return showToast("Customer not found", "error");
-            }
-
+            if (!c) return showToast("Customer not found", "error");
             const name = prompt("Name:", c.name);
             const email = prompt("Email:", c.email);
             const phone = prompt("Phone:", c.phone);
-
             if (name) {
                 c.name = name.trim();
                 if (email !== null) c.email = email.trim();
                 if (phone !== null) c.phone = phone.trim();
-
                 saveData();
                 render();
                 showToast("Customer updated", "success");
@@ -3856,15 +3598,10 @@
                 // Sync in background
                 if (syncEnabled) syncInBackground();
             }
-
-            unlockOperation('editCustomer');
         }
 
         function deleteCustomerIndex(i) {
             showConfirm("Delete this customer?", async function () {
-                // Prevent duplicate operations
-                if (!lockOperation('deleteCustomer')) return;
-
                 state.customers.splice(i, 1);
                 saveData();
                 render();
@@ -3872,10 +3609,9 @@
 
                 // Sync in background
                 if (syncEnabled) syncInBackground();
-
-                unlockOperation('deleteCustomer');
             });
         }
+
         function renderInvoices() {
             const stats = getStats();
             return `
@@ -3972,15 +3708,9 @@
             }
         }
 
-        async function toggleInvoiceStatus(idx) {
-            // Prevent duplicate operations
-            if (!lockOperation('toggleInvoice')) return;
-
+        function toggleInvoiceStatus(idx) {
             const inv = state.invoices[idx];
-            if (!inv) {
-                unlockOperation('toggleInvoice');
-                return;
-            }
+            if (!inv) return;
 
             const statuses = ['Pending', 'Paid', 'Overdue'];
             const currentIdx = statuses.indexOf(inv.status);
@@ -3992,25 +3722,16 @@
 
             // Sync in background
             if (syncEnabled) syncInBackground();
-
-            unlockOperation('toggleInvoice');
         }
 
         async function createInvoice(e) {
             e.preventDefault();
-
-            // Prevent duplicate operations
-            if (!lockOperation('createInvoice')) return;
-
             const customerSelect = document.getElementById('invoiceCustomer').value;
             let customer;
 
             if (customerSelect === 'new') {
                 const newName = document.getElementById('newInvoiceCustomerName')?.value.trim();
-                if (!newName) {
-                    unlockOperation('createInvoice');
-                    return showToast('Please enter customer name', 'error');
-                }
+                if (!newName) return showToast('Please enter customer name', 'error');
                 const newPhone = document.getElementById('newInvoiceCustomerPhone')?.value.trim();
                 customer = { name: newName, email: '', phone: newPhone, address: '', totalPurchases: 0 };
                 state.customers.push(customer);
@@ -4020,7 +3741,6 @@
 
             const amount = parseFloat(document.getElementById('invoiceAmount').value);
             if (isNaN(amount) || amount <= 0) {
-                unlockOperation('createInvoice');
                 return showToast('Please enter a valid amount', 'error');
             }
 
@@ -4036,25 +3756,12 @@
             };
 
             state.invoices.push(invoice);
-
-            // ADD THIS SYNC CODE:
-            if (syncEnabled) {
-                await pushToSupabase('invoices', {
-                    number: invoice.number,
-                    customer: invoice.customer,
-                    date: invoice.date,
-                    due_date: invoice.dueDate,
-                    items: invoice.items,
-                    amount: invoice.amount,
-                    status: invoice.status
-                });
-            }
-
             saveData();
             render();
             showToast("Invoice created", "success");
 
-            unlockOperation('createInvoice');
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
 
         function downloadInvoicePDF(i) {
@@ -4179,10 +3886,6 @@
 
         async function addUnpaidEntry(e) {
             e.preventDefault();
-
-            // Prevent duplicate operations
-            if (!lockOperation('addUnpaid')) return;
-
             const now = new Date();
             state.unpaidEntries = state.unpaidEntries || [];
 
@@ -4193,7 +3896,6 @@
                 customerName = state.customers[customerIndex].name;
             }
             if (!customerName) {
-                unlockOperation('addUnpaid');
                 return showToast("Please select or enter customer name", "error");
             }
 
@@ -4204,13 +3906,11 @@
                 transactionType = state.products[productIndex].name;
             }
             if (!transactionType) {
-                unlockOperation('addUnpaid');
                 return showToast("Please select product or enter transaction type", "error");
             }
 
             const amount = parseFloat(document.getElementById('unpaidAmount').value);
             if (isNaN(amount) || amount <= 0) {
-                unlockOperation('addUnpaid');
                 return showToast("Please enter a valid amount", "error");
             }
 
@@ -4225,35 +3925,17 @@
             };
 
             state.unpaidEntries.push(entry);
-
-            if (syncEnabled) {
-                await pushToSupabase('unpaid_entries', {
-                    name: entry.name,
-                    type: entry.type,
-                    amount: entry.amount,
-                    date: entry.date,
-                    time: entry.time,
-                    timestamp: entry.timestamp,
-                    paid: false
-                });
-            }
-
             saveData();
             render();
             showToast("Unpaid entry added", "success");
 
-            unlockOperation('addUnpaid');
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
 
-        async function markAsPaid(timestamp) {
-            // Prevent duplicate operations
-            if (!lockOperation('markPaid')) return;
-
+        function markAsPaid(timestamp) {
             const entry = state.unpaidEntries.find(e => e.timestamp === timestamp);
-            if (!entry) {
-                unlockOperation('markPaid');
-                return showToast("Entry not found", "error");
-            }
+            if (!entry) return showToast("Entry not found", "error");
 
             entry.paid = true;
             const now = new Date();
@@ -4284,27 +3966,17 @@
 
             // Sync in background
             if (syncEnabled) syncInBackground();
-
-            unlockOperation('markPaid');
         }
 
         function deleteUnpaidEntry(timestamp) {
-            showConfirm("Delete this unpaid entry?", async function () {
-                // Prevent duplicate operations
-                if (!lockOperation('deleteUnpaid')) return;
-
+            showConfirm("Delete this unpaid entry?", function () {
                 const idx = state.unpaidEntries.findIndex(e => e.timestamp === timestamp);
                 if (idx !== -1) {
                     state.unpaidEntries.splice(idx, 1);
                     saveData();
                     render();
                     showToast("Entry deleted", "success");
-
-                    // Sync in background
-                    if (syncEnabled) syncInBackground();
                 }
-
-                unlockOperation('deleteUnpaid');
             });
         }
 
@@ -4369,16 +4041,11 @@
 
         async function addNote(e) {
             e.preventDefault();
-
-            // Prevent duplicate operations
-            if (!lockOperation('addNote')) return;
-
             const now = new Date();
             const content = document.getElementById('noteContent').value.trim();
             const title = document.getElementById('noteTitle')?.value.trim();
 
             if (!content) {
-                unlockOperation('addNote');
                 return showToast('Please enter note content', 'error');
             }
 
@@ -4391,22 +4058,12 @@
             };
 
             state.notes.push(note);
-
-            if (syncEnabled) {
-                await pushToSupabase('notes', {
-                    title: note.title,
-                    content: note.content,
-                    date: note.date,
-                    time: note.time,
-                    timestamp: note.timestamp
-                });
-            }
-
             saveData();
             render();
             showToast("Note saved", "success");
 
-            unlockOperation('addNote');
+            // Sync in background
+            if (syncEnabled) syncInBackground();
         }
 
         function openNoteModal(index) {
@@ -4427,23 +4084,14 @@
             state.currentNoteIndex = null;
         }
 
-        async function editNoteFromModal() {
-            // Prevent duplicate operations
-            if (!lockOperation('editNote')) return;
-
-            if (state.currentNoteIndex === null) {
-                unlockOperation('editNote');
-                return;
-            }
-
+        function editNoteFromModal() {
+            if (state.currentNoteIndex === null) return;
             const note = state.notes[state.currentNoteIndex];
             const newTitle = prompt("Edit title:", note.title);
             const newContent = prompt("Edit note:", note.content);
-
             if (newContent !== null && newContent.trim()) {
                 if (newTitle !== null) note.title = newTitle.trim();
                 note.content = newContent.trim();
-
                 saveData();
                 closeNoteModal();
                 render();
@@ -4452,17 +4100,11 @@
                 // Sync in background
                 if (syncEnabled) syncInBackground();
             }
-
-            unlockOperation('editNote');
         }
 
         function deleteNoteFromModal() {
             if (state.currentNoteIndex === null) return;
-
-            showConfirm("Delete this note?", async function () {
-                // Prevent duplicate operations
-                if (!lockOperation('deleteNote')) return;
-
+            showConfirm("Delete this note?", function () {
                 state.notes.splice(state.currentNoteIndex, 1);
                 saveData();
                 closeNoteModal();
@@ -4471,8 +4113,6 @@
 
                 // Sync in background
                 if (syncEnabled) syncInBackground();
-
-                unlockOperation('deleteNote');
             });
         }
 
@@ -4481,57 +4121,58 @@
             const netProfit = stats.netProfit;
 
             return `
-                <div class="stat-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">REVENUE</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.totalRevenue)} Tsh</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">EXPENSES</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.totalExpenses)} Tsh</div>
-                    </div>
-                    <div class="stat-card" style="background: ${netProfit >= 0 ? '#2e7d32' : '#d32f2f'};">
-                        <div class="stat-label">NET PROFIT</div>
-                        <div class="stat-value">💱 ${formatNumber(netProfit)} Tsh</div>
-                    </div>
-                    <div class="stat-card" style="background: #1976d2;">
-                        <div class="stat-label">TOTAL SALES</div>
-                        <div class="stat-value">${stats.totalSalesCount}</div>
-                    </div>
-                </div>
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-label">REVENUE</div>
+                <div class="stat-value">💱 ${formatNumber(stats.totalRevenue)} Tsh</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">EXPENSES</div>
+                <div class="stat-value">💱 ${formatNumber(stats.totalExpenses)} Tsh</div>
+            </div>
+            <div class="stat-card" style="background: ${netProfit >= 0 ? '#2e7d32' : '#d32f2f'};">
+                <div class="stat-label">NET PROFIT</div>
+                <div class="stat-value">💱 ${formatNumber(netProfit)} Tsh</div>
+            </div>
+            <div class="stat-card" style="background: #1976d2;">
+                <div class="stat-label">TOTAL SALES</div>
+                <div class="stat-value">${stats.totalSalesCount}</div>
+            </div>
+        </div>
 
-                <div class="card">
-                    <h2>Payment Methods</h2>
-                    ${getPaymentMethodsHTML()}
-                </div>
+        <div class="card">
+            <h2>Payment Methods</h2>
+            ${getPaymentMethodsHTML()}
+        </div>
 
-                <div class="card">
-                    <h2>Money Transactions Summary</h2>
-                    ${getTransactionSummaryHTML()}
-                </div>
+        <div class="card">
+            <h2>Money Transactions Summary</h2>
+            ${getTransactionSummaryHTML()}
+        </div>
 
-                <div class="card">
-                    <h2>Category Performance</h2>
-                    ${getCategoryPerformanceHTML()}
-                </div>
+        <div class="card">
+            <h2>Category Performance</h2>
+            ${getCategoryPerformanceHTML()}
+        </div>
 
-                <div class="card">
-                    <h2>Top Products by Profit</h2>
-                    ${getTopProductsHTML()}
-                </div>
+        <div class="card">
+            <h2>Top Products by Profit</h2>
+            ${getTopProductsHTML()}
+        </div>
 
-                <div class="card">
-                    <h2>Analytics Chart</h2>
-                    <canvas id="analyticsChart"></canvas>
-                </div>
+        <div class="card">
+            <h2>Analytics Chart</h2>
+            <canvas id="analyticsChart"></canvas>
+        </div>
 
-                <div class="card">
-                    <h2>Download Reports</h2>
-                    <button onclick="downloadSalesReportPDF()">📥 Download Report (PDF)</button>
-                    <button class="btn-secondary" style="margin-top:8px;" onclick="downloadSalesReportExcel()">📥 Download Report (Excel)</button>
-                    <button class="btn-secondary" style="margin-top:8px;" onclick="downloadBackup()">💾 Backup All Data</button>
-                </div>
-            `;
+        <div class="card">
+            <h2>Download Reports</h2>
+            <button onclick="downloadDailyReportPDF()">📥 DAILY REPORT (PDF)</button>
+            <button style="margin-top:8px;" onclick="downloadSalesReportPDF()">📥 Download Report (PDF)</button>
+            <button class="btn-secondary" style="margin-top:8px;" onclick="downloadSalesReportExcel()">📥 Download Report (Excel)</button>
+            <button class="btn-secondary" style="margin-top:8px;" onclick="downloadBackup()">💾 Backup All Data</button>
+        </div>
+    `;
         }
 
         function getCategoryPerformanceHTML() {
@@ -4898,6 +4539,183 @@
 
             doc.save(`Financial_Report_${getTodayDateString()}.pdf`);
             showToast("PDF downloaded successfully!", "success");
+        }
+
+        function downloadDailyReportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            const pageWidth = 595.28;
+            const margin = 50;
+            const usableWidth = pageWidth - margin * 2;
+            let y = 50;
+
+            const today = getTodayDateString();
+            const todaySales = state.sales.filter(s => s.date === today);
+            const todayExpenses = state.expenses.filter(e => e.date === today);
+            const todayTransactions = state.transactions.filter(t => t.date === today);
+
+            // Calculate today's stats
+            const todayRevenue = todaySales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+            const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0);
+            const todayExpenseTotal = todayExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+            const todayNetProfit = todayProfit - todayExpenseTotal;
+
+            // Header
+            doc.setFillColor(26, 26, 26);
+            doc.rect(0, 0, pageWidth, 100, 'F');
+
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(24);
+            doc.setFont(undefined, 'bold');
+            doc.text(SHOP_NAME, margin, 45);
+
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${SHOP_ADDRESS} | ${SHOP_PHONE} | ${SHOP_EMAIL}`, margin, 70);
+
+            doc.setDrawColor(102, 126, 234);
+            doc.setLineWidth(3);
+            doc.line(margin, 85, pageWidth - margin, 85);
+
+            y = 120;
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.text("Daily Report", margin, y);
+
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Date: ${today}`, margin, y + 20);
+            y += 50;
+
+            // Summary Box
+            doc.setFillColor(240, 248, 255);
+            doc.roundedRect(margin, y, usableWidth, 100, 5, 5, 'F');
+            doc.setDrawColor(102, 126, 234);
+            doc.setLineWidth(2);
+            doc.roundedRect(margin, y, usableWidth, 100, 5, 5, 'S');
+
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.text("TODAY'S SUMMARY", margin + 15, y + 20);
+
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(10);
+            doc.text(`Total Sales: ${todaySales.length}`, margin + 15, y + 40);
+            doc.text(`Revenue: ${formatNumber(todayRevenue)} Tsh`, margin + 15, y + 55);
+            doc.text(`Profit: ${formatNumber(todayProfit)} Tsh`, margin + 15, y + 70);
+            doc.text(`Expenses: ${formatNumber(todayExpenseTotal)} Tsh`, margin + 200, y + 40);
+            doc.text(`Net Profit: ${formatNumber(todayNetProfit)} Tsh`, margin + 200, y + 55);
+
+            const netColor = todayNetProfit >= 0 ? [46, 125, 50] : [211, 47, 47];
+            doc.setTextColor(...netColor);
+            doc.setFont(undefined, 'bold');
+            doc.text(`Status: ${todayNetProfit >= 0 ? 'Profitable ✓' : 'Loss ✗'}`, margin + 200, y + 70);
+
+            y += 120;
+
+            function drawTable(headers, rows, startY) {
+                const colCount = headers.length;
+                const colWidth = usableWidth / colCount;
+                let curY = startY;
+                const rowHeight = 22;
+
+                doc.setFillColor(102, 126, 234);
+                doc.roundedRect(margin, curY, usableWidth, rowHeight, 3, 3, 'F');
+
+                doc.setTextColor(255, 255, 255);
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(10);
+                for (let i = 0; i < colCount; i++) {
+                    const txtX = margin + i * colWidth + 8;
+                    doc.text(String(headers[i]), txtX, curY + 15);
+                }
+                curY += rowHeight + 2;
+
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(9);
+                for (let r = 0; r < rows.length; r++) {
+                    if (curY + rowHeight > 750) {
+                        doc.addPage();
+                        curY = margin;
+                    }
+
+                    if (r % 2 === 0) {
+                        doc.setFillColor(248, 249, 250);
+                        doc.roundedRect(margin, curY, usableWidth, rowHeight, 2, 2, 'F');
+                    }
+
+                    doc.setTextColor(40, 40, 40);
+                    for (let c = 0; c < colCount; c++) {
+                        const txt = rows[r][c] === null || rows[r][c] === undefined ? '' : String(rows[r][c]);
+                        const txtX = margin + c * colWidth + 8;
+                        doc.text(txt, txtX, curY + 15, { maxWidth: colWidth - 16 });
+                    }
+                    curY += rowHeight;
+                }
+                return curY + 20;
+            }
+
+            // Today's Sales
+            if (todaySales.length > 0) {
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(0, 0, 0);
+                doc.text("Today's Sales", margin, y);
+                y += 15;
+                const salesHeaders = ["Time", "Product", "Customer", "Qty", "Price", "Profit"];
+                const salesRows = todaySales.map(s => [
+                    s.time, s.productName, s.customer, s.quantity,
+                    formatNumber(s.totalPrice) + ' Tsh', formatNumber(s.profit) + ' Tsh'
+                ]);
+                y = drawTable(salesHeaders, salesRows, y);
+            }
+
+            // Today's Expenses
+            if (todayExpenses.length > 0) {
+                if (y > 650) { doc.addPage(); y = margin; }
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text("Today's Expenses", margin, y);
+                y += 15;
+                const expHeaders = ["Time", "Description", "Category", "Amount"];
+                const expRows = todayExpenses.map(e => [
+                    e.time, e.description, e.category, formatNumber(e.amount || 0) + ' Tsh'
+                ]);
+                y = drawTable(expHeaders, expRows, y);
+            }
+
+            // Today's Transactions
+            if (todayTransactions.length > 0) {
+                if (y > 650) { doc.addPage(); y = margin; }
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text("Today's Transactions", margin, y);
+                y += 15;
+                const transHeaders = ["Type", "Time", "Customer", "Amount"];
+                const transRows = todayTransactions.map(t => [
+                    t.channel.toUpperCase(), t.time, t.customerName || 'N/A',
+                    formatNumber(t.amount || 0) + ' Tsh'
+                ]);
+                y = drawTable(transHeaders, transRows, y);
+            }
+
+            // Footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFillColor(240, 240, 240);
+                doc.rect(0, 792 - 30, pageWidth, 30, 'F');
+                doc.setTextColor(100, 100, 100);
+                doc.setFontSize(9);
+                doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 12);
+                doc.text(`Daniel's Finance Manager © ${new Date().getFullYear()}`, pageWidth - margin - 150, 792 - 12);
+            }
+
+            doc.save(`Daily_Report_${today}.pdf`);
+            showToast("Daily report downloaded successfully!", "success");
         }
 
         function downloadSalesReportExcel() {
