@@ -1070,7 +1070,10 @@
         <div class="header">
             <button class="header-btn-left" onclick="importData()">📥</button>
             <div class="sync-indicator" id="syncIndicator">☁️ Synced</div>
-            <h1>💼 TUBA</h1>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <h1 style="margin: 0;">💼 TUBA</h1>
+                <div id="headerDate" style="font-size: 10px; opacity: 0.8; font-weight: 400;"></div>
+            </div>
             <button class="header-btn" onclick="exportData()">💾</button>
         </div>
 
@@ -1701,6 +1704,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (products) state.products = products.map(p => ({
+                    id: generateID('products'),
                     name: p.name,
                     category: p.category,
                     cost: parseFloat(p.cost),
@@ -1714,6 +1718,7 @@
                     .eq('user_id', currentUser.id)
                     .order('timestamp', { ascending: false });
                 if (sales) state.sales = sales.map(s => ({
+                    id: generateID('sales'),
                     date: s.date,
                     time: s.time,
                     timestamp: s.timestamp,
@@ -1741,6 +1746,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (expenses) state.expenses = expenses.map(e => ({
+                    id: generateID('expenses'),
                     date: e.date,
                     time: e.time,
                     timestamp: e.timestamp,
@@ -1757,6 +1763,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (customers) state.customers = customers.map(c => ({
+                    id: generateID('customers'),
                     name: c.name,
                     email: c.email || '',
                     phone: c.phone || '',
@@ -1770,6 +1777,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (invoices) state.invoices = invoices.map(i => ({
+                    id: generateID('invoices'),
                     number: i.number,
                     customer: i.customer,
                     date: i.date,
@@ -1800,6 +1808,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (notes) state.notes = notes.map(n => ({
+                    id: generateID('notes'),
                     title: n.title || '',
                     content: n.content,
                     date: n.date,
@@ -1813,6 +1822,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (transactions) state.transactions = transactions.map(t => ({
+                    id: generateID('transactions'),
                     channel: t.channel,
                     customerName: t.customer_name,
                     type: t.type,
@@ -1828,6 +1838,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (unpaidEntries) state.unpaidEntries = unpaidEntries.map(u => ({
+                    id: generateID('unpaid'),
                     name: u.name,
                     type: u.type,
                     amount: parseFloat(u.amount),
@@ -1870,7 +1881,6 @@
                 console.error('Pull error:', error);
             }
         }
-
         async function pushToSupabase(table, data) {
             if (!syncEnabled || !currentUser) return;
             try {
@@ -1894,6 +1904,7 @@
             transactions: [],
             unpaidEntries: [],
             currentNoteIndex: null,
+            editingNoteIndex: null,     // ADD THIS LINE
             collapsedSections: {},
             listExpanded: {},           // ADD THIS
             selectedItems: {},          // ADD THIS
@@ -2171,58 +2182,58 @@
             const monthlyProgress = state.monthlyTarget > 0 ? (stats.monthProfit / state.monthlyTarget * 100) : 0;
 
             return `
-                <div class="stat-grid">
-                    <div class="stat-card" onclick="switchTab('sales')">
-                        <div class="stat-label">TODAY'S PROFIT</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.todayProfit)} Tsh</div>
-                        <div class="stat-subvalue">${stats.todaySalesCount} sales today</div>
-                        ${state.dailyTarget > 0 ? `
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${Math.min(dailyProgress, 100)}%"></div>
-                            </div>
-                            <div class="stat-subvalue">${dailyProgress.toFixed(0)}% of daily target</div>
-                        ` : ''}
-                    </div>
-                    
-                    <div class="stat-card" onclick="switchTab('sales')">
-                        <div class="stat-label">YESTERDAY'S PROFIT</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.yesterdayProfit)} Tsh</div>
-                        <div class="stat-subvalue">
-                            ${stats.todayProfit > stats.yesterdayProfit ? '📈 Better than yesterday!' :
-                    stats.todayProfit < stats.yesterdayProfit ? '📉 Lower than yesterday' : '➡️ Same as yesterday'}
-                        </div>
-                    </div>
-
-                    <div class="stat-card" onclick="switchTab('analytics')">
-                        <div class="stat-label">MONTH PROFIT</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.monthProfit)} Tsh</div>
-                        <div class="stat-subvalue">Revenue: ${formatNumber(stats.monthRevenue)} Tsh</div>
-                        ${state.monthlyTarget > 0 ? `
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${Math.min(monthlyProgress, 100)}%"></div>
-                            </div>
-                            <div class="stat-subvalue">${monthlyProgress.toFixed(0)}% of monthly target</div>
-                        ` : ''}
-                    </div>
-
-                    <div class="stat-card" onclick="switchTab('analytics')" style="background: ${stats.monthNetProfit >= 0 ? '#2e7d32' : '#d32f2f'};">
-                        <div class="stat-label">NET PROFIT (MONTH)</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.monthNetProfit)} Tsh</div>
-                        <div class="stat-subvalue">Expenses: ${formatNumber(stats.monthExpenses)} Tsh</div>
-                    </div>
-
-                    <div class="stat-card" onclick="switchTab('unpaid')">
-                        <div class="stat-label">UNPAID ENTRIES</div>
-                        <div class="stat-value">${unpaidCount}</div>
-                        <div class="stat-subvalue">Total: ${formatNumber(unpaidAmount)} Tsh</div>
-                    </div>
-
-                    <div class="stat-card" onclick="switchTab('inventory')">
-                        <div class="stat-label">LOW STOCK ALERT</div>
-                        <div class="stat-value">${lowStockProducts.length}</div>
-                        <div class="stat-subvalue">${lowStockProducts.length > 0 ? '⚠️ Check inventory' : '✅ All good'}</div>
-                    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
+        <div class="stat-card" onclick="switchTab('sales')" style="padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">TODAY'S PROFIT</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.todayProfit)} Tsh</div>
+            <div class="stat-subvalue" style="font-size: 11px;">${stats.todaySalesCount} sales today</div>
+            ${state.dailyTarget > 0 ? `
+                <div class="progress-bar" style="height: 6px; margin-top: 6px;">
+                    <div class="progress-fill" style="width: ${Math.min(dailyProgress, 100)}%"></div>
                 </div>
+                <div class="stat-subvalue" style="font-size: 10px; margin-top: 4px;">${dailyProgress.toFixed(0)}% of target</div>
+            ` : ''}
+        </div>
+        
+        <div class="stat-card" onclick="switchTab('sales')" style="padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">YESTERDAY'S PROFIT</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.yesterdayProfit)} Tsh</div>
+            <div class="stat-subvalue" style="font-size: 10px;">
+                ${stats.todayProfit > stats.yesterdayProfit ? '📈 Better!' :
+                    stats.todayProfit < stats.yesterdayProfit ? '📉 Lower' : '➡️ Same'}
+            </div>
+        </div>
+
+        <div class="stat-card" onclick="switchTab('analytics')" style="padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">MONTH PROFIT</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.monthProfit)} Tsh</div>
+            <div class="stat-subvalue" style="font-size: 10px;">Revenue: ${formatNumber(stats.monthRevenue)} Tsh</div>
+            ${state.monthlyTarget > 0 ? `
+                <div class="progress-bar" style="height: 6px; margin-top: 6px;">
+                    <div class="progress-fill" style="width: ${Math.min(monthlyProgress, 100)}%"></div>
+                </div>
+                <div class="stat-subvalue" style="font-size: 10px; margin-top: 4px;">${monthlyProgress.toFixed(0)}% of target</div>
+            ` : ''}
+        </div>
+
+        <div class="stat-card" onclick="switchTab('analytics')" style="background: ${stats.monthNetProfit >= 0 ? '#2e7d32' : '#d32f2f'}; padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">NET PROFIT (MONTH)</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.monthNetProfit)} Tsh</div>
+            <div class="stat-subvalue" style="font-size: 10px;">Expenses: ${formatNumber(stats.monthExpenses)} Tsh</div>
+        </div>
+
+        <div class="stat-card" onclick="switchTab('unpaid')" style="padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">UNPAID ENTRIES</div>
+            <div class="stat-value" style="font-size: 18px;">${unpaidCount}</div>
+            <div class="stat-subvalue" style="font-size: 10px;">Total: ${formatNumber(unpaidAmount)} Tsh</div>
+        </div>
+
+        <div class="stat-card" onclick="switchTab('inventory')" style="padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">LOW STOCK ALERT</div>
+            <div class="stat-value" style="font-size: 18px;">${lowStockProducts.length}</div>
+            <div class="stat-subvalue" style="font-size: 10px;">${lowStockProducts.length > 0 ? '⚠️ Check inventory' : '✅ All good'}</div>
+        </div>
+    </div>
 
                 ${lowStockProducts.length > 0 ? `
                     <div class="alert-box-danger">
@@ -4357,16 +4368,16 @@
         function renderInvoices() {
             const stats = getStats();
             return `
-                <div class="stat-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">TOTAL INVOICED</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.totalInvoiced)} Tsh</div>
-                    </div>
-                    <div class="stat-card" style="background: #2e7d32;">
-                        <div class="stat-label">PAID</div>
-                        <div class="stat-value">💱 ${formatNumber(stats.totalPaid)} Tsh</div>
-                    </div>
-                </div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
+        <div class="stat-card" style="padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">TOTAL INVOICED</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalInvoiced)} Tsh</div>
+        </div>
+        <div class="stat-card" style="background: #2e7d32; padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">PAID</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalPaid)} Tsh</div>
+        </div>
+    </div>
 
                 <div class="card">
                     <h2>Create Invoice</h2>
@@ -5011,26 +5022,77 @@
 
             return notes.map((note, idx) => {
                 const actualIndex = state.notes.length - 1 - idx;
+                const isEditing = state.editingNoteIndex === actualIndex;
+
+                if (isEditing) {
+                    return `
+                <div class="item">
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Title (Optional)</label>
+                        <input type="text" id="editNoteTitle_${actualIndex}" 
+                               value="${(note.title || '').replace(/"/g, '&quot;')}" 
+                               placeholder="Note title..."
+                               style="width: 100%; padding: 10px; border: 2px solid #667eea; border-radius: 8px;">
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Content</label>
+                        <textarea id="editNoteContent_${actualIndex}" 
+                                  style="width: 100%; min-height: 150px; padding: 10px; border: 2px solid #667eea; border-radius: 8px;"
+                                  placeholder="Write your note here...">${note.content}</textarea>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-success btn-small" onclick="saveNoteEdit(${actualIndex})">💾 Save</button>
+                        <button class="btn-secondary btn-small" onclick="cancelNoteEdit()">✖ Cancel</button>
+                    </div>
+                </div>
+            `;
+                }
+
                 return `
-            <div class="item" style="display: flex; gap: 12px; align-items: start;">
-                <div class="note-preview" onclick="openNoteModal(${actualIndex})" style="flex: 1; cursor: pointer;">
+            <div class="item">
+                <div class="note-preview" onclick="openNoteModal(${actualIndex})" style="cursor: pointer;">
                     ${note.title ? `<div class="item-title" style="margin-bottom: 8px;">${note.title}</div>` : ''}
                     <div class="item-subtitle" style="margin-bottom: 8px;">${note.date} ${note.time}</div>
                     <div style="white-space: pre-wrap;">${note.content}</div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <button class="btn-small" onclick="event.stopPropagation(); editNoteByIndex(${actualIndex})" 
-                            style="padding: 8px; width: 40px; height: 40px;">
-                        ✏️
-                    </button>
-                    <button class="btn-small btn-danger" onclick="event.stopPropagation(); deleteNoteByIndex(${actualIndex})"
-                            style="padding: 8px; width: 40px; height: 40px;">
-                        🗑️
-                    </button>
+                <div style="display: flex; gap: 6px; margin-top: 8px;">
+                    <button class="btn-small" onclick="startEditingNote(${actualIndex})">✏️ Edit</button>
+                    <button class="btn-small btn-danger" onclick="deleteNoteByIndex(${actualIndex})">🗑️ Delete</button>
                 </div>
             </div>
         `;
             }).join('');
+        }
+
+        function startEditingNote(index) {
+            state.editingNoteIndex = index;
+            saveData();
+            render();
+        }
+
+        function cancelNoteEdit() {
+            state.editingNoteIndex = null;
+            saveData();
+            render();
+        }
+
+        function saveNoteEdit(index) {
+            const titleInput = document.getElementById(`editNoteTitle_${index}`);
+            const contentInput = document.getElementById(`editNoteContent_${index}`);
+
+            if (!contentInput || !contentInput.value.trim()) {
+                return showToast('Note content cannot be empty', 'error');
+            }
+
+            state.notes[index].title = titleInput ? titleInput.value.trim() : '';
+            state.notes[index].content = contentInput.value.trim();
+            state.editingNoteIndex = null;
+
+            saveData();
+            render();
+            showToast('Note updated successfully', 'success');
+
+            if (syncEnabled) syncInBackground();
         }
 
         function searchNotes(term) {
@@ -5128,28 +5190,6 @@
             });
         }
 
-        function editNoteByIndex(index) {
-            const note = state.notes[index];
-            if (!note) return showToast("Note not found", "error");
-
-            const newTitle = prompt("Edit title:", note.title || "");
-            if (newTitle === null) return; // User cancelled
-
-            const newContent = prompt("Edit note content:", note.content);
-            if (newContent === null) return; // User cancelled
-
-            if (newContent.trim()) {
-                note.title = newTitle.trim();
-                note.content = newContent.trim();
-                saveData();
-                render();
-                showToast("Note updated", "success");
-
-                if (syncEnabled) syncInBackground();
-            } else {
-                showToast("Note content cannot be empty", "error");
-            }
-        }
 
         function deleteNoteByIndex(index) {
             showConfirm("Delete this note?", function () {
@@ -5870,6 +5910,27 @@
             input.click();
         }
 
+        function updateHeaderDate() {
+            const dateElement = document.getElementById('headerDate');
+            if (!dateElement) return;
+
+            const now = new Date();
+
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // Convert 0 to 12
+
+            dateElement.textContent = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${ampm}`;
+        }
+
         function render() {
             const app = document.getElementById('app');
             switch (state.activeTab) {
@@ -5895,6 +5956,7 @@
 
         // Initialize
         initSupabase(); // Start Supabase first
+        updateHeaderDate(); // Set initial date
         render();
 
         // Only load local data if NOT signed in
@@ -5910,6 +5972,10 @@
             }
         }, 1000);
 
+        // Update header date every second
+        setInterval(() => {
+            updateHeaderDate();
+        }, 1000);
         // Auto-save every 15 seconds
         setInterval(() => {
             saveData();
