@@ -158,11 +158,11 @@
         .card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 20px;
-            margin-bottom: 16px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15),
-                0 1px 3px rgba(0, 0, 0, 0.1),
+            border-radius: 16px;
+            padding: 14px;
+            margin-bottom: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12),
+                0 1px 3px rgba(0, 0, 0, 0.08),
                 inset 0 1px 0 rgba(255, 255, 255, 0.8);
             border: 1px solid rgba(255, 255, 255, 0.5);
             position: relative;
@@ -175,31 +175,32 @@
         }
 
         .card h2 {
-            font-size: 18px;
+            font-size: 15px;
             font-weight: 700;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             color: #1a1a1a;
             text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
         }
 
         .card-header-buttons {
             position: absolute;
-            right: 20px;
-            top: 20px;
+            right: 14px;
+            top: 14px;
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
         }
 
         .quick-nav-btn {
-            padding: 6px 12px;
+            padding: 4px 8px;
             border: none;
-            border-radius: 12px;
-            font-size: 11px;
+            border-radius: 8px;
+            font-size: 10px;
             font-weight: 600;
             color: white;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18), inset 0 -2px 5px rgba(0, 0, 0, 0.1);
+            white-space: nowrap;
         }
 
         .quick-nav-btn:hover {
@@ -224,14 +225,14 @@
         }
 
         .form-group {
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .form-group label {
             display: block;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             color: #333;
             text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8);
         }
@@ -240,10 +241,10 @@
         select,
         textarea {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             border: 2px solid rgba(0, 0, 0, 0.1);
-            border-radius: 12px;
-            font-size: 15px;
+            border-radius: 10px;
+            font-size: 14px;
             background: rgba(255, 255, 255, 0.9);
             box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.05);
         }
@@ -265,17 +266,17 @@
         button,
         .btn {
             width: 100%;
-            padding: 14px;
+            padding: 11px;
             background: linear-gradient(145deg, #1a1a1a, #000000);
             color: white;
             border: none;
-            border-radius: 12px;
-            font-size: 15px;
+            border-radius: 10px;
+            font-size: 13px;
             font-weight: 700;
             cursor: pointer;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+            letter-spacing: 0.4px;
+            box-shadow: 0 5px 16px rgba(0, 0, 0, 0.28), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
         }
 
         button:hover {
@@ -309,10 +310,10 @@
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08),
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07),
                 inset 0 1px 0 rgba(255, 255, 255, 0.8);
         }
 
@@ -750,6 +751,25 @@
             min-width: 120px;
         }
 
+        .filter-row input[type="date"] {
+            position: relative;
+        }
+
+        .filter-row input[type="date"]::-webkit-datetime-edit {
+            display: block;
+            padding: 0;
+        }
+
+        .filter-row input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+            display: block;
+        }
+
+        .filter-row input[type="date"]::-webkit-calendar-picker-indicator {
+            position: absolute;
+            right: 8px;
+            cursor: pointer;
+        }
+
         .alert-box {
             background: linear-gradient(145deg, #fff3e0, #ffe0b2);
             border-left: 4px solid #e65100;
@@ -983,15 +1003,16 @@
 
         .sync-indicator {
             position: absolute;
-            left: 70px;
+            left: 62px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 11px;
-            padding: 4px 10px;
-            border-radius: 12px;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 13px;
             background: linear-gradient(145deg, #2e7d32, #1b5e20);
             color: white;
             display: none;
+            white-space: nowrap;
         }
 
         .sync-indicator.show {
@@ -1063,7 +1084,7 @@
     <div class="welcome-screen">
         <div class="welcome-logo">💼</div>
         <div class="welcome-title">TUBA</div>
-        <div class="welcome-subtitle">The Ultimate Business Manager</div>
+        <div class="welcome-subtitle">The Ultimate Business Architecture</div>
     </div>
 
     <div class="app-container">
@@ -1072,7 +1093,7 @@
             <div class="sync-indicator" id="syncIndicator">☁️ Synced</div>
             <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
                 <h1 style="margin: 0;">💼 TUBA</h1>
-                <div id="headerDate" style="font-size: 10px; opacity: 0.8; font-weight: 400;"></div>
+                <div id="headerDate" style="font-size: 9px; opacity: 0.8; font-weight: 400;"></div>
             </div>
             <button class="header-btn" onclick="exportData()">💾</button>
         </div>
@@ -1793,23 +1814,19 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (inventory && inventory.length > 0) {
-                    // DON'T reset inventory to empty object
+                    // Preserve existing inventory if not in cloud
                     if (!state.inventory) {
                         state.inventory = {};
                     }
                     inventory.forEach(item => {
                         state.inventory[item.product_name] = {
-                            stock: item.stock,
-                            minAlert: item.min_alert
+                            stock: parseInt(item.stock) || 0,
+                            minAlert: parseInt(item.min_alert) || 5
                         };
                     });
-                } else {
-                    // Initialize empty inventory if none exists
-                    if (!state.inventory) {
-                        state.inventory = {};
-                    }
                 }
 
+                // Don't reset inventory if cloud has no data - keep local data
                 // Notes
                 const { data: notes } = await supabase
                     .from('notes')
@@ -2806,14 +2823,14 @@
                 </div>
 
                 <div class="filter-row">
-                    <div class="form-group">
-                        <label>From...</label>
-                        <input type="date" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}">
-                    </div>
-                    <div class="form-group">
-                        <label>To...</label>
-                        <input type="date" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
-                    </div>
+    <div class="form-group">
+        <label>From...</label>
+        <input type="date" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}" placeholder="mm/dd/yyyy">
+    </div>
+    <div class="form-group">
+        <label>To...</label>
+        <input type="date" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}" placeholder="mm/dd/yyyy">
+    </div>
                     <div class="form-group">
                         <label>Customer</label>
                         <select onchange="updateFilterCustomer(this.value)">
@@ -3685,15 +3702,16 @@
             };
             state.products.push(product);
 
-            // CRITICAL FIX: Ensure inventory object exists
+            // Initialize inventory for new product
             if (!state.inventory) {
                 state.inventory = {};
             }
 
-            // CRITICAL FIX: Only create inventory if it doesn't exist for this product
-            if (!state.inventory[name]) {
-                state.inventory[name] = { stock: stock, minAlert: 5 };
-            }
+            // Always set initial stock when adding new product
+            state.inventory[name] = {
+                stock: parseInt(stock) || 0,
+                minAlert: 5
+            };
 
             saveData();
             render();
@@ -4821,7 +4839,34 @@
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ unit: 'pt', format: [226.77, 396.85] }); // 80mm x 140mm receipt size
             const margin = 20;
-            let y = 20;
+            const contentWidth = 226.77 - (margin * 2);
+            let y = 30;
+
+            // Draw zigzag top border
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(1);
+            const zigzagSize = 8;
+            const zigzagCount = Math.floor(226.77 / zigzagSize);
+
+            // Top zigzag
+            for (let i = 0; i < zigzagCount; i++) {
+                const x1 = i * zigzagSize;
+                const x2 = (i + 0.5) * zigzagSize;
+                const x3 = (i + 1) * zigzagSize;
+                if (i % 2 === 0) {
+                    doc.line(x1, 10, x2, 5);
+                    doc.line(x2, 5, x3, 10);
+                } else {
+                    doc.line(x1, 10, x2, 15);
+                    doc.line(x2, 15, x3, 10);
+                }
+            }
+
+            // Left border
+            doc.line(10, 10, 10, 396.85 - 10);
+
+            // Right border
+            doc.line(226.77 - 10, 10, 226.77 - 10, 396.85 - 10);
 
             // Get profile data
             const profile = getUserProfileData();
@@ -4829,17 +4874,18 @@
             // Header - Business Name
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
-            doc.text(profile.businessName, margin, y);
+            const centerX = 226.77 / 2;
+            doc.text(profile.businessName, centerX, y, { align: 'center' });
             y += 18;
 
             // Business Info
             doc.setFontSize(8);
             doc.setFont(undefined, 'normal');
-            doc.text(profile.address, margin, y);
+            doc.text(profile.address, centerX, y, { align: 'center' });
             y += 12;
-            doc.text(`Tel: ${profile.phone}`, margin, y);
+            doc.text(`Tel: ${profile.phone}`, centerX, y, { align: 'center' });
             y += 12;
-            doc.text(`Email: ${profile.email}`, margin, y);
+            doc.text(`Email: ${profile.email}`, centerX, y, { align: 'center' });
             y += 18;
 
             // Separator line
@@ -4850,7 +4896,7 @@
             // Receipt Title
             doc.setFontSize(12);
             doc.setFont(undefined, 'bold');
-            doc.text('SALES RECEIPT', margin, y);
+            doc.text('SALES RECEIPT', centerX, y, { align: 'center' });
             y += 18;
 
             // Date and Time
@@ -4870,7 +4916,7 @@
             // Item Details Header
             doc.setFontSize(8);
             doc.setFont(undefined, 'bold');
-            doc.text('ITEM', margin, y);
+            doc.text('ITEM/DESCRIPTION', margin, y);
             doc.text('QTY', 120, y);
             doc.text('PRICE', 160, y, { align: 'right' });
             y += 12;
@@ -4912,14 +4958,29 @@
 
             // Footer
             doc.setFontSize(8);
-            doc.text('Thank you for your business!', margin, y);
+            doc.text('Thank you for your business!', centerX, y, { align: 'center' });
             y += 12;
-            doc.text('Visit us again', margin, y);
+            doc.text('Visit us again', centerX, y, { align: 'center' });
             y += 18;
 
             // Transaction ID
             doc.setFontSize(7);
-            doc.text(`Trans ID: ${sale.id || timestamp}`, margin, y);
+            doc.text(`Trans ID: ${sale.id || timestamp}`, centerX, y, { align: 'center' });
+
+            // Bottom zigzag
+            const bottomY = 396.85 - 10;
+            for (let i = 0; i < zigzagCount; i++) {
+                const x1 = i * zigzagSize;
+                const x2 = (i + 0.5) * zigzagSize;
+                const x3 = (i + 1) * zigzagSize;
+                if (i % 2 === 0) {
+                    doc.line(x1, bottomY, x2, bottomY + 5);
+                    doc.line(x2, bottomY + 5, x3, bottomY);
+                } else {
+                    doc.line(x1, bottomY, x2, bottomY - 5);
+                    doc.line(x2, bottomY - 5, x3, bottomY);
+                }
+            }
 
             // Save the PDF
             doc.save(`Receipt_${sale.id || timestamp}.pdf`);
@@ -5374,57 +5435,57 @@
 
             return `
     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
-        <div class="stat-card" style="padding: 12px;">
-            <div class="stat-label" style="font-size: 10px;">REVENUE</div>
-            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalRevenue)} Tsh</div>
-        </div>
-        <div class="stat-card" style="padding: 12px;">
-            <div class="stat-label" style="font-size: 10px;">EXPENSES</div>
-            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalExpenses)} Tsh</div>
-        </div>
-        <div class="stat-card" style="background: ${netProfit >= 0 ? '#2e7d32' : '#d32f2f'}; padding: 12px;">
-            <div class="stat-label" style="font-size: 10px;">NET PROFIT</div>
-            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(netProfit)} Tsh</div>
-        </div>
-        <div class="stat-card" style="background: #1976d2; padding: 12px;">
-            <div class="stat-label" style="font-size: 10px;">TOTAL SALES</div>
-            <div class="stat-value" style="font-size: 16px;">${stats.totalSalesCount}</div>
-        </div>
+    <div class="stat-card" style="padding: 12px;">
+        <div class="stat-label" style="font-size: 10px;">REVENUE</div>
+        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalRevenue)} Tsh</div>
+    </div>
+    <div class="stat-card" style="padding: 12px;">
+        <div class="stat-label" style="font-size: 10px;">EXPENSES</div>
+        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalExpenses)} Tsh</div>
+    </div>
+    <div class="stat-card" style="background: ${netProfit >= 0 ? '#2e7d32' : '#d32f2f'}; padding: 12px;">
+        <div class="stat-label" style="font-size: 10px;">NET PROFIT</div>
+        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(netProfit)} Tsh</div>
+    </div>
+    <div class="stat-card" style="background: #1976d2; padding: 12px;">
+        <div class="stat-label" style="font-size: 10px;">TOTAL SALES</div>
+        <div class="stat-value" style="font-size: 16px;">${stats.totalSalesCount}</div>
+    </div>
+</div>
+
+    <div class="card">
+        <h2>Download Reports</h2>
+        <button onclick="downloadDailyReportPDF()">📥 DAILY REPORT (PDF)</button>
+        <button style="margin-top:8px;" onclick="downloadSalesReportPDF()">📥 Download Report (PDF)</button>
+        <button class="btn-secondary" style="margin-top:8px;" onclick="downloadSalesReportExcel()">📥 Download Report (Excel)</button>
+        <button class="btn-secondary" style="margin-top:8px;" onclick="downloadBackup()">💾 Backup All Data</button>
     </div>
 
-        <div class="card">
-            <h2>Payment Methods</h2>
-            ${getPaymentMethodsHTML()}
-        </div>
+    <div class="card">
+        <h2>Payment Methods</h2>
+        ${getPaymentMethodsHTML()}
+    </div>
 
-        <div class="card">
-            <h2>Money Transactions Summary</h2>
-            ${getTransactionSummaryHTML()}
-        </div>
+    <div class="card">
+        <h2>Money Transactions Summary</h2>
+        ${getTransactionSummaryHTML()}
+    </div>
 
-        <div class="card">
-            <h2>Category Performance</h2>
-            ${getCategoryPerformanceHTML()}
-        </div>
+    <div class="card">
+        <h2>Category Performance</h2>
+        ${getCategoryPerformanceHTML()}
+    </div>
 
-        <div class="card">
-            <h2>Top Products by Profit</h2>
-            ${getTopProductsHTML()}
-        </div>
+    <div class="card">
+        <h2>Top Products by Profit</h2>
+        ${getTopProductsHTML()}
+    </div>
 
-        <div class="card">
-            <h2>Analytics Chart</h2>
-            <canvas id="analyticsChart"></canvas>
-        </div>
-
-        <div class="card">
-            <h2>Download Reports</h2>
-            <button onclick="downloadDailyReportPDF()">📥 DAILY REPORT (PDF)</button>
-            <button style="margin-top:8px;" onclick="downloadSalesReportPDF()">📥 Download Report (PDF)</button>
-            <button class="btn-secondary" style="margin-top:8px;" onclick="downloadSalesReportExcel()">📥 Download Report (Excel)</button>
-            <button class="btn-secondary" style="margin-top:8px;" onclick="downloadBackup()">💾 Backup All Data</button>
-        </div>
-    `;
+    <div class="card">
+        <h2>Analytics Chart</h2>
+        <canvas id="analyticsChart"></canvas>
+    </div>
+`;
         }
 
         function getCategoryPerformanceHTML() {
@@ -5785,8 +5846,8 @@
                 doc.rect(0, 792 - 30, pageWidth, 30, 'F');
                 doc.setTextColor(100, 100, 100);
                 doc.setFontSize(9);
-                doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 12);
-                doc.text(`The Ultimate Business Manager (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin - 150, 792 - 12);
+                doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 11);
+                doc.text(`The Ultimate Business Achitecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
             }
 
             doc.save(`Financial_Report_${getTodayDateString()}.pdf`);
@@ -5965,7 +6026,7 @@
                 doc.setTextColor(100, 100, 100);
                 doc.setFontSize(9);
                 doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 12);
-                doc.text(`TUBA © ${new Date().getFullYear()}`, pageWidth - margin - 150, 792 - 12);
+                doc.text(`The Ultimate Business Achitecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
             }
 
             doc.save(`Daily_Report_${today}.pdf`);
@@ -5974,7 +6035,7 @@
 
         function downloadSalesReportExcel() {
             const rows = [
-                ["TUBA - The Ultimate Business Manager"],
+                ["TUBA - The Ultimate Business Architecture"],
                 ["Financial Report"],
                 [`Generated: ${getTodayDateString()}`],
                 [],
