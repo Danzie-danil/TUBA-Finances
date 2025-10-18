@@ -1333,51 +1333,67 @@
             try {
                 updateSyncIndicator('syncing');
 
-                // Pull cloud data first
-                await pullDataFromSupabase();
-                const cloudData = {
-                    sales: [...state.sales],
-                    products: [...state.products],
-                    expenses: [...state.expenses],
-                    customers: [...state.customers],
-                    transactions: [...state.transactions],
-                    unpaidEntries: [...state.unpaidEntries],
-                    notes: [...state.notes]
+                // Save local data BEFORE pulling from cloud
+                const localData = {
+                    sales: [...(state.sales || [])],
+                    products: [...(state.products || [])],
+                    expenses: [...(state.expenses || [])],
+                    customers: [...(state.customers || [])],
+                    transactions: [...(state.transactions || [])],
+                    unpaidEntries: [...(state.unpaidEntries || [])],
+                    notes: [...(state.notes || [])]
                 };
 
-                // Reload local data
-                const saved = localStorage.getItem('financeManagerData');
-                if (saved) {
-                    const localData = JSON.parse(saved);
+                // Pull cloud data
+                await pullDataFromSupabase();
+                const cloudData = {
+                    sales: [...(state.sales || [])],
+                    products: [...(state.products || [])],
+                    expenses: [...(state.expenses || [])],
+                    customers: [...(state.customers || [])],
+                    transactions: [...(state.transactions || [])],
+                    unpaidEntries: [...(state.unpaidEntries || [])],
+                    notes: [...(state.notes || [])]
+                };
 
-                    // Merge function - combine by ID
-                    const mergeByID = (local, cloud) => {
-                        const idMap = new Map();
-                        cloud.forEach(item => {
-                            if (item.id) idMap.set(item.id, item);
-                        });
-                        local.forEach(item => {
-                            if (!item.id) item.id = generateID(getTypeFromItem(item));
-                            if (!idMap.has(item.id)) {
-                                idMap.set(item.id, item);
-                            }
-                        });
-                        return Array.from(idMap.values());
-                    };
+                // Improved merge function - prioritizes cloud data for existing IDs
+                const mergeByID = (local, cloud) => {
+                    const idMap = new Map();
 
-                    // Merge each array
-                    state.sales = mergeByID(localData.sales || [], cloudData.sales);
-                    state.products = mergeByID(localData.products || [], cloudData.products);
-                    state.expenses = mergeByID(localData.expenses || [], cloudData.expenses);
-                    state.customers = mergeByID(localData.customers || [], cloudData.customers);
-                    state.transactions = mergeByID(localData.transactions || [], cloudData.transactions);
-                    state.unpaidEntries = mergeByID(localData.unpaidEntries || [], cloudData.unpaidEntries);
-                    state.notes = mergeByID(localData.notes || [], cloudData.notes);
-                }
+                    // Add cloud items first (they take priority)
+                    cloud.forEach(item => {
+                        if (!item.id) item.id = generateID(getTypeFromItem(item));
+                        idMap.set(item.id, item);
+                    });
+
+                    // Add local items only if ID doesn't exist
+                    local.forEach(item => {
+                        if (!item.id) item.id = generateID(getTypeFromItem(item));
+                        if (!idMap.has(item.id)) {
+                            idMap.set(item.id, item);
+                        }
+                    });
+
+                    return Array.from(idMap.values());
+                };
+
+                // Merge each array
+                state.sales = mergeByID(localData.sales, cloudData.sales);
+                state.products = mergeByID(localData.products, cloudData.products);
+                state.expenses = mergeByID(localData.expenses, cloudData.expenses);
+                state.customers = mergeByID(localData.customers, cloudData.customers);
+                state.transactions = mergeByID(localData.transactions, cloudData.transactions);
+                state.unpaidEntries = mergeByID(localData.unpaidEntries, cloudData.unpaidEntries);
+                state.notes = mergeByID(localData.notes, cloudData.notes);
+
+                // Save merged data locally
+                saveData();
 
                 // Push merged data back to cloud
                 await clearAndPushAllData();
                 updateSyncIndicator('synced');
+
+                console.log('✅ Smart merge completed successfully');
             } catch (error) {
                 console.error('Smart merge error:', error);
                 updateSyncIndicator('synced');
@@ -2522,32 +2538,6 @@
             }
         }
 
-        function scrollToUserProfile() {
-            // Switch to account tab
-            state.activeTab = 'account';
-            render();
-
-            // Wait for render to complete, then scroll
-            setTimeout(() => {
-                const profileCard = document.getElementById('userProfileCard');
-                if (profileCard) {
-                    profileCard.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
-
-                    // Add a highlight animation
-                    profileCard.style.transition = 'all 0.5s ease';
-                    profileCard.style.boxShadow = '0 0 0 4px rgba(102, 126, 234, 0.4), 0 15px 50px rgba(0, 0, 0, 0.2)';
-                    profileCard.style.transform = 'scale(1.01)';
-
-                    setTimeout(() => {
-                        profileCard.style.boxShadow = '';
-                        profileCard.style.transform = '';
-                    }, 2000);
-                }
-            }, 300);
-        }
         function switchAuthTab(tab) {
             if (tab === 'login') {
                 document.getElementById('loginForm').style.display = 'block';
@@ -2654,8 +2644,8 @@
             try {
                 const result = await signIn(email, password);
                 if (result) {
-                    // Success - scroll to profile section
-                    scrollToUserProfile();
+                    // Success - just render normally
+                    render();
                 } else {
                     // Failed - re-enable buttons
                     if (loginForm) {
@@ -2719,24 +2709,24 @@
             }
 
             return `
-        <div class="stat-grid">
-            <div class="stat-card">
-                <div class="stat-label">TOTAL CAPITAL</div>
-                <div class="stat-value">💱 ${formatNumber(stats.totalCapital)} Tsh</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">TOTAL PROFIT</div>
-                <div class="stat-value">💱 ${formatNumber(stats.totalProfit)} Tsh</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">TODAY'S PROFIT</div>
-                <div class="stat-value">💱 ${formatNumber(stats.todayProfit)} Tsh</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">10% TODAY</div>
-                <div class="stat-value">💱 ${formatNumber(stats.todayProfit * 0.1)} Tsh</div>
-            </div>
-        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
+    <div class="stat-card" style="padding: 12px;">
+        <div class="stat-label" style="font-size: 10px;">TOTAL CAPITAL</div>
+        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalCapital)} Tsh</div>
+    </div>
+    <div class="stat-card" style="padding: 12px;">
+        <div class="stat-label" style="font-size: 10px;">TOTAL PROFIT</div>
+        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalProfit)} Tsh</div>
+    </div>
+    <div class="stat-card" style="padding: 12px;">
+        <div class="stat-label" style="font-size: 10px;">TODAY'S PROFIT</div>
+        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.todayProfit)} Tsh</div>
+    </div>
+    <div class="stat-card" style="padding: 12px;">
+        <div class="stat-label" style="font-size: 10px;">10% TODAY</div>
+        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.todayProfit * 0.1)} Tsh</div>
+    </div>
+</div>
 
         <div class="card">
             <h2>Add Sale</h2>
@@ -2982,15 +2972,21 @@
 
         function toggleSelectAll(type) {
             if (!state.selectedItems[type]) state.selectedItems[type] = {};
-            const checkbox = document.getElementById(`selectAll_${type}`);
-            const checked = checkbox ? checkbox.checked : false;
 
             const items = type === 'unpaidEntries' ? state.unpaidEntries : state[type];
+
+            // Check if all items are currently selected
+            const allSelected = items.every(item => item.id && state.selectedItems[type][item.id]);
+
+            // Toggle: if all selected, unselect all; otherwise, select all
+            const newState = !allSelected;
+
             items.forEach(item => {
                 if (item.id) {
-                    state.selectedItems[type][item.id] = checked;
+                    state.selectedItems[type][item.id] = newState;
                 }
             });
+
             saveData();
             render();
         }
@@ -3173,15 +3169,6 @@
                 document.getElementById('totalPrice').textContent = `💱 ${formatNumber(p * quantity)} Tsh`;
                 document.getElementById('totalProfit').textContent = `💱 ${formatNumber((p - product.cost) * quantity)} Tsh`;
             });
-
-            setTimeout(() => {
-                const submitBtn = document.querySelector('form[onsubmit*="addSale"] button[type="submit"]');
-                if (submitBtn) {
-                    submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    submitBtn.classList.add('highlight-pulse');
-                    setTimeout(() => submitBtn.classList.remove('highlight-pulse'), 1000);
-                }
-            }, 100);
         }
 
         function addSale(e) {
@@ -3306,6 +3293,16 @@
                     </div>
                 </div>
 
+                </div>
+
+        <div class="card">
+            <h2>${channels.find(c => c.id === currentChannel).label} Transactions (${channelTransactions.length})</h2>
+            
+            <div class="search-box">
+                <input type="text" placeholder="🔍 Search transactions..." 
+                       oninput="searchTransactions(this.value)" 
+                       id="transactionSearch">
+            </div>
                 <div class="card">
                     <h2>Add ${channels.find(c => c.id === currentChannel).label} Transaction</h2>
                     <form onsubmit="addTransaction(event)">
@@ -3332,43 +3329,21 @@
                     <h2>${channels.find(c => c.id === currentChannel).label} Transactions (${channelTransactions.length})</h2>
                     
                     ${state.listExpanded.transactions ? `
-                        <div class="bulk-actions">
-                            <input type="checkbox" id="selectAll_transactions" onchange="toggleSelectAll('transactions')" class="checkbox-select">
-                            <label for="selectAll_transactions">Select All</label>
-                            <span style="color: #666; font-size: 12px; margin-left: 8px;">
-                                ${getSelectedCount('transactions')} selected
-                            </span>
-                            <button class="btn-small btn-danger" onclick="bulkDelete('transactions')" ${!hasSelected('transactions') ? 'disabled' : ''}>
-                                🗑️ Delete Selected
-                            </button>
-                        </div>
+    <div class="bulk-actions">
+        <input type="checkbox" id="selectAll_transactions" onchange="toggleSelectAll('transactions')" class="checkbox-select">
+        <label for="selectAll_transactions">Select All</label>
+        <span style="color: #666; font-size: 12px; margin-left: 8px;">
+            ${getSelectedCount('transactions')} selected
+        </span>
+        <button class="btn-small btn-danger" onclick="bulkDelete('transactions')" ${!hasSelected('transactions') ? 'disabled' : ''}>
+            🗑️ Delete Selected
+        </button>
+    </div>
 
-                        ${channelTransactions.slice().reverse().map((t, idx) => `
-                            <div class="item">
-                                <div style="display: flex; gap: 12px; align-items: start;">
-                                    <input type="checkbox" class="checkbox-select" 
-                                           ${state.selectedItems.transactions && state.selectedItems.transactions[t.id] ? 'checked' : ''}
-                                           onchange="toggleSelect('transactions', '${t.id}')">
-                                    <div style="flex: 1;">
-                                        <div class="item-header">
-                                            <span class="item-title">${t.customerName || 'N/A'}</span>
-                                            <span class="badge badge-${t.channel}">${t.type.toUpperCase()}</span>
-                                        </div>
-                                        <div class="item-subtitle">
-                                            ${t.date} ${t.time}<br>
-                                            Amount: <strong style="color: ${t.type === 'deposit' ? '#2e7d32' : '#d32f2f'};">
-                                                ${t.type === 'deposit' ? '+' : '-'}💰 ${formatNumber(t.amount)} Tsh
-                                            </strong>
-                                        </div>
-                                        <div class="flex-gap" style="margin-top:8px;">
-                                            <button class="btn-small" onclick="editTransactionByTimestamp(${t.timestamp})">Edit</button>
-                                            <button class="btn-small btn-danger" onclick="deleteTransactionByTimestamp(${t.timestamp})">Delete</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('') || '<p style="text-align: center; color: #666;">No transactions yet</p>'}
-                    ` : ''}
+    <div id="transactionsList">
+        ${renderTransactionsList(channelTransactions)}
+    </div>
+` : ''}
 
                     <button class="collapse-btn" onclick="toggleListExpanded('transactions')">
                         <span class="collapse-icon ${state.listExpanded.transactions ? 'expanded' : ''}">▼</span>
@@ -3376,6 +3351,56 @@
                     </button>
                 </div>
             `;
+        }
+
+        function renderTransactionsList(transactions, searchTerm = '') {
+            let filtered = transactions;
+
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filtered = transactions.filter(t =>
+                    (t.customerName && t.customerName.toLowerCase().includes(term)) ||
+                    t.type.toLowerCase().includes(term) ||
+                    t.channel.toLowerCase().includes(term)
+                );
+            }
+
+            if (filtered.length === 0) {
+                return '<p style="text-align: center; color: #666;">No transactions found</p>';
+            }
+
+            return filtered.slice().reverse().map((t, idx) => `
+        <div class="item">
+            <div style="display: flex; gap: 12px; align-items: start;">
+                <input type="checkbox" class="checkbox-select" 
+                       ${state.selectedItems.transactions && state.selectedItems.transactions[t.id] ? 'checked' : ''}
+                       onchange="toggleSelect('transactions', '${t.id}')">
+                <div style="flex: 1;">
+                    <div class="item-header">
+                        <span class="item-title">${t.customerName || 'N/A'}</span>
+                        <span class="badge badge-${t.channel}">${t.type.toUpperCase()}</span>
+                    </div>
+                    <div class="item-subtitle">
+                        ${t.date} ${t.time}<br>
+                        Amount: <strong style="color: ${t.type === 'deposit' ? '#2e7d32' : '#d32f2f'};">
+                            ${t.type === 'deposit' ? '+' : '-'}💰 ${formatNumber(t.amount)} Tsh
+                        </strong>
+                    </div>
+                    <div class="flex-gap" style="margin-top:8px;">
+                        <button class="btn-small" onclick="editTransactionByTimestamp(${t.timestamp})">Edit</button>
+                        <button class="btn-small btn-danger" onclick="deleteTransactionByTimestamp(${t.timestamp})">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+        }
+
+        function searchTransactions(term) {
+            const currentChannel = state.activeTransactionChannel || 'mpesa';
+            const channelTransactions = (state.transactions || []).filter(t => t.channel === currentChannel);
+
+            document.getElementById('transactionsList').innerHTML = renderTransactionsList(channelTransactions, term);
         }
 
         async function editInitialFloat(channel) {
@@ -3513,13 +3538,27 @@
 
                 <div class="card">
                     <h2>All Products (${state.products.length})</h2>
-                    <div class="search-box">
-                        <input type="text" placeholder="🔍 Search products..." oninput="searchProducts(this.value)" id="productSearch">
-                    </div>
-                    <div id="productsList">
-                        ${renderProductsList()}
-                    </div>
-                </div>
+    <div class="search-box">
+        <input type="text" placeholder="🔍 Search products..." oninput="searchProducts(this.value)" id="productSearch">
+    </div>
+    
+    ${state.products.length > 0 ? `
+        <div class="bulk-actions">
+            <input type="checkbox" id="selectAll_products" onchange="toggleSelectAll('products')" class="checkbox-select">
+            <label for="selectAll_products">Select All</label>
+            <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                ${getSelectedCount('products')} selected
+            </span>
+            <button class="btn-small btn-danger" onclick="bulkDelete('products')" ${!hasSelected('products') ? 'disabled' : ''}>
+                🗑️ Delete Selected
+            </button>
+        </div>
+    ` : ''}
+    
+    <div id="productsList">
+        ${renderProductsList()}
+    </div>
+</div>
             `;
         }
 
@@ -3542,7 +3581,12 @@
                 const inv = state.inventory[p.name] || { stock: 0 };
                 const margin = ((p.price - p.cost) / p.cost * 100).toFixed(1);
                 return `
-                    <div class="item">
+        <div class="item">
+            <div style="display: flex; gap: 12px; align-items: start;">
+                <input type="checkbox" class="checkbox-select" 
+                       ${state.selectedItems.products && state.selectedItems.products[p.id] ? 'checked' : ''}
+                       onchange="toggleSelect('products', '${p.id}')">
+                <div style="flex: 1;">
                         <div class="item-title">${p.name}</div>
                         <div class="item-subtitle">
                             Category: ${p.category} | Stock: ${inv.stock} units<br>
@@ -3554,11 +3598,13 @@
                             <span style="color: #2e7d32; font-weight: 600;">+${formatNumber(p.price - p.cost)} Tsh</span>
                         </div>
                         <div class="flex-gap" style="margin-top:8px;">
-                            <button class="btn-small" onclick="editProductIndex(${actualIndex})">Edit</button>
-                            <button class="btn-small btn-danger" onclick="deleteProductIndex(${actualIndex})">Delete</button>
-                        </div>
+                        <button class="btn-small" onclick="editProductIndex(${actualIndex})">Edit</button>
+                        <button class="btn-small btn-danger" onclick="deleteProductIndex(${actualIndex})">Delete</button>
                     </div>
-                `;
+                </div>
+            </div>
+        </div>
+    `;
             }).join('');
         }
 
@@ -3666,27 +3712,96 @@
                     </form>
                 </div>
 
-                <div class="card">
-                    <h2>All Categories (${state.categories.length})</h2>
-                    ${state.categories.map((cat, i) => {
-                const productCount = state.products.filter(p => p.category === cat).length;
+               <div class="card">
+    <h2>All Categories (${state.categories.length})</h2>
+    
+    ${state.categories.length > 0 ? `
+        <div class="bulk-actions">
+            <input type="checkbox" id="selectAll_categories" onchange="toggleSelectAllCategories()" class="checkbox-select">
+            <label for="selectAll_categories">Select All</label>
+            <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                ${getSelectedCategoryCount()} selected
+            </span>
+            <button class="btn-small btn-danger" onclick="bulkDeleteCategories()" ${!hasSelectedCategories() ? 'disabled' : ''}>
+                🗑️ Delete Selected
+            </button>
+        </div>
+    ` : ''}
+    
+    ${state.categories.map((cat, i) => {
                 return `
-                            <div class="item">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <span class="item-title">${cat}</span>
-                                        <div class="item-subtitle">${productCount} products</div>
-                                    </div>
-                                    <div class="flex-gap">
-                                        <button class="btn-small" onclick="editCategoryIndex(${i})">Edit</button>
-                                        <button class="btn-small btn-danger" onclick="deleteCategoryIndex(${i})">Delete</button>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-            }).join('') || '<p style="text-align: center; color: #666;">No categories yet</p>'}
+            <div class="item">
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <input type="checkbox" class="checkbox-select" 
+                           ${state.selectedItems.categories && state.selectedItems.categories[i] ? 'checked' : ''}
+                           onchange="toggleSelectCategory(${i})">
+                    <div style="flex: 1; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span class="item-title">${cat}</span>
+                            <div class="item-subtitle">${state.products.filter(p => p.category === cat).length} products</div>
+                        </div>
+                        <div class="flex-gap">
+                            <button class="btn-small" onclick="editCategoryIndex(${i})">Edit</button>
+                            <button class="btn-small btn-danger" onclick="deleteCategoryIndex(${i})">Delete</button>
+                        </div>
+                    </div>
                 </div>
+            </div>
+        `;
+            }).join('') || '<p style="text-align: center; color: #666;">No categories yet</p>'}
+</div>
             `;
+        }
+
+        function toggleSelectAllCategories() {
+            if (!state.selectedItems.categories) state.selectedItems.categories = {};
+
+            const allSelected = state.categories.every((cat, i) => state.selectedItems.categories[i]);
+            const newState = !allSelected;
+
+            state.categories.forEach((cat, i) => {
+                state.selectedItems.categories[i] = newState;
+            });
+
+            saveData();
+            render();
+        }
+
+        function toggleSelectCategory(index) {
+            if (!state.selectedItems.categories) state.selectedItems.categories = {};
+            state.selectedItems.categories[index] = !state.selectedItems.categories[index];
+            saveData();
+        }
+
+        function hasSelectedCategories() {
+            return state.selectedItems.categories && Object.values(state.selectedItems.categories).some(v => v);
+        }
+
+        function getSelectedCategoryCount() {
+            if (!state.selectedItems.categories) return 0;
+            return Object.values(state.selectedItems.categories).filter(v => v).length;
+        }
+
+        function bulkDeleteCategories() {
+            const selected = Object.keys(state.selectedItems.categories || {})
+                .filter(i => state.selectedItems.categories[i])
+                .map(i => parseInt(i));
+
+            if (selected.length === 0) return showToast('No categories selected', 'info');
+
+            showConfirm(`Delete ${selected.length} selected categories?`, async function () {
+                // Sort in reverse to delete from end first
+                selected.sort((a, b) => b - a).forEach(i => {
+                    state.categories.splice(i, 1);
+                });
+
+                state.selectedItems.categories = {};
+                saveData();
+                render();
+                showToast(`${selected.length} categories deleted`, 'success');
+
+                if (syncEnabled) syncInBackground();
+            });
         }
 
         async function addCategory(e) {
@@ -3846,10 +3961,29 @@
                         </select>
                         <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
                     </div>
+                    </div>
+
+    ${filteredExpenses.length > 0 ? `
+        <div class="bulk-actions">
+            <input type="checkbox" id="selectAll_expenses" onchange="toggleSelectAll('expenses')" class="checkbox-select">
+            <label for="selectAll_expenses">Select All</label>
+            <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                ${getSelectedCount('expenses')} selected
+            </span>
+            <button class="btn-small btn-danger" onclick="bulkDelete('expenses')" ${!hasSelected('expenses') ? 'disabled' : ''}>
+                🗑️ Delete Selected
+            </button>
+        </div>
+    ` : ''}
 
                     ${filteredExpenses.slice().reverse().map((e, idx) => `
-                        <div class="item">
-                            <div class="item-header">
+    <div class="item">
+        <div style="display: flex; gap: 12px; align-items: start;">
+            <input type="checkbox" class="checkbox-select" 
+                   ${state.selectedItems.expenses && state.selectedItems.expenses[e.id] ? 'checked' : ''}
+                   onchange="toggleSelect('expenses', '${e.id}')">
+            <div style="flex: 1;">
+                <div class="item-header">
                                 <span class="item-title">${e.description}</span>
                                 <span style="color: #d32f2f; font-weight: 700;">💱 ${formatNumber(e.amount)} Tsh</span>
                             </div>
@@ -3860,8 +3994,11 @@
                             <div class="flex-gap" style="margin-top:8px;">
                                 <button class="btn-small" onclick="editExpenseIndex(${state.expenses.length - 1 - idx})">Edit</button>
                                 <button class="btn-small btn-danger" onclick="deleteExpenseIndex(${state.expenses.length - 1 - idx})">Delete</button>
-                            </div>
-                        </div>
+                       </div>
+                </div>
+            </div>
+        </div>
+    </div>
                     `).join('') || '<p style="text-align: center; color: #666;">No expenses yet</p>'}
                 </div>
             `;
@@ -4066,14 +4203,28 @@
                 </div>
 
                 <div class="card">
-                    <h2>All Customers (${state.customers.length})</h2>
-                    <div class="search-box">
-                        <input type="text" placeholder="🔍 Search customers..." oninput="searchCustomers(this.value)" id="customerSearch">
-                    </div>
-                    <div id="customersList">
-                        ${renderCustomersList()}
-                    </div>
-                </div>
+    <h2>All Customers (${state.customers.length})</h2>
+    <div class="search-box">
+        <input type="text" placeholder="🔍 Search customers..." oninput="searchCustomers(this.value)" id="customerSearch">
+    </div>
+    
+    ${state.customers.length > 0 ? `
+        <div class="bulk-actions">
+            <input type="checkbox" id="selectAll_customers" onchange="toggleSelectAll('customers')" class="checkbox-select">
+            <label for="selectAll_customers">Select All</label>
+            <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                ${getSelectedCount('customers')} selected
+            </span>
+            <button class="btn-small btn-danger" onclick="bulkDelete('customers')" ${!hasSelected('customers') ? 'disabled' : ''}>
+                🗑️ Delete Selected
+            </button>
+        </div>
+    ` : ''}
+    
+    <div id="customersList">
+        ${renderCustomersList()}
+    </div>
+</div>
             `;
         }
 
@@ -4096,8 +4247,13 @@
                 const actualIndex = state.customers.indexOf(c);
                 const purchaseCount = state.sales.filter(s => s.customer === c.name).length;
                 return `
-                    <div class="item">
-                        <div class="item-title">${c.name}</div>
+        <div class="item">
+            <div style="display: flex; gap: 12px; align-items: start;">
+                <input type="checkbox" class="checkbox-select" 
+                       ${state.selectedItems.customers && state.selectedItems.customers[c.id] ? 'checked' : ''}
+                       onchange="toggleSelect('customers', '${c.id}')">
+                <div style="flex: 1;">
+                    <div class="item-title">${c.name}</div>
                         <div class="item-subtitle">
                             ${c.email ? '📧 ' + c.email + '<br>' : ''}
                             ${c.phone ? '📱 ' + c.phone + '<br>' : ''}
@@ -4108,12 +4264,14 @@
                             </div>
                         </div>
                         <div class="flex-gap" style="margin-top:8px;">
-                            <button class="btn-small" onclick="viewCustomerHistory(${actualIndex})">History</button>
-                            <button class="btn-small" onclick="editCustomerIndex(${actualIndex})">Edit</button>
-                            <button class="btn-small btn-danger" onclick="deleteCustomerIndex(${actualIndex})">Delete</button>
-                        </div>
+                        <button class="btn-small" onclick="viewCustomerHistory(${actualIndex})">History</button>
+                        <button class="btn-small" onclick="editCustomerIndex(${actualIndex})">Edit</button>
+                        <button class="btn-small btn-danger" onclick="deleteCustomerIndex(${actualIndex})">Delete</button>
                     </div>
-                `;
+                </div>
+            </div>
+        </div>
+    `;
             }).join('');
         }
 
@@ -4256,28 +4414,245 @@
                 </div>
 
                 <div class="card">
-                    <h2>All Invoices (${state.invoices.length})</h2>
-                    ${state.invoices.slice().reverse().map((inv, idx) => `
-                        <div class="item">
+    <h2>Unpaid Invoices (${state.invoices.filter(i => i.status !== 'Paid').length})</h2>
+    
+    ${state.invoices.filter(i => i.status !== 'Paid').length > 0 ? `
+        <div class="bulk-actions">
+            <input type="checkbox" id="selectAll_unpaid_invoices" onchange="toggleSelectAllUnpaidInvoices()" class="checkbox-select">
+            <label for="selectAll_unpaid_invoices">Select All</label>
+            <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                ${getSelectedUnpaidInvoiceCount()} selected
+            </span>
+            <button class="btn-small btn-success" onclick="bulkMarkInvoicesPaid()" ${!hasSelectedUnpaidInvoices() ? 'disabled' : ''}>
+                ✓ Mark as Paid
+            </button>
+            <button class="btn-small btn-danger" onclick="bulkDeleteUnpaidInvoices()" ${!hasSelectedUnpaidInvoices() ? 'disabled' : ''}>
+                🗑️ Delete Selected
+            </button>
+        </div>
+        
+        ${state.invoices.filter(i => i.status !== 'Paid').map((inv, origIdx) => {
+                const actualIndex = state.invoices.findIndex(i => i === inv);
+                return `
+                <div class="item">
+                    <div style="display: flex; gap: 12px; align-items: start;">
+                        <input type="checkbox" class="checkbox-select" 
+                               ${state.selectedItems.unpaid_invoices && state.selectedItems.unpaid_invoices[actualIndex] ? 'checked' : ''}
+                               onchange="toggleSelectUnpaidInvoice(${actualIndex})">
+                        <div style="flex: 1;">
                             <div class="item-header">
                                 <span class="item-title">${inv.number}</span>
-                                <span class="badge ${inv.status === 'Paid' ? 'badge-success' : inv.status === 'Overdue' ? 'badge-danger' : 'badge-warning'}">
+                                <span class="badge ${inv.status === 'Overdue' ? 'badge-danger' : 'badge-warning'}">
                                     ${inv.status}
                                 </span>
                             </div>
                             <div class="item-subtitle">
                                 ${inv.customer}<br>
                                 Due: ${inv.dueDate}<br>
-                                <span style="font-weight: 700; color: #000;">Amount: 💱 ${formatNumber(inv.amount)} Tsh</span>
+                                <span style="font-weight: 700; color: #000;">Amount: 💰 ${formatNumber(inv.amount)} Tsh</span>
                             </div>
                             <div class="flex-gap" style="margin-top:8px;">
-                                <button class="btn-small" onclick="downloadInvoicePDF(${state.invoices.length - 1 - idx})">📥 PDF</button>
-                                <button class="btn-small" onclick="toggleInvoiceStatus(${state.invoices.length - 1 - idx})">Change Status</button>
+                                <button class="btn-small" onclick="downloadInvoicePDF(${actualIndex})">📥 PDF</button>
+                                <button class="btn-small" onclick="toggleInvoiceStatus(${actualIndex})">Change Status</button>
+                                <button class="btn-small btn-danger" onclick="deleteInvoice(${actualIndex})">Delete</button>
                             </div>
                         </div>
-                    `).join('') || '<p style="text-align: center; color: #666;">No invoices yet</p>'}
+                    </div>
                 </div>
             `;
+            }).join('')}
+    ` : '<p style="text-align: center; color: #666;">No unpaid invoices</p>'}
+</div>
+
+<div class="card">
+    <h2>Paid Invoices (${state.invoices.filter(i => i.status === 'Paid').length})</h2>
+    
+    ${state.invoices.filter(i => i.status === 'Paid').length > 0 ? `
+        <div class="bulk-actions">
+            <input type="checkbox" id="selectAll_paid_invoices" onchange="toggleSelectAllPaidInvoices()" class="checkbox-select">
+            <label for="selectAll_paid_invoices">Select All</label>
+            <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                ${getSelectedPaidInvoiceCount()} selected
+            </span>
+            <button class="btn-small btn-danger" onclick="bulkDeletePaidInvoices()" ${!hasSelectedPaidInvoices() ? 'disabled' : ''}>
+                🗑️ Delete Selected
+            </button>
+        </div>
+        
+        ${state.invoices.filter(i => i.status === 'Paid').map((inv, origIdx) => {
+                const actualIndex = state.invoices.findIndex(i => i === inv);
+                return `
+                <div class="item">
+                    <div style="display: flex; gap: 12px; align-items: start;">
+                        <input type="checkbox" class="checkbox-select" 
+                               ${state.selectedItems.paid_invoices && state.selectedItems.paid_invoices[actualIndex] ? 'checked' : ''}
+                               onchange="toggleSelectPaidInvoice(${actualIndex})">
+                        <div style="flex: 1;">
+                            <div class="item-header">
+                                <span class="item-title">${inv.number}</span>
+                                <span class="badge badge-success">Paid</span>
+                            </div>
+                            <div class="item-subtitle">
+                                ${inv.customer}<br>
+                                Due: ${inv.dueDate}<br>
+                                <span style="font-weight: 700; color: #000;">Amount: 💰 ${formatNumber(inv.amount)} Tsh</span>
+                            </div>
+                            <div class="flex-gap" style="margin-top:8px;">
+                                <button class="btn-small" onclick="downloadInvoicePDF(${actualIndex})">📥 PDF</button>
+                                <button class="btn-small btn-danger" onclick="deleteInvoice(${actualIndex})">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            }).join('')}
+    ` : '<p style="text-align: center; color: #666;">No paid invoices</p>'}
+</div>
+            `;
+        }
+
+        function toggleSelectAllUnpaidInvoices() {
+            if (!state.selectedItems.unpaid_invoices) state.selectedItems.unpaid_invoices = {};
+
+            const unpaidInvoices = state.invoices.filter(i => i.status !== 'Paid');
+            const allSelected = unpaidInvoices.every((inv) => {
+                const idx = state.invoices.indexOf(inv);
+                return state.selectedItems.unpaid_invoices[idx];
+            });
+
+            const newState = !allSelected;
+            unpaidInvoices.forEach(inv => {
+                const idx = state.invoices.indexOf(inv);
+                state.selectedItems.unpaid_invoices[idx] = newState;
+            });
+
+            saveData();
+            render();
+        }
+
+        function toggleSelectUnpaidInvoice(index) {
+            if (!state.selectedItems.unpaid_invoices) state.selectedItems.unpaid_invoices = {};
+            state.selectedItems.unpaid_invoices[index] = !state.selectedItems.unpaid_invoices[index];
+            saveData();
+        }
+
+        function hasSelectedUnpaidInvoices() {
+            return state.selectedItems.unpaid_invoices && Object.values(state.selectedItems.unpaid_invoices).some(v => v);
+        }
+
+        function getSelectedUnpaidInvoiceCount() {
+            if (!state.selectedItems.unpaid_invoices) return 0;
+            return Object.values(state.selectedItems.unpaid_invoices).filter(v => v).length;
+        }
+
+        function bulkMarkInvoicesPaid() {
+            const selected = Object.keys(state.selectedItems.unpaid_invoices || {})
+                .filter(i => state.selectedItems.unpaid_invoices[i])
+                .map(i => parseInt(i));
+
+            if (selected.length === 0) return showToast('No invoices selected', 'info');
+
+            showConfirm(`Mark ${selected.length} invoices as paid?`, async function () {
+                selected.forEach(i => {
+                    if (state.invoices[i]) {
+                        state.invoices[i].status = 'Paid';
+                    }
+                });
+
+                state.selectedItems.unpaid_invoices = {};
+                saveData();
+                render();
+                showToast(`${selected.length} invoices marked as paid`, 'success');
+
+                if (syncEnabled) syncInBackground();
+            });
+        }
+
+        function bulkDeleteUnpaidInvoices() {
+            const selected = Object.keys(state.selectedItems.unpaid_invoices || {})
+                .filter(i => state.selectedItems.unpaid_invoices[i])
+                .map(i => parseInt(i));
+
+            if (selected.length === 0) return showToast('No invoices selected', 'info');
+
+            showConfirm(`Delete ${selected.length} selected invoices?`, async function () {
+                selected.sort((a, b) => b - a).forEach(i => {
+                    state.invoices.splice(i, 1);
+                });
+
+                state.selectedItems.unpaid_invoices = {};
+                saveData();
+                render();
+                showToast(`${selected.length} invoices deleted`, 'success');
+
+                if (syncEnabled) syncInBackground();
+            });
+        }
+
+        function toggleSelectAllPaidInvoices() {
+            if (!state.selectedItems.paid_invoices) state.selectedItems.paid_invoices = {};
+
+            const paidInvoices = state.invoices.filter(i => i.status === 'Paid');
+            const allSelected = paidInvoices.every((inv) => {
+                const idx = state.invoices.indexOf(inv);
+                return state.selectedItems.paid_invoices[idx];
+            });
+
+            const newState = !allSelected;
+            paidInvoices.forEach(inv => {
+                const idx = state.invoices.indexOf(inv);
+                state.selectedItems.paid_invoices[idx] = newState;
+            });
+
+            saveData();
+            render();
+        }
+
+        function toggleSelectPaidInvoice(index) {
+            if (!state.selectedItems.paid_invoices) state.selectedItems.paid_invoices = {};
+            state.selectedItems.paid_invoices[index] = !state.selectedItems.paid_invoices[index];
+            saveData();
+        }
+
+        function hasSelectedPaidInvoices() {
+            return state.selectedItems.paid_invoices && Object.values(state.selectedItems.paid_invoices).some(v => v);
+        }
+
+        function getSelectedPaidInvoiceCount() {
+            if (!state.selectedItems.paid_invoices) return 0;
+            return Object.values(state.selectedItems.paid_invoices).filter(v => v).length;
+        }
+
+        function bulkDeletePaidInvoices() {
+            const selected = Object.keys(state.selectedItems.paid_invoices || {})
+                .filter(i => state.selectedItems.paid_invoices[i])
+                .map(i => parseInt(i));
+
+            if (selected.length === 0) return showToast('No invoices selected', 'info');
+
+            showConfirm(`Delete ${selected.length} selected invoices?`, async function () {
+                selected.sort((a, b) => b - a).forEach(i => {
+                    state.invoices.splice(i, 1);
+                });
+
+                state.selectedItems.paid_invoices = {};
+                saveData();
+                render();
+                showToast(`${selected.length} invoices deleted`, 'success');
+
+                if (syncEnabled) syncInBackground();
+            });
+        }
+
+        function deleteInvoice(index) {
+            showConfirm("Delete this invoice?", async function () {
+                state.invoices.splice(index, 1);
+                saveData();
+                render();
+                showToast("Invoice deleted", "success");
+
+                if (syncEnabled) syncInBackground();
+            });
         }
 
         function toggleInvoiceCustomerInput() {
@@ -4637,24 +5012,24 @@
             return notes.map((note, idx) => {
                 const actualIndex = state.notes.length - 1 - idx;
                 return `
-                    <div class="item" style="display: flex; gap: 12px; align-items: start;">
-                        <div class="note-preview" onclick="openNoteModal(${actualIndex})" style="flex: 1; cursor: pointer;">
-                            ${note.title ? `<div class="item-title" style="margin-bottom: 8px;">${note.title}</div>` : ''}
-                            <div class="item-subtitle" style="margin-bottom: 8px;">${note.date} ${note.time}</div>
-                            <div style="white-space: pre-wrap;">${note.content}</div>
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <button class="btn-small" onclick="event.stopPropagation(); editNoteByIndex(${actualIndex})" 
-                                    style="padding: 8px; width: 40px; height: 40px;">
-                                ✏️
-                            </button>
-                            <button class="btn-small btn-danger" onclick="event.stopPropagation(); deleteNoteByIndex(${actualIndex})"
-                                    style="padding: 8px; width: 40px; height: 40px;">
-                                🗑️
-                            </button>
-                        </div>
-                    </div>
-                `;
+            <div class="item" style="display: flex; gap: 12px; align-items: start;">
+                <div class="note-preview" onclick="openNoteModal(${actualIndex})" style="flex: 1; cursor: pointer;">
+                    ${note.title ? `<div class="item-title" style="margin-bottom: 8px;">${note.title}</div>` : ''}
+                    <div class="item-subtitle" style="margin-bottom: 8px;">${note.date} ${note.time}</div>
+                    <div style="white-space: pre-wrap;">${note.content}</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <button class="btn-small" onclick="event.stopPropagation(); editNoteByIndex(${actualIndex})" 
+                            style="padding: 8px; width: 40px; height: 40px;">
+                        ✏️
+                    </button>
+                    <button class="btn-small btn-danger" onclick="event.stopPropagation(); deleteNoteByIndex(${actualIndex})"
+                            style="padding: 8px; width: 40px; height: 40px;">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        `;
             }).join('');
         }
 
@@ -4792,24 +5167,24 @@
             const netProfit = stats.netProfit;
 
             return `
-        <div class="stat-grid">
-            <div class="stat-card">
-                <div class="stat-label">REVENUE</div>
-                <div class="stat-value">💱 ${formatNumber(stats.totalRevenue)} Tsh</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">EXPENSES</div>
-                <div class="stat-value">💱 ${formatNumber(stats.totalExpenses)} Tsh</div>
-            </div>
-            <div class="stat-card" style="background: ${netProfit >= 0 ? '#2e7d32' : '#d32f2f'};">
-                <div class="stat-label">NET PROFIT</div>
-                <div class="stat-value">💱 ${formatNumber(netProfit)} Tsh</div>
-            </div>
-            <div class="stat-card" style="background: #1976d2;">
-                <div class="stat-label">TOTAL SALES</div>
-                <div class="stat-value">${stats.totalSalesCount}</div>
-            </div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
+        <div class="stat-card" style="padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">REVENUE</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalRevenue)} Tsh</div>
         </div>
+        <div class="stat-card" style="padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">EXPENSES</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalExpenses)} Tsh</div>
+        </div>
+        <div class="stat-card" style="background: ${netProfit >= 0 ? '#2e7d32' : '#d32f2f'}; padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">NET PROFIT</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(netProfit)} Tsh</div>
+        </div>
+        <div class="stat-card" style="background: #1976d2; padding: 12px;">
+            <div class="stat-label" style="font-size: 10px;">TOTAL SALES</div>
+            <div class="stat-value" style="font-size: 16px;">${stats.totalSalesCount}</div>
+        </div>
+    </div>
 
         <div class="card">
             <h2>Payment Methods</h2>
