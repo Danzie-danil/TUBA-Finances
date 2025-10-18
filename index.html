@@ -3,11 +3,17 @@
 
 <head>
     <meta charset="UTF-8">
+    <!-- Favicon and App Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="tuba-icon.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="tuba-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="tuba-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="tuba-icon.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="tuba-icon.png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#000000">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <title>💼 TUBA</title>
+    <title>TUBA</title>
     <link rel="manifest" href="manifest.json">
     <style>
         * {
@@ -15,6 +21,51 @@
             padding: 0;
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
+        }
+
+        .privacy-blur {
+            filter: blur(8px);
+            -webkit-filter: blur(8px);
+            transition: filter 0.3s ease;
+        }
+
+        .privacy-toggle-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4), inset 0 -1px 2px rgba(0, 0, 0, 0.2);
+            z-index: 50;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .privacy-toggle-btn.show {
+            display: flex;
+        }
+
+        .privacy-toggle-btn:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6), inset 0 -1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .privacy-toggle-btn:active {
+            transform: translate(-50%, -50%) scale(0.95);
+        }
+
+        .privacy-container {
+            position: relative;
+            margin-bottom: 12px;
         }
 
         input[readonly] {
@@ -1725,7 +1776,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (products) state.products = products.map(p => ({
-                    id: generateID('products'),
+                    id: `P-${p.name.replace(/\s+/g, '_')}_${Date.now()}`,
                     name: p.name,
                     category: p.category,
                     cost: parseFloat(p.cost),
@@ -1739,7 +1790,7 @@
                     .eq('user_id', currentUser.id)
                     .order('timestamp', { ascending: false });
                 if (sales) state.sales = sales.map(s => ({
-                    id: generateID('sales'),
+                    id: `S-${s.timestamp}`,
                     date: s.date,
                     time: s.time,
                     timestamp: s.timestamp,
@@ -1766,8 +1817,9 @@
                     .from('expenses')
                     .select('*')
                     .eq('user_id', currentUser.id);
+                // Expenses
                 if (expenses) state.expenses = expenses.map(e => ({
-                    id: generateID('expenses'),
+                    id: `E-${e.timestamp}`,
                     date: e.date,
                     time: e.time,
                     timestamp: e.timestamp,
@@ -1783,8 +1835,9 @@
                     .from('customers')
                     .select('*')
                     .eq('user_id', currentUser.id);
+                // Customers
                 if (customers) state.customers = customers.map(c => ({
-                    id: generateID('customers'),
+                    id: `C-${c.name.replace(/\s+/g, '_')}_${Date.now()}`,
                     name: c.name,
                     email: c.email || '',
                     phone: c.phone || '',
@@ -1797,8 +1850,9 @@
                     .from('invoices')
                     .select('*')
                     .eq('user_id', currentUser.id);
+                // Invoices
                 if (invoices) state.invoices = invoices.map(i => ({
-                    id: generateID('invoices'),
+                    id: `INV-${i.number}`,
                     number: i.number,
                     customer: i.customer,
                     date: i.date,
@@ -1832,8 +1886,9 @@
                     .from('notes')
                     .select('*')
                     .eq('user_id', currentUser.id);
+                // Notes
                 if (notes) state.notes = notes.map(n => ({
-                    id: generateID('notes'),
+                    id: `N-${n.timestamp}`,
                     title: n.title || '',
                     content: n.content,
                     date: n.date,
@@ -1846,8 +1901,9 @@
                     .from('transactions')
                     .select('*')
                     .eq('user_id', currentUser.id);
+                // Transactions
                 if (transactions) state.transactions = transactions.map(t => ({
-                    id: generateID('transactions'),
+                    id: `T-${t.timestamp}`,
                     channel: t.channel,
                     customerName: t.customer_name,
                     type: t.type,
@@ -1862,8 +1918,9 @@
                     .from('unpaid_entries')
                     .select('*')
                     .eq('user_id', currentUser.id);
+                // Unpaid entries
                 if (unpaidEntries) state.unpaidEntries = unpaidEntries.map(u => ({
-                    id: generateID('unpaid'),
+                    id: `U-${u.timestamp}`,
                     name: u.name,
                     type: u.type,
                     amount: parseFloat(u.amount),
@@ -1929,10 +1986,10 @@
             transactions: [],
             unpaidEntries: [],
             currentNoteIndex: null,
-            editingNoteIndex: null,     // ADD THIS LINE
+            editingNoteIndex: null,
             collapsedSections: {},
-            listExpanded: {},           // ADD THIS
-            selectedItems: {},          // ADD THIS
+            listExpanded: {},
+            selectedItems: {},
             transactionFloats: {
                 mpesa: { initial: 0, current: 0 },
                 crdb: { initial: 0, current: 0 },
@@ -1955,7 +2012,8 @@
                 address: ""
             },
             profileEditMode: false,
-            profileLoaded: false        // ADD THIS
+            profileLoaded: false,
+            privacyBlurred: true  // ADD THIS LINE
         };
 
         let chartInstance = null;
@@ -2165,6 +2223,10 @@
 
         function switchTab(tabId) {
             state.activeTab = tabId;
+            // Reset privacy blur when switching away from sales
+            if (tabId !== 'sales') {
+                state.privacyBlurred = true;
+            }
             render();
         }
 
@@ -2745,22 +2807,29 @@
             }
 
             return `
+        <div class="privacy-container">
+            <button class="privacy-toggle-btn show" id="privacyToggleBtn" onclick="togglePrivacy()">
+                ${state.privacyBlurred ? '' : '🔒🔓'}
+            </button>
+
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
-    <div class="stat-card" style="padding: 12px;">
-        <div class="stat-label" style="font-size: 10px;">TOTAL CAPITAL</div>
-        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalCapital)} Tsh</div>
-    </div>
-    <div class="stat-card" style="padding: 12px;">
-        <div class="stat-label" style="font-size: 10px;">TOTAL PROFIT</div>
-        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalProfit)} Tsh</div>
-    </div>
-    <div class="stat-card" style="padding: 12px;">
-        <div class="stat-label" style="font-size: 10px;">TODAY'S PROFIT</div>
-        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.todayProfit)} Tsh</div>
-    </div>
-    <div class="stat-card" style="padding: 12px;">
-        <div class="stat-label" style="font-size: 10px;">10% TODAY</div>
-        <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.todayProfit * 0.1)} Tsh</div>
+            <div class="stat-card ${state.privacyBlurred ? 'privacy-blur' : ''}" style="padding: 12px;">
+                <div class="stat-label" style="font-size: 10px;">TOTAL CAPITAL</div>
+                <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalCapital)} Tsh</div>
+            </div>
+            <div class="stat-card ${state.privacyBlurred ? 'privacy-blur' : ''}" style="padding: 12px;">
+                <div class="stat-label" style="font-size: 10px;">TOTAL PROFIT</div>
+                <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalProfit)} Tsh</div>
+            </div>
+            <div class="stat-card ${state.privacyBlurred ? 'privacy-blur' : ''}" style="padding: 12px;">
+                <div class="stat-label" style="font-size: 10px;">TODAY'S PROFIT</div>
+                <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.todayProfit)} Tsh</div>
+            </div>
+            <div class="stat-card ${state.privacyBlurred ? 'privacy-blur' : ''}" style="padding: 12px;">
+                <div class="stat-label" style="font-size: 10px;">10% TODAY</div>
+                <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.todayProfit * 0.1)} Tsh</div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -2816,77 +2885,77 @@
         </div>
 
         <div class="card">
-                <h2>Recent Sales (${filteredSales.length})</h2>
-                
-                <div class="search-box">
-                    <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
-                </div>
+            <h2>Recent Sales (${filteredSales.length})</h2>
+            
+            <div class="search-box">
+                <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
+            </div>
 
-                <div class="filter-row">
-    <div class="form-group">
-        <label>From...</label>
-        <input type="date" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}" placeholder="mm/dd/yyyy">
-    </div>
-    <div class="form-group">
-        <label>To...</label>
-        <input type="date" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}" placeholder="mm/dd/yyyy">
-    </div>
-                    <div class="form-group">
-                        <label>Customer</label>
-                        <select onchange="updateFilterCustomer(this.value)">
-                            <option value="">All Customers</option>
-                            ${[...new Set(state.sales.map(s => s.customer))].map(c =>
+            <div class="filter-row">
+                <div class="form-group">
+                    <label>From...</label>
+                    <input type="date" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}" placeholder="mm/dd/yyyy">
+                </div>
+                <div class="form-group">
+                    <label>To...</label>
+                    <input type="date" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}" placeholder="mm/dd/yyyy">
+                </div>
+                <div class="form-group">
+                    <label>Customer</label>
+                    <select onchange="updateFilterCustomer(this.value)">
+                        <option value="">All Customers</option>
+                        ${[...new Set(state.sales.map(s => s.customer))].map(c =>
                 `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
             ).join('')}
-                        </select>
-                    </div>
-                    <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
+                    </select>
+                </div>
+                <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
+            </div>
+
+            ${(state.listExpanded.sales || state.searchTerm || state.filterDateFrom || state.filterDateTo || state.filterCustomer) ? `
+                <div class="bulk-actions">
+                    <input type="checkbox" id="selectAll_sales" onchange="toggleSelectAll('sales')" class="checkbox-select">
+                    <label for="selectAll_sales">Select All</label>
+                    <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                        ${getSelectedCount('sales')} selected
+                    </span>
+                    <button class="btn-small btn-danger" onclick="bulkDelete('sales')" ${!hasSelected('sales') ? 'disabled' : ''}>
+                        🗑️ Delete Selected
+                    </button>
                 </div>
 
-                ${(state.listExpanded.sales || state.searchTerm || state.filterDateFrom || state.filterDateTo || state.filterCustomer) ? `
-                    <div class="bulk-actions">
-                        <input type="checkbox" id="selectAll_sales" onchange="toggleSelectAll('sales')" class="checkbox-select">
-                        <label for="selectAll_sales">Select All</label>
-                        <span style="color: #666; font-size: 12px; margin-left: 8px;">
-                            ${getSelectedCount('sales')} selected
-                        </span>
-                        <button class="btn-small btn-danger" onclick="bulkDelete('sales')" ${!hasSelected('sales') ? 'disabled' : ''}>
-                            🗑️ Delete Selected
-                        </button>
-                    </div>
-
-                    ${filteredSales.slice().reverse().map((s, idx) => `
-                        <div class="item">
-                            <div style="display: flex; gap: 12px; align-items: start;">
-                                <input type="checkbox" class="checkbox-select" 
-                                       ${state.selectedItems.sales && state.selectedItems.sales[s.id] ? 'checked' : ''}
-                                       onchange="toggleSelect('sales', '${s.id}')">
-                                <div style="flex: 1;">
-                                    <div class="item-header">
-                                        <span class="item-title">${s.productName}</span>
-                                        <span style="color: #2e7d32; font-weight: 700;">💰 ${formatNumber(s.profit)} Tsh</span>
-                                    </div>
-                                    <div class="item-subtitle">
-                                        ${s.date} ${s.time}<br>
-                                        ${s.customer} | Qty: ${s.quantity} | ${s.payment}<br>
-                                        Cost: ${formatNumber(s.totalCost)} | Price: ${formatNumber(s.totalPrice)}
-                                    </div>
-                                    <div class="flex-gap" style="margin-top:8px;">
-                                        <button class="btn-small" style="background: linear-gradient(145deg, #ffeb3b, #fbc02d); color: #333;" onclick="downloadSaleReceiptPDF(${s.timestamp})">📄 Receipt</button>
-                                        <button class="btn-small" onclick="editSaleByTimestamp(${s.timestamp})">Edit</button>
-                                        <button class="btn-small btn-danger" onclick="deleteSaleByTimestamp(${s.timestamp})">Delete</button>
-                                    </div>
+                ${filteredSales.slice().reverse().map((s, idx) => `
+                    <div class="item">
+                        <div style="display: flex; gap: 12px; align-items: start;">
+                            <input type="checkbox" class="checkbox-select" 
+                                   ${state.selectedItems.sales && state.selectedItems.sales[s.id] ? 'checked' : ''}
+                                   onchange="toggleSelect('sales', '${s.id}')">
+                            <div style="flex: 1;">
+                                <div class="item-header">
+                                    <span class="item-title">${s.productName}</span>
+                                    <span style="color: #2e7d32; font-weight: 700;">💰 ${formatNumber(s.profit)} Tsh</span>
+                                </div>
+                                <div class="item-subtitle">
+                                    ${s.date} ${s.time}<br>
+                                    ${s.customer} | Qty: ${s.quantity} | ${s.payment}<br>
+                                    Cost: ${formatNumber(s.totalCost)} | Price: ${formatNumber(s.totalPrice)}
+                                </div>
+                                <div class="flex-gap" style="margin-top:8px;">
+                                    <button class="btn-small" style="background: linear-gradient(145deg, #ffeb3b, #fbc02d); color: #333;" onclick="downloadSaleReceiptPDF(${s.timestamp})">📄 Receipt</button>
+                                    <button class="btn-small" onclick="editSaleByTimestamp(${s.timestamp})">Edit</button>
+                                    <button class="btn-small btn-danger" onclick="deleteSaleByTimestamp(${s.timestamp})">Delete</button>
                                 </div>
                             </div>
                         </div>
-                    `).join('') || '<p style="text-align: center; color: #666;">No sales found</p>'}
-                ` : ''}
+                    </div>
+                `).join('') || '<p style="text-align: center; color: #666;">No sales found</p>'}
+            ` : ''}
 
-                <button class="collapse-btn" onclick="toggleListExpanded('sales')">
-                    <span class="collapse-icon ${state.listExpanded.sales ? 'expanded' : ''}">▼</span>
-                    <span>${state.listExpanded.sales ? 'Hide' : 'Show'} All Sales</span>
-                </button>
-            </div>
+            <button class="collapse-btn" onclick="toggleListExpanded('sales')">
+                <span class="collapse-icon ${state.listExpanded.sales ? 'expanded' : ''}">▼</span>
+                <span>${state.listExpanded.sales ? 'Hide' : 'Show'} All Sales</span>
+            </button>
+        </div>
     `;
         }
 
@@ -3019,8 +3088,8 @@
                 }
             });
 
-            // Check if all items are currently selected
-            const allSelected = items.length > 0 && items.every(item => state.selectedItems[type][item.id]);
+            // Check if ALL items are currently selected
+            const allSelected = items.every(item => state.selectedItems[type][item.id]);
 
             // Toggle: if all selected, unselect all; otherwise, select all
             const newState = !allSelected;
@@ -3031,14 +3100,42 @@
             });
 
             saveData();
-            render(); // RE-RENDER TO SHOW CHECKED ITEMS
+            render(); // Re-render to update UI
+        }
+
+        function updateSelectAllCheckbox(type) {
+            // Use setTimeout to ensure DOM is ready
+            setTimeout(() => {
+                const items = type === 'unpaidEntries' ? state.unpaidEntries : state[type];
+                const checkbox = document.getElementById(`selectAll_${type}`);
+
+                if (!checkbox || !items || items.length === 0) return;
+
+                // Ensure all items have IDs
+                items.forEach(item => {
+                    if (!item.id) {
+                        item.id = generateID(type);
+                    }
+                });
+
+                // Check if all items are selected
+                const allSelected = items.every(item => state.selectedItems[type] && state.selectedItems[type][item.id]);
+
+                // Update the "Select All" checkbox state
+                checkbox.checked = allSelected;
+            }, 0);
         }
 
         function toggleSelect(type, id) {
             if (!state.selectedItems[type]) state.selectedItems[type] = {};
             state.selectedItems[type][id] = !state.selectedItems[type][id];
             saveData();
-            render(); // RE-RENDER TO UPDATE CHECKBOXES AND COUNT
+
+            // Update the "Select All" checkbox state
+            updateSelectAllCheckbox(type);
+
+            // Update count display
+            render();
         }
 
         function hasSelected(type) {
@@ -4463,13 +4560,13 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Due Date</label>
-                            <input type="date" id="invoiceDueDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Items</label>
-                            <input type="text" id="invoiceItems" placeholder="Item 1, Item 2, Item 3" required>
-                        </div>
+    <label>Due Date</label>
+    <input type="date" id="invoiceDueDate" style="width: 100%;" required>
+</div>
+<div class="form-group">
+    <label>Items</label>
+    <input type="text" id="invoiceItems" placeholder="Item 1, Item 2, Item 3" required>
+</div>
                         <div class="form-group">
                             <label>Amount</label>
                             <input type="number" id="invoiceAmount" placeholder="0.00" step="0.01" required>
@@ -4818,7 +4915,7 @@
             doc.setFontSize(12); doc.text(`Invoice: ${inv.number}`, 420, y); doc.text(`Date: ${inv.date}`, 420, y + 16); doc.text(`Due: ${inv.dueDate}`, 420, y + 32);
             y += 64;
             doc.setDrawColor(200); doc.line(left, y, 555, y); y += 18;
-            doc.setFontSize(11); doc.text("Item(s)", left, y); doc.text("Amount", 420, y); doc.text("10%", 500, y); y += 10; doc.line(left, y, 555, y); y += 18;
+            doc.setFontSize(11); doc.text("Item(s)", left, y); doc.text("Amount", 480, y); y += 10; doc.line(left, y, 555, y); y += 18;
             const items = inv.items.split(',').map(s => s.trim()).filter(Boolean);
             items.forEach(it => { doc.text(it, left, y); y += 14; });
             y += 6;
@@ -5427,6 +5524,12 @@
 
                 if (syncEnabled) syncInBackground();
             });
+        }
+
+        function togglePrivacy() {
+            state.privacyBlurred = !state.privacyBlurred;
+            saveData();
+            render();
         }
 
         function renderAnalytics() {
@@ -6162,7 +6265,7 @@
             const app = document.getElementById('app');
             switch (state.activeTab) {
                 case 'dashboard': app.innerHTML = renderDashboard(); break;
-                case 'account': app.innerHTML = renderAccount(); break;  // ADD THIS LINE
+                case 'account': app.innerHTML = renderAccount(); break;
                 case 'sales': app.innerHTML = renderSales(); break;
                 case 'transactions': app.innerHTML = renderTransactions(); break;
                 case 'products': app.innerHTML = renderProducts(); break;
@@ -6179,6 +6282,16 @@
                 case 'notes': app.innerHTML = renderNotes(); break;
             }
             renderNav();
+
+            // Update all "Select All" checkboxes after render
+            setTimeout(() => {
+                updateSelectAllCheckbox('sales');
+                updateSelectAllCheckbox('products');
+                updateSelectAllCheckbox('expenses');
+                updateSelectAllCheckbox('customers');
+                updateSelectAllCheckbox('transactions');
+                updateSelectAllCheckbox('unpaidEntries');
+            }, 0);
         }
 
         // Initialize
@@ -6208,19 +6321,28 @@
             saveData();
         }, 15000);
 
-        // PWA Manifest
+        // PWA Manifest (find this section and replace it)
         const manifestData = {
-            "name": "TUBA",
+            "name": "TUBA - The Ultimate Business Architecture",
             "short_name": "TUBA",
             "start_url": ".",
             "display": "standalone",
             "background_color": "#000000",
             "theme_color": "#000000",
-            "icons": [{
-                "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='75' font-size='75'%3E💼%3C/text%3E%3C/svg%3E",
-                "sizes": "512x512",
-                "type": "image/svg+xml"
-            }]
+            "description": "Complete business management solution",
+            "icons": [
+                {
+                    "src": "tuba-icon.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                },
+                {
+                    "src": "tuba-icon.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                }
+            ]
         };
 
         const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
