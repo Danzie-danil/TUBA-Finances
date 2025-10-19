@@ -949,7 +949,7 @@
             align-items: center;
             justify-content: center;
             z-index: 10000;
-            animation: fadeOut 0.5s ease-in-out 1.5s forwards;
+            animation: fadeOut 0.3s ease-in-out 0.5s forwards;
         }
 
         @keyframes fadeOut {
@@ -1005,7 +1005,7 @@
 
         .app-container {
             opacity: 0;
-            animation: fadeIn 0.5s ease-in-out 2s forwards;
+            animation: fadeIn 0.3s ease-in-out 0.8s forwards;
         }
 
         @keyframes fadeIn {
@@ -1363,6 +1363,8 @@
             </div>
         </div>
 
+
+
         <div class="side-nav-footer">
             <div class="side-nav-footer-text">Empowering Your Business</div>
             <div class="side-nav-footer-brand">The Ultimate Business Architecture (TUBA)</div>
@@ -1370,7 +1372,9 @@
     </div>
     <div class="welcome-screen">
         <div class="welcome-logo">💼</div>
-        <div class="welcome-title">TUBA</div>
+        <div class="welcome-title">
+            TUBA
+        </div>
         <div class="welcome-subtitle">The Ultimate Business Architecture</div>
     </div>
 
@@ -1409,6 +1413,18 @@
         </div>
     </div>
 
+
+    <div class="modal" id="cleanupModal">
+        <div class="modal-content">
+            <div class="modal-title">Clean Duplicate Records</div>
+            <p>This will remove duplicate entries from your local and cloud data based on ID.</p>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button class="btn-small btn-success" onclick="confirmCleanup()">Proceed</button>
+                <button class="btn-small btn-secondary" onclick="closeCleanupModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="floatModal">
         <div class="modal-content">
             <div class="modal-title">Set Initial Float</div>
@@ -1424,6 +1440,29 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qeGtsd29uenJwYXdlcmZvcGRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA0NjY0MzYsImV4cCI6MjA3NjA0MjQzNn0.cWLOALsj1iwxgFsSlWMTcMwf4Zfm8pIY5z1ICNNcsdk';
 
         let supabase;
+        // ===============================
+        // ID SANITIZATION & DEDUP HELPERS
+        // ===============================
+        function ensureItemIDs() {
+            const lists = ['sales', 'products', 'expenses', 'customers', 'transactions', 'unpaidEntries', 'notes'];
+            lists.forEach(listName => {
+                if (!Array.isArray(state[listName])) return;
+                state[listName] = state[listName].map(item => {
+                    if (!item.id) item.id = generateID(listName);
+                    return item;
+                });
+            });
+        }
+
+        function removeDuplicatesByID(arr) {
+            const seen = new Set();
+            return arr.filter(item => {
+                if (!item.id) return true;
+                if (seen.has(item.id)) return false;
+                seen.add(item.id);
+                return true;
+            });
+        }
         let currentUser = null;
         let syncEnabled = false;
 
@@ -2343,7 +2382,7 @@
             }
         }
         let state = {
-            activeTab: 'dashboard',
+            activeTab: 'sales',
             activeTransactionChannel: 'mpesa',
             products: [],
             sales: [],
@@ -2388,6 +2427,8 @@
         };
 
         let chartInstance = null;
+        let cachedStats = null;
+        let lastStatsUpdate = 0;
         let isSyncing = false;
         let idCounters = {              // ADD THIS ENTIRE OBJECT
             sales: 0,
@@ -2489,6 +2530,7 @@
         }
 
         function saveData() {
+            cachedStats = null; // Clear cache when data changes
             try {
                 localStorage.setItem('financeManagerData', JSON.stringify(state));
             } catch (e) {
@@ -2516,6 +2558,13 @@
         }
 
         function getStats() {
+            const currentTime = Date.now();
+
+            // Return cached stats if less than 3 seconds old
+            if (cachedStats && (currentTime - lastStatsUpdate) < 3000) {
+                return cachedStats;
+            }
+
             const totalCapital = state.sales.reduce((sum, s) => sum + (s.totalCost || 0), 0);
             const totalProfit = state.sales.reduce((sum, s) => sum + (s.profit || 0), 0);
             const totalRevenue = state.sales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
@@ -2545,7 +2594,7 @@
             const netProfit = totalProfit - totalExpenses;
             const monthNetProfit = monthProfit - monthExpenses;
 
-            return {
+            cachedStats = {
                 totalCapital,
                 totalProfit,
                 totalRevenue,
@@ -2563,6 +2612,9 @@
                 totalSalesCount: state.sales.length,
                 todaySalesCount: todaySales.length
             };
+
+            lastStatsUpdate = now;
+            return cachedStats;
         }
 
 
@@ -2713,8 +2765,11 @@
                     <div class="flex-gap">
                         <button class="btn-success btn-small" onclick="switchTab('sales')">➕ New Sale</button>
                         <button class="btn-danger btn-small" onclick="switchTab('expenses')">💸 Add Expense</button>
-                        <button class="btn-small" onclick="switchTab('products')">🛍️ Manage Products</button>
+                        <button class="btn-small" onclick="switchTab('products')">🛒 Manage Products</button>
                         <button class="btn-small" onclick="switchTab('transactions')">💳 Transactions</button>
+                        <button class="btn-small" onclick="switchTab('invoices')" style="background: linear-gradient(145deg, #1976d2, #0d47a1); color: white;">📄 Invoices</button>
+                        <button class="btn-small" onclick="switchTab('notes')" style="background: linear-gradient(145deg, #e65100, #bf360c); color: white;">📝 Notes</button>
+                        <button class="btn-small" onclick="switchTab('analytics')" style="background: linear-gradient(145deg, #7b1fa2, #4a148c); color: white;">📈 Analytics</button>
                     </div>
                 </div>
 
@@ -7462,6 +7517,51 @@
             exportData();
         }
 
+
+        function openCleanupModal() {
+            if (!currentUser) {
+                showToast('You must be signed in to clean duplicates.', 'info');
+                return;
+            }
+            document.getElementById('cleanupModal').classList.add('show');
+        }
+
+        function closeCleanupModal() {
+            document.getElementById('cleanupModal').classList.remove('show');
+        }
+
+        async function confirmCleanup() {
+            closeCleanupModal();
+            await cleanDuplicatesInSupabase();
+        }
+
+        async function cleanDuplicatesInSupabase() {
+            if (!supabase || !currentUser) {
+                showToast('You must be signed in before cleaning.', 'error');
+                return;
+            }
+
+            showToast('🧹 Starting cleanup...', 'info');
+            updateSyncIndicator('syncing');
+
+            const lists = ['sales', 'products', 'expenses', 'customers', 'transactions', 'unpaidEntries', 'notes'];
+            let localRemoved = 0;
+
+            lists.forEach(listName => {
+                if (!Array.isArray(state[listName])) return;
+                const before = state[listName].length;
+                state[listName] = removeDuplicatesByID(state[listName]);
+                const after = state[listName].length;
+                localRemoved += before - after;
+            });
+
+            saveData();
+            await pushAllDataToSupabase();
+
+            updateSyncIndicator('synced');
+            showToast(`✅ Removed ${localRemoved} duplicates!`, 'success');
+        }
+
         function exportData() {
             const data = {
                 products: state.products,
@@ -7623,19 +7723,22 @@
         initSupabase();
         updateHeaderDate();
 
-        // Restore session and load data
+        // Load local data IMMEDIATELY - don't wait
+        console.log('📱 Loading local data...');
+        loadData();
+        render(); // SHOW UI NOW
+
+        // Restore session in BACKGROUND
         (async function () {
-            const sessionRestored = await restoreSession();
-
-            if (!sessionRestored) {
-                // Not signed in - load local data
-                console.log('📱 Loading local data...');
-                loadData();
-            } else {
-                console.log('☁️ Session restored - data loaded from cloud');
+            try {
+                const sessionRestored = await restoreSession();
+                if (sessionRestored) {
+                    console.log('☁️ Session restored - syncing...');
+                    render(); // Update UI with cloud data
+                }
+            } catch (error) {
+                console.error('Session restore failed:', error);
             }
-
-            render();
         })();
 
         // Update header date every second
@@ -7675,6 +7778,1060 @@
         const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
         const manifestURL = URL.createObjectURL(manifestBlob);
         document.querySelector('link[rel="manifest"]').setAttribute('href', manifestURL);
+
+        // ============================================
+        // TUBA SALES ENHANCEMENT PATCH v1.0
+        // Added: Dynamic Product & Category Creation
+        // ============================================
+
+        // Store original renderSales function
+        const originalRenderSales = window.renderSales;
+
+        // Override renderSales function
+        window.renderSales = function () {
+            const stats = getStats();
+
+            // Filter sales based on search and filters
+            let filteredSales = state.sales.slice();
+
+            if (state.searchTerm) {
+                const term = state.searchTerm.toLowerCase();
+                filteredSales = filteredSales.filter(s =>
+                    s.productName.toLowerCase().includes(term) ||
+                    s.customer.toLowerCase().includes(term) ||
+                    s.payment.toLowerCase().includes(term)
+                );
+            }
+
+            if (state.filterDateFrom) {
+                filteredSales = filteredSales.filter(s => new Date(s.date) >= new Date(state.filterDateFrom));
+            }
+
+            if (state.filterDateTo) {
+                filteredSales = filteredSales.filter(s => new Date(s.date) <= new Date(state.filterDateTo));
+            }
+
+            if (state.filterCustomer) {
+                filteredSales = filteredSales.filter(s => s.customer === state.filterCustomer);
+            }
+
+            return `
+        <div class="privacy-container">
+            <button class="privacy-toggle-btn show" id="privacyToggleBtn" onclick="togglePrivacy()">
+                ${state.privacyBlurred ? '🔒' : '🔓'}
+            </button>
+
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
+            <div class="stat-card ${state.privacyBlurred ? 'privacy-blur' : ''}" style="padding: 12px;">
+                <div class="stat-label" style="font-size: 10px;">TOTAL CAPITAL</div>
+                <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalCapital)} Tsh</div>
+            </div>
+            <div class="stat-card ${state.privacyBlurred ? 'privacy-blur' : ''}" style="padding: 12px;">
+                <div class="stat-label" style="font-size: 10px;">TOTAL PROFIT</div>
+                <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.totalProfit)} Tsh</div>
+            </div>
+            <div class="stat-card ${state.privacyBlurred ? 'privacy-blur' : ''}" style="padding: 12px;">
+                <div class="stat-label" style="font-size: 10px;">TODAY'S PROFIT</div>
+                <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.todayProfit)} Tsh</div>
+            </div>
+            <div class="stat-card ${state.privacyBlurred ? 'privacy-blur' : ''}" style="padding: 12px;">
+                <div class="stat-label" style="font-size: 10px;">10% TODAY</div>
+                <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.todayProfit * 0.1)} Tsh</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+        <div class="card">
+            <h2>Add Sale</h2>
+            <div class="card-header-buttons">
+                <button class="quick-nav-btn products" onclick="switchTab('products')">Products</button>
+                <button class="quick-nav-btn categories" onclick="switchTab('categories')">Categories</button>
+            </div>
+            <form onsubmit="addSale(event)">
+                <div class="form-group">
+                    <label>Product</label>
+                    <select id="saleProduct" onchange="handleProductSelection()" required>
+                        <option value="">-- Select Product --</option>
+                        ${state.products.map((p, i) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || { stock: 0 }).stock})</option>`).join('')}
+                        <option value="new" style="background: #e3f2fd; font-weight: 600;">+ Add New Product</option>
+                    </select>
+                </div>
+                
+                <div id="newProductFields" style="display:none;">
+                    <div class="form-group">
+                        <label>New Product Name</label>
+                        <input type="text" id="newProductName" placeholder="Enter product name">
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="newProductCategory" onchange="handleCategorySelection()">
+                            <option value="">-- Select Category --</option>
+                            ${state.categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                            <option value="new" style="background: #fff3e0; font-weight: 600;">+ Add New Category</option>
+                        </select>
+                    </div>
+                    
+                    <div id="newCategoryField" style="display:none;">
+                        <div class="form-group">
+                            <label>New Category Name</label>
+                            <input type="text" id="newCategoryName" placeholder="Enter category name">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Cost (Capital)</label>
+                        <input type="number" id="newProductCost" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Price (Selling)</label>
+                        <input type="number" id="newProductPrice" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Initial Stock</label>
+                        <input type="number" id="newProductStock" placeholder="0" min="0" value="0">
+                    </div>
+                    <button type="button" class="btn-success" onclick="saveNewProductFromSales()" style="margin-bottom: 12px;">
+                        ✅ Save New Product
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="cancelNewProduct()" style="margin-bottom: 12px;">
+                        ✖ Cancel
+                    </button>
+                </div>
+
+                <div class="form-group">
+                    <label>Customer</label>
+                    <select id="saleCustomer" onchange="toggleCustomerInput()">
+                        <option value="">-- Walk-in --</option>
+                        ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+                        <option value="new">+ Add New Customer</option>
+                    </select>
+                </div>
+                <div id="newCustomerFields" style="display:none;">
+                    <div class="form-group">
+                        <label>New Customer Name</label>
+                        <input type="text" id="newCustomerName" placeholder="Enter customer name">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone (Optional)</label>
+                        <input type="tel" id="newCustomerPhone" placeholder="+255...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input type="number" id="saleQuantity" value="1" min="1" onchange="updateSaleTotal()" required>
+                </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="salePayment">
+                        <option>Cash</option>
+                        <option>Card</option>
+                        <option>Mobile Money</option>
+                        <option>M-Pesa Lipa Number</option>
+                        <option>Bank Transfer</option>
+                    </select>
+                </div>
+                <div id="saleInfo"></div>
+                <button type="submit">Record Sale</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Recent Sales (${filteredSales.length})</h2>
+            
+            <div class="search-box">
+                <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
+            </div>
+
+            <div class="filter-row">
+                <div class="form-group">
+                    <label>From...</label>
+                    <input type="date" onchange="updateFilterDateFrom(this.value)" value="${state.filterDateFrom || ''}" placeholder="mm/dd/yyyy">
+                </div>
+                <div class="form-group">
+                    <label>To...</label>
+                    <input type="date" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}" placeholder="mm/dd/yyyy">
+                </div>
+                <div class="form-group">
+                    <label>Customer</label>
+                    <select onchange="updateFilterCustomer(this.value)">
+                        <option value="">All Customers</option>
+                        ${[...new Set(state.sales.map(s => s.customer))].map(c =>
+                `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
+            ).join('')}
+                    </select>
+                </div>
+                <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
+            </div>
+
+            ${(state.listExpanded.sales || state.searchTerm || state.filterDateFrom || state.filterDateTo || state.filterCustomer) ? `
+                <div class="bulk-actions">
+                    <input type="checkbox" id="selectAll_sales" onchange="toggleSelectAll('sales')" class="checkbox-select">
+                    <label for="selectAll_sales">Select All</label>
+                    <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                        ${getSelectedCount('sales')} selected
+                    </span>
+                    <button class="btn-small btn-danger" onclick="bulkDelete('sales')" ${!hasSelected('sales') ? 'disabled' : ''}>
+                        🗑️ Delete Selected
+                    </button>
+                </div>
+
+                ${filteredSales.slice().reverse().map((s, idx) => `
+                    <div class="item">
+                        <div style="display: flex; gap: 12px; align-items: start;">
+                            <input type="checkbox" class="checkbox-select" 
+                                   ${state.selectedItems.sales && state.selectedItems.sales[s.id] ? 'checked' : ''}
+                                   onchange="toggleSelect('sales', '${s.id}')">
+                            <div style="flex: 1;">
+                                <div class="item-header">
+                                    <span class="item-title">${s.productName}</span>
+                                    <span style="color: #2e7d32; font-weight: 700;">💰 ${formatNumber(s.profit)} Tsh</span>
+                                </div>
+                                <div class="item-subtitle">
+                                    ${s.date} ${s.time}<br>
+                                    ${s.customer} | Qty: ${s.quantity} | ${s.payment}<br>
+                                    Cost: ${formatNumber(s.totalCost)} | Price: ${formatNumber(s.totalPrice)}
+                                </div>
+                                <div class="flex-gap" style="margin-top:8px;">
+                                    <button class="btn-small" style="background: linear-gradient(145deg, #ffeb3b, #fbc02d); color: #333;" onclick="downloadSaleReceiptPDF(${s.timestamp})">📄 Receipt</button>
+                                    <button class="btn-small" onclick="editSaleByTimestamp(${s.timestamp})">Edit</button>
+                                    <button class="btn-small btn-danger" onclick="deleteSaleByTimestamp(${s.timestamp})">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('') || '<p style="text-align: center; color: #666;">No sales found</p>'}
+            ` : ''}
+
+            <button class="collapse-btn" onclick="toggleListExpanded('sales')">
+                <span class="collapse-icon ${state.listExpanded.sales ? 'expanded' : ''}">▼</span>
+                <span>${state.listExpanded.sales ? 'Hide' : 'Show'} All Sales</span>
+            </button>
+        </div>
+    `;
+        };
+
+        // New function: Handle product selection
+        window.handleProductSelection = function () {
+            const select = document.getElementById('saleProduct');
+            const newFields = document.getElementById('newProductFields');
+
+            if (select && newFields) {
+                if (select.value === 'new') {
+                    newFields.style.display = 'block';
+                    // Clear previous inputs
+                    document.getElementById('newProductName').value = '';
+                    document.getElementById('newProductCategory').value = '';
+                    document.getElementById('newCategoryName').value = '';
+                    document.getElementById('newProductCost').value = '';
+                    document.getElementById('newProductPrice').value = '';
+                    document.getElementById('newProductStock').value = '0';
+                    document.getElementById('newCategoryField').style.display = 'none';
+                } else {
+                    newFields.style.display = 'none';
+                    updateSaleTotal();
+                }
+            }
+        };
+
+        // New function: Handle category selection in new product form
+        window.handleCategorySelection = function () {
+            const select = document.getElementById('newProductCategory');
+            const newCategoryField = document.getElementById('newCategoryField');
+
+            if (select && newCategoryField) {
+                if (select.value === 'new') {
+                    newCategoryField.style.display = 'block';
+                    document.getElementById('newCategoryName').value = '';
+                } else {
+                    newCategoryField.style.display = 'none';
+                }
+            }
+        };
+
+        // New function: Save new product from sales form
+        window.saveNewProductFromSales = async function () {
+            const name = document.getElementById('newProductName').value.trim();
+            const categorySelect = document.getElementById('newProductCategory').value;
+            const newCategoryName = document.getElementById('newCategoryName').value.trim();
+            const cost = parseFloat(document.getElementById('newProductCost').value);
+            const price = parseFloat(document.getElementById('newProductPrice').value);
+            const stock = parseInt(document.getElementById('newProductStock').value) || 0;
+
+            // Validation
+            if (!name) {
+                return showToast('Please enter product name', 'error');
+            }
+
+            let category;
+            if (categorySelect === 'new') {
+                if (!newCategoryName) {
+                    return showToast('Please enter category name', 'error');
+                }
+                // Check if category already exists
+                if (state.categories.includes(newCategoryName)) {
+                    category = newCategoryName;
+                    showToast('Category already exists, using existing one', 'info');
+                } else {
+                    // Add new category
+                    state.categories.push(newCategoryName);
+                    category = newCategoryName;
+                    showToast('New category added!', 'success');
+                }
+            } else {
+                if (!categorySelect) {
+                    return showToast('Please select or create a category', 'error');
+                }
+                category = categorySelect;
+            }
+
+            if (isNaN(cost) || cost < 0) {
+                return showToast('Please enter a valid cost', 'error');
+            }
+
+            if (isNaN(price) || price < 0) {
+                return showToast('Please enter a valid price', 'error');
+            }
+
+            if (price < cost) {
+                if (!confirm('Warning: Selling price is less than cost. Continue?')) {
+                    return;
+                }
+            }
+
+            // Check if product already exists
+            if (state.products.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                return showToast('Product already exists', 'error');
+            }
+
+            // Create new product
+            const product = {
+                id: generateID('products'),
+                name,
+                category,
+                cost,
+                price
+            };
+            state.products.push(product);
+
+            // Initialize inventory
+            if (!state.inventory) {
+                state.inventory = {};
+            }
+            state.inventory[name] = {
+                stock: stock,
+                minAlert: 5
+            };
+
+            saveData();
+
+            // Sync in background if online
+            if (syncEnabled) syncInBackground();
+
+            // Auto-select the new product
+            const productSelect = document.getElementById('saleProduct');
+            const newProductIndex = state.products.length - 1;
+
+            // Re-render to show new product in list
+            render();
+
+            // After re-render, select the new product
+            setTimeout(() => {
+                const updatedSelect = document.getElementById('saleProduct');
+                if (updatedSelect) {
+                    updatedSelect.value = newProductIndex;
+                    updateSaleTotal();
+                }
+            }, 100);
+
+            showToast('✅ Product added successfully!', 'success');
+        };
+
+        // New function: Cancel new product creation
+        window.cancelNewProduct = function () {
+            document.getElementById('saleProduct').value = '';
+            document.getElementById('newProductFields').style.display = 'none';
+            document.getElementById('saleInfo').innerHTML = '';
+        };
+
+        console.log('✅ TUBA Sales Enhancement Patch loaded successfully!');
+        // END OF PATCH
+
+
+        // ============================================
+        // TUBA COMPLETE ENHANCEMENT v2.0
+        // ============================================
+
+        console.log('🚀 Loading TUBA enhancements...');
+
+        // ============================================
+        // FIX 1: Deterministic ID Generation
+        // ============================================
+
+        function generateDeterministicID(type, item) {
+            let hashBase = '';
+
+            switch (type) {
+                case 'sales':
+                    hashBase = `${item.productName}|${item.customer}|${item.timestamp || Date.now()}`;
+                    break;
+                case 'products':
+                    hashBase = `${item.name}|${item.category}|${item.cost}|${item.price}`;
+                    break;
+                case 'expenses':
+                    hashBase = `${item.description}|${item.category}|${item.timestamp || Date.now()}`;
+                    break;
+                case 'customers':
+                    hashBase = `${item.name}|${item.email || ''}|${item.phone || ''}`;
+                    break;
+                case 'transactions':
+                    hashBase = `${item.channel}|${item.type}|${item.timestamp || Date.now()}`;
+                    break;
+                case 'unpaid':
+                    hashBase = `${item.name}|${item.type}|${item.timestamp || Date.now()}`;
+                    break;
+                case 'notes':
+                    hashBase = `${item.content.substring(0, 50)}|${item.timestamp || Date.now()}`;
+                    break;
+                default:
+                    hashBase = JSON.stringify(item);
+            }
+
+            let hash = 0;
+            for (let i = 0; i < hashBase.length; i++) {
+                const char = hashBase.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+
+            const prefix = {
+                'sales': 'S',
+                'products': 'P',
+                'expenses': 'E',
+                'customers': 'C',
+                'transactions': 'T',
+                'unpaid': 'U',
+                'notes': 'N'
+            }[type] || 'X';
+
+            return `${prefix}-${Math.abs(hash).toString(36).toUpperCase()}`;
+        }
+
+        function generateIDSafe(type, item = null) {
+            if (item && typeof item === 'object') {
+                return generateDeterministicID(type, item);
+            }
+            return generateID(type);
+        }
+
+        // ============================================
+        // FIX 2: Content-Based Deduplication
+        // ============================================
+
+        function deduplicateByContent(items, type) {
+            if (!Array.isArray(items) || items.length === 0) return items;
+
+            const uniqueMap = new Map();
+
+            items.forEach(item => {
+                let contentKey;
+
+                switch (type) {
+                    case 'sales':
+                        contentKey = `${item.productName}|${item.customer}|${item.date}|${item.time}|${item.quantity}|${item.totalPrice}`;
+                        break;
+                    case 'products':
+                        contentKey = `${item.name}|${item.category}`;
+                        break;
+                    case 'expenses':
+                        contentKey = `${item.description}|${item.date}|${item.time}|${item.amount}`;
+                        break;
+                    case 'customers':
+                        contentKey = `${item.name}|${item.email || ''}|${item.phone || ''}`;
+                        break;
+                    case 'transactions':
+                        contentKey = `${item.channel}|${item.date}|${item.time}|${item.amount}|${item.type}`;
+                        break;
+                    case 'unpaid':
+                        contentKey = `${item.name}|${item.type}|${item.date}|${item.amount}`;
+                        break;
+                    case 'notes':
+                        contentKey = `${item.content}|${item.date}|${item.time}`;
+                        break;
+                    default:
+                        contentKey = JSON.stringify(item);
+                }
+
+                if (!uniqueMap.has(contentKey)) {
+                    if (!item.id) {
+                        item.id = generateDeterministicID(type, item);
+                    }
+                    uniqueMap.set(contentKey, item);
+                } else {
+                    const existing = uniqueMap.get(contentKey);
+                    const merged = { ...existing, ...item };
+                    merged.id = existing.id;
+                    uniqueMap.set(contentKey, merged);
+                }
+            });
+
+            return Array.from(uniqueMap.values());
+        }
+
+        // ============================================
+        // FIX 3: Improved Smart Merge
+        // ============================================
+
+        async function smartMergeDataFixed() {
+            try {
+                updateSyncIndicator('syncing');
+                console.log('🔄 Starting smart merge with duplicate prevention...');
+
+                const localData = {
+                    sales: [...(state.sales || [])],
+                    products: [...(state.products || [])],
+                    expenses: [...(state.expenses || [])],
+                    customers: [...(state.customers || [])],
+                    transactions: [...(state.transactions || [])],
+                    unpaidEntries: [...(state.unpaidEntries || [])],
+                    notes: [...(state.notes || [])]
+                };
+
+                console.log('📦 Local data backed up');
+
+                const cloudData = {
+                    sales: [],
+                    products: [],
+                    expenses: [],
+                    customers: [],
+                    transactions: [],
+                    unpaidEntries: [],
+                    notes: []
+                };
+
+                try {
+                    const { data: products } = await supabase
+                        .from('products')
+                        .select('*')
+                        .eq('user_id', currentUser.id);
+                    if (products) {
+                        cloudData.products = products.map(p => ({
+                            name: p.name,
+                            category: p.category,
+                            cost: parseFloat(p.cost),
+                            price: parseFloat(p.price)
+                        }));
+                    }
+
+                    const { data: sales } = await supabase
+                        .from('sales')
+                        .select('*')
+                        .eq('user_id', currentUser.id)
+                        .order('timestamp', { ascending: false });
+                    if (sales) {
+                        cloudData.sales = sales.map(s => ({
+                            date: s.date,
+                            time: s.time,
+                            timestamp: s.timestamp,
+                            productName: s.product_name,
+                            customer: s.customer,
+                            quantity: s.quantity,
+                            costPerUnit: parseFloat(s.cost_per_unit),
+                            pricePerUnit: parseFloat(s.price_per_unit),
+                            totalCost: parseFloat(s.total_cost),
+                            totalPrice: parseFloat(s.total_price),
+                            profit: parseFloat(s.profit),
+                            payment: s.payment
+                        }));
+                    }
+
+                    const { data: expenses } = await supabase
+                        .from('expenses')
+                        .select('*')
+                        .eq('user_id', currentUser.id);
+                    if (expenses) {
+                        cloudData.expenses = expenses.map(e => ({
+                            date: e.date,
+                            time: e.time,
+                            timestamp: e.timestamp,
+                            description: e.description,
+                            category: e.category,
+                            amount: parseFloat(e.amount),
+                            payment: e.payment,
+                            comment: e.comment
+                        }));
+                    }
+
+                    const { data: customers } = await supabase
+                        .from('customers')
+                        .select('*')
+                        .eq('user_id', currentUser.id);
+                    if (customers) {
+                        cloudData.customers = customers.map(c => ({
+                            name: c.name,
+                            email: c.email || '',
+                            phone: c.phone || '',
+                            address: c.address || '',
+                            totalPurchases: parseFloat(c.total_purchases || 0)
+                        }));
+                    }
+
+                    const { data: transactions } = await supabase
+                        .from('transactions')
+                        .select('*')
+                        .eq('user_id', currentUser.id);
+                    if (transactions) {
+                        cloudData.transactions = transactions.map(t => ({
+                            channel: t.channel,
+                            customerName: t.customer_name,
+                            type: t.type,
+                            amount: parseFloat(t.amount),
+                            date: t.date,
+                            time: t.time,
+                            timestamp: t.timestamp
+                        }));
+                    }
+
+                    const { data: unpaidEntries } = await supabase
+                        .from('unpaid_entries')
+                        .select('*')
+                        .eq('user_id', currentUser.id);
+                    if (unpaidEntries) {
+                        cloudData.unpaidEntries = unpaidEntries.map(u => ({
+                            name: u.name,
+                            type: u.type,
+                            amount: parseFloat(u.amount),
+                            date: u.date,
+                            time: u.time,
+                            timestamp: u.timestamp,
+                            paid: u.paid
+                        }));
+                    }
+
+                    const { data: notes } = await supabase
+                        .from('notes')
+                        .select('*')
+                        .eq('user_id', currentUser.id);
+                    if (notes) {
+                        cloudData.notes = notes.map(n => ({
+                            title: n.title || '',
+                            content: n.content,
+                            date: n.date,
+                            time: n.time,
+                            timestamp: n.timestamp
+                        }));
+                    }
+
+                    console.log('☁️  Cloud data fetched');
+
+                } catch (fetchError) {
+                    console.error('Error fetching cloud data:', fetchError);
+                    throw fetchError;
+                }
+
+                console.log('🔀 Merging data...');
+
+                state.sales = [...localData.sales, ...cloudData.sales];
+                state.products = [...localData.products, ...cloudData.products];
+                state.expenses = [...localData.expenses, ...cloudData.expenses];
+                state.customers = [...localData.customers, ...cloudData.customers];
+                state.transactions = [...localData.transactions, ...cloudData.transactions];
+                state.unpaidEntries = [...localData.unpaidEntries, ...cloudData.unpaidEntries];
+                state.notes = [...localData.notes, ...cloudData.notes];
+
+                state.sales = deduplicateByContent(state.sales, 'sales');
+                state.products = deduplicateByContent(state.products, 'products');
+                state.expenses = deduplicateByContent(state.expenses, 'expenses');
+                state.customers = deduplicateByContent(state.customers, 'customers');
+                state.transactions = deduplicateByContent(state.transactions, 'transactions');
+                state.unpaidEntries = deduplicateByContent(state.unpaidEntries, 'unpaid');
+                state.notes = deduplicateByContent(state.notes, 'notes');
+
+                console.log('✅ Deduplication complete');
+                console.log(`📊 Final counts: ${state.sales.length} sales, ${state.products.length} products`);
+
+                saveData();
+
+                console.log('⬆️  Pushing merged data to cloud...');
+                await clearAndPushAllData();
+
+                updateSyncIndicator('synced');
+                console.log('✅ Smart merge completed successfully');
+
+            } catch (error) {
+                console.error('Smart merge error:', error);
+                updateSyncIndicator('synced');
+                throw error;
+            }
+        }
+
+        window.smartMergeData = smartMergeDataFixed;
+
+        // ============================================
+        // FIX 4: Sync Lock
+        // ============================================
+
+        let syncLock = false;
+
+        async function syncInBackgroundSafe() {
+            if (!syncEnabled || !currentUser) return;
+            if (syncLock) {
+                console.log('⏸️  Sync already in progress, skipping...');
+                return;
+            }
+
+            syncLock = true;
+            try {
+                await clearAndPushAllData();
+                console.log('✅ Background sync complete');
+            } catch (error) {
+                console.error('❌ Background sync error:', error);
+            } finally {
+                syncLock = false;
+            }
+        }
+
+        window.syncInBackground = syncInBackgroundSafe;
+
+        // ============================================
+        // FIX 5: Manual Duplicate Cleaner
+        // ============================================
+
+        async function cleanAllDuplicates() {
+            console.log('🧹 Cleaning duplicates...');
+
+            const beforeCounts = {
+                sales: state.sales.length,
+                products: state.products.length,
+                expenses: state.expenses.length,
+                customers: state.customers.length,
+                transactions: state.transactions.length,
+                unpaidEntries: state.unpaidEntries.length,
+                notes: state.notes.length
+            };
+
+            state.sales = deduplicateByContent(state.sales, 'sales');
+            state.products = deduplicateByContent(state.products, 'products');
+            state.expenses = deduplicateByContent(state.expenses, 'expenses');
+            state.customers = deduplicateByContent(state.customers, 'customers');
+            state.transactions = deduplicateByContent(state.transactions, 'transactions');
+            state.unpaidEntries = deduplicateByContent(state.unpaidEntries, 'unpaid');
+            state.notes = deduplicateByContent(state.notes, 'notes');
+
+            const afterCounts = {
+                sales: state.sales.length,
+                products: state.products.length,
+                expenses: state.expenses.length,
+                customers: state.customers.length,
+                transactions: state.transactions.length,
+                unpaidEntries: state.unpaidEntries.length,
+                notes: state.notes.length
+            };
+
+            const removed = {
+                sales: beforeCounts.sales - afterCounts.sales,
+                products: beforeCounts.products - afterCounts.products,
+                expenses: beforeCounts.expenses - afterCounts.expenses,
+                customers: beforeCounts.customers - afterCounts.customers,
+                transactions: beforeCounts.transactions - afterCounts.transactions,
+                unpaidEntries: beforeCounts.unpaidEntries - afterCounts.unpaidEntries,
+                notes: beforeCounts.notes - afterCounts.notes
+            };
+
+            const totalRemoved = Object.values(removed).reduce((a, b) => a + b, 0);
+
+            console.log('✅ Duplicates removed:', removed);
+            console.log(`🎉 Total duplicates removed: ${totalRemoved}`);
+
+            saveData();
+
+            if (syncEnabled && currentUser) {
+                await clearAndPushAllData();
+            }
+
+            render();
+            showToast(`🧹 Removed ${totalRemoved} duplicates!`, 'success');
+
+            return { removed, totalRemoved };
+        }
+
+        window.cleanAllDuplicates = cleanAllDuplicates;
+
+        // ============================================
+        // FIX 6: Auto Duplicate Detection on Load
+        // ============================================
+
+        function detectDuplicatesOnLoad() {
+            console.log('🔍 Checking for duplicates on load...');
+
+            const duplicateCounts = {
+                sales: 0,
+                products: 0,
+                expenses: 0,
+                customers: 0,
+                transactions: 0,
+                unpaidEntries: 0,
+                notes: 0
+            };
+
+            // Check sales
+            const salesMap = new Map();
+            state.sales.forEach(s => {
+                const key = `${s.productName}|${s.customer}|${s.date}|${s.time}`;
+                if (salesMap.has(key)) duplicateCounts.sales++;
+                salesMap.set(key, true);
+            });
+
+            // Check products
+            const productsMap = new Map();
+            state.products.forEach(p => {
+                const key = `${p.name}|${p.category}`;
+                if (productsMap.has(key)) duplicateCounts.products++;
+                productsMap.set(key, true);
+            });
+
+            // Check expenses
+            const expensesMap = new Map();
+            state.expenses.forEach(e => {
+                const key = `${e.description}|${e.date}|${e.time}`;
+                if (expensesMap.has(key)) duplicateCounts.expenses++;
+                expensesMap.set(key, true);
+            });
+
+            // Check customers
+            const customersMap = new Map();
+            state.customers.forEach(c => {
+                const key = `${c.name}|${c.email || ''}`;
+                if (customersMap.has(key)) duplicateCounts.customers++;
+                customersMap.set(key, true);
+            });
+
+            // Check transactions
+            const transactionsMap = new Map();
+            state.transactions.forEach(t => {
+                const key = `${t.channel}|${t.date}|${t.time}|${t.amount}`;
+                if (transactionsMap.has(key)) duplicateCounts.transactions++;
+                transactionsMap.set(key, true);
+            });
+
+            // Check unpaid
+            const unpaidMap = new Map();
+            state.unpaidEntries.forEach(u => {
+                const key = `${u.name}|${u.type}|${u.date}`;
+                if (unpaidMap.has(key)) duplicateCounts.unpaidEntries++;
+                unpaidMap.set(key, true);
+            });
+
+            // Check notes
+            const notesMap = new Map();
+            state.notes.forEach(n => {
+                const key = `${n.content}|${n.date}|${n.time}`;
+                if (notesMap.has(key)) duplicateCounts.notes++;
+                notesMap.set(key, true);
+            });
+
+            const totalDuplicates = Object.values(duplicateCounts).reduce((a, b) => a + b, 0);
+
+            if (totalDuplicates > 0) {
+                console.warn(`⚠️  Found ${totalDuplicates} potential duplicates!`, duplicateCounts);
+                state.hasDuplicates = true;
+                state.duplicateCounts = duplicateCounts;
+            } else {
+                console.log('✅ No duplicates detected');
+                state.hasDuplicates = false;
+                state.duplicateCounts = null;
+            }
+
+            return { hasDuplicates: totalDuplicates > 0, counts: duplicateCounts, total: totalDuplicates };
+        }
+
+        window.detectDuplicatesOnLoad = detectDuplicatesOnLoad;
+
+        // ============================================
+        // FIX 7: Enhanced Dashboard with Duplicate Alert
+        // ============================================
+
+        const originalRenderDashboard = window.renderDashboard;
+
+        window.renderDashboard = function () {
+            const dashboardHTML = originalRenderDashboard();
+
+            // Check for duplicates
+            const dupeCheck = detectDuplicatesOnLoad();
+
+            if (dupeCheck.hasDuplicates) {
+                const dupeAlert = `
+                <div class="alert-box-danger" style="animation: highlightFade 2s ease-out;">
+                    <strong>⚠️  Duplicate Data Detected!</strong><br>
+                    Found ${dupeCheck.total} potential duplicates in your data.<br>
+                    <div style="margin-top: 8px; font-size: 12px;">
+                        Sales: ${dupeCheck.counts.sales} | 
+                        Products: ${dupeCheck.counts.products} | 
+                        Expenses: ${dupeCheck.counts.expenses} |
+                        Customers: ${dupeCheck.counts.customers}
+                    </div>
+                    <button class="btn-danger" style="margin-top: 12px; width: 100%;" onclick="cleanDuplicatesFromUI()">
+                        🧹 Clean All Duplicates Now
+                    </button>
+                </div>
+            `;
+
+                return dupeAlert + dashboardHTML;
+            }
+
+            return dashboardHTML;
+        };
+
+        // ============================================
+        // FIX 8: Clean Duplicates UI Function
+        // ============================================
+
+        async function cleanDuplicatesFromUI() {
+            if (!confirm('This will remove all duplicate entries. Continue?')) {
+                return;
+            }
+
+            showToast('🧹 Cleaning duplicates...', 'info');
+
+            try {
+                const result = await cleanAllDuplicates();
+
+                if (result.totalRemoved > 0) {
+                    showToast(`✅ Removed ${result.totalRemoved} duplicates!`, 'success');
+                } else {
+                    showToast('✅ No duplicates found!', 'success');
+                }
+            } catch (error) {
+                console.error('Error cleaning duplicates:', error);
+                showToast('❌ Error cleaning duplicates', 'error');
+            }
+        }
+
+        window.cleanDuplicatesFromUI = cleanDuplicatesFromUI;
+
+        // ============================================
+        // FIX 9: Update Side Nav with Clean Button
+        // ============================================
+
+        const sideNavCleanupItem = document.querySelector('.side-nav-item[onclick="openCleanupModal()"]');
+        if (sideNavCleanupItem) {
+            sideNavCleanupItem.setAttribute('onclick', 'cleanDuplicatesFromUI(); toggleSideNav();');
+            sideNavCleanupItem.innerHTML = `
+            <span class="side-nav-icon">🧹</span>
+            <span>Clean Duplicates</span>
+        `;
+        }
+
+        // ============================================
+        // FIX 10: Run Detection on First Load
+        // ============================================
+
+        setTimeout(() => {
+            const dupeCheck = detectDuplicatesOnLoad();
+            if (dupeCheck.hasDuplicates && state.activeTab === 'dashboard') {
+                render();
+            }
+        }, 2000);
+
+        console.log('✅ All TUBA enhancements loaded successfully!');
+        console.log('📋 Available functions:');
+        console.log('   • cleanAllDuplicates() - Manual duplicate cleaning');
+        console.log('   • detectDuplicatesOnLoad() - Check for duplicates');
+        console.log('   • cleanDuplicatesFromUI() - UI-triggered cleaning');
+
+
+        // ============================================
+        // UI ENHANCEMENT FUNCTIONS
+        // ============================================
+
+        console.log('🎨 Loading UI enhancements...');
+
+        // Update side nav auth button based on login state
+        function updateSideNavAuthButton() {
+            const authButton = document.getElementById('sideNavAuthButton');
+            const authIcon = document.getElementById('sideNavAuthIcon');
+            const authText = document.getElementById('sideNavAuthText');
+
+            if (!authButton || !authIcon || !authText) return;
+
+            if (currentUser && syncEnabled) {
+                // User is logged in
+                authIcon.textContent = '🚪';
+                authText.textContent = 'Logout';
+                authButton.style.background = 'linear-gradient(145deg, #d32f2f, #b71c1c)';
+            } else {
+                // User is logged out
+                authIcon.textContent = '🔐';
+                authText.textContent = 'Login';
+                authButton.style.background = 'linear-gradient(145deg, #2e7d32, #1b5e20)';
+            }
+        }
+
+        // Handle side nav auth button click
+        async function handleSideNavAuth() {
+            if (currentUser && syncEnabled) {
+                // User is logged in - logout
+                if (confirm('Are you sure you want to logout?')) {
+                    await signOut();
+                    toggleSideNav();
+                    showToast('Logged out successfully', 'info');
+                }
+            } else {
+                // User is logged out - go to account tab
+                switchTab('account');
+                toggleSideNav();
+            }
+        }
+
+        // Override the original render to update auth button
+        const originalRender = window.render;
+        window.render = function () {
+            originalRender();
+            updateSideNavAuthButton();
+        };
+
+        // Override toggleSideNav to update button when opened
+        const originalToggleSideNav = window.toggleSideNav;
+        window.toggleSideNav = function () {
+            originalToggleSideNav();
+            setTimeout(updateSideNavAuthButton, 100);
+        };
+
+        // Update button on initial load
+        setTimeout(updateSideNavAuthButton, 1000);
+
+        // Enhanced renderDashboard with new quick actions
+
+        window.renderDashboard = function () {
+            let html = originalRenderDashboard();
+
+            // Check if quick actions need updating (for older versions)
+            if (!html.includes('📄 Invoices')) {
+                const quickActionsRegex = /<div class="card">\s*<h2>Quick Actions<\/h2>\s*<div class="flex-gap">([\s\S]*?)<\/div>\s*<\/div>/;
+
+                const newQuickActions = `<div class="card">
+                    <h2>Quick Actions</h2>
+                    <div class="flex-gap">
+                        <button class="btn-success btn-small" onclick="switchTab('sales')">➕ New Sale</button>
+                        <button class="btn-danger btn-small" onclick="switchTab('expenses')">💸 Add Expense</button>
+                        <button class="btn-small" onclick="switchTab('products')">🛒 Manage Products</button>
+                        <button class="btn-small" onclick="switchTab('transactions')">💳 Transactions</button>
+                        <button class="btn-small" onclick="switchTab('invoices')" style="background: linear-gradient(145deg, #1976d2, #0d47a1); color: white;">📄 Invoices</button>
+                        <button class="btn-small" onclick="switchTab('notes')" style="background: linear-gradient(145deg, #e65100, #bf360c); color: white;">📝 Notes</button>
+                        <button class="btn-small" onclick="switchTab('analytics')" style="background: linear-gradient(145deg, #7b1fa2, #4a148c); color: white;">📈 Analytics</button>
+                    </div>
+                </div>`;
+
+                if (quickActionsRegex.test(html)) {
+                    html = html.replace(quickActionsRegex, newQuickActions);
+                }
+            }
+
+            return html;
+        };
+
+        console.log('✅ UI enhancements loaded successfully!');
+
     </script>
 </body>
 
