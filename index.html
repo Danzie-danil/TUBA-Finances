@@ -1195,34 +1195,74 @@
 
         function initSupabase() {
             try {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                console.log('✅ Supabase initialized');
-
-                supabase.auth.getSession().then(({ data: { session } }) => {
-                    if (session) {
-                        currentUser = session.user;
-                        syncEnabled = true;
-                        updateSyncIndicator('synced');
-                        syncAllData();
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: true,
+                        storageKey: 'tuba-auth-token',
+                        storage: window.localStorage
                     }
                 });
-                supabase.auth.onAuthStateChange((event, session) => {
-                    if (event === 'SIGNED_IN') {
+
+                console.log('✅ Supabase initialized');
+
+                // Listen for auth state changes
+                supabase.auth.onAuthStateChange(async (event, session) => {
+                    console.log('Auth event:', event);
+
+                    if (event === 'SIGNED_IN' && session) {
                         currentUser = session.user;
                         syncEnabled = true;
                         updateSyncIndicator('synced');
-                        render();
-                        // Don't call syncAllData() here - it's already called in signIn()
+
+                        // Don't call render here - it's handled in signIn()
                     } else if (event === 'SIGNED_OUT') {
                         currentUser = null;
                         syncEnabled = false;
                         updateSyncIndicator('offline');
                         render();
+                    } else if (event === 'TOKEN_REFRESHED' && session) {
+                        console.log('✅ Token refreshed');
+                        currentUser = session.user;
+                        syncEnabled = true;
                     }
                 });
+
             } catch (error) {
                 console.error('Supabase init error:', error);
                 syncEnabled = false;
+            }
+        }
+
+        async function restoreSession() {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+
+                if (error) {
+                    console.error('Session restore error:', error);
+                    return false;
+                }
+
+                if (session) {
+                    currentUser = session.user;
+                    syncEnabled = true;
+                    updateSyncIndicator('synced');
+
+                    // Load user profile
+                    await loadUserProfile();
+
+                    // Load data from cloud
+                    await pullDataFromSupabase();
+
+                    console.log('✅ Session restored successfully');
+                    return true;
+                }
+
+                return false;
+            } catch (error) {
+                console.error('Restore session error:', error);
+                return false;
             }
         }
 
@@ -7176,27 +7216,29 @@
         }
 
         // Initialize
-        initSupabase(); // Start Supabase first
-        updateHeaderDate(); // Set initial date
-        render();
+        initSupabase();
+        updateHeaderDate();
 
-        // Only load local data if NOT signed in
-        setTimeout(() => {
-            if (!syncEnabled || !currentUser) {
+        // Restore session and load data
+        (async function () {
+            const sessionRestored = await restoreSession();
+
+            if (!sessionRestored) {
+                // Not signed in - load local data
+                console.log('📱 Loading local data...');
                 loadData();
-                render();
             } else {
-                // If signed in, load profile
-                loadUserProfile().then(() => {
-                    render();
-                });
+                console.log('☁️ Session restored - data loaded from cloud');
             }
-        }, 1000);
+
+            render();
+        })();
 
         // Update header date every second
         setInterval(() => {
             updateHeaderDate();
         }, 1000);
+
         // Auto-save every 15 seconds
         setInterval(() => {
             saveData();
