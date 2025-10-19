@@ -1599,6 +1599,23 @@
                     await supabase.from('invoices').insert(invoicesData);
                 }
 
+                // Sync receipts
+                if (state.receipts && state.receipts.length > 0) {
+                    const receiptsData = state.receipts.map(r => ({
+                        user_id: currentUser.id,
+                        number: r.number,
+                        customer: r.customer,
+                        customer_email: r.customerEmail || '',
+                        date: r.date,
+                        time: r.time,
+                        timestamp: r.timestamp,
+                        description: r.description,
+                        amount: r.amount,
+                        payment_method: r.paymentMethod
+                    }));
+                    await supabase.from('receipts').insert(receiptsData);
+                }
+
                 // Sync inventory
                 if (Object.keys(state.inventory).length > 0) {
                     const inventoryData = Object.entries(state.inventory).map(([productName, inv]) => ({
@@ -1732,6 +1749,7 @@
                     supabase.from('expenses').delete().eq('user_id', currentUser.id),
                     supabase.from('customers').delete().eq('user_id', currentUser.id),
                     supabase.from('invoices').delete().eq('user_id', currentUser.id),
+                    supabase.from('receipts').delete().eq('user_id', currentUser.id),
                     supabase.from('inventory').delete().eq('user_id', currentUser.id),
                     supabase.from('notes').delete().eq('user_id', currentUser.id),
                     supabase.from('transactions').delete().eq('user_id', currentUser.id),
@@ -1862,6 +1880,24 @@
                     status: i.status
                 }));
 
+                // Receipts
+                const { data: receipts } = await supabase
+                    .from('receipts')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (receipts) state.receipts = receipts.map(r => ({
+                    id: `RCPT-${r.timestamp}`,
+                    number: r.number,
+                    customer: r.customer,
+                    customerEmail: r.customer_email || '',
+                    date: r.date,
+                    time: r.time,
+                    timestamp: r.timestamp,
+                    description: r.description,
+                    amount: parseFloat(r.amount),
+                    paymentMethod: r.payment_method
+                }));
+
                 // Inventory
                 const { data: inventory } = await supabase
                     .from('inventory')
@@ -1980,6 +2016,7 @@
             expenses: [],
             customers: [],
             invoices: [],
+            receipts: [],
             categories: [],
             inventory: {},
             notes: [],
@@ -2205,7 +2242,7 @@
             { id: 'expenses', label: 'Expenses', icon: '💸' },
             { id: 'inventory', label: 'Stock', icon: '📦' },
             { id: 'customers', label: 'Customers', icon: '👥' },
-            { id: 'invoices', label: 'Invoices', icon: '📄' },
+            { id: 'invoices', label: 'Invoices & Receipts', icon: '📄' }, ,
             { id: 'analytics', label: 'Analytics', icon: '📈' },
             { id: 'unpaid', label: 'Unpaid', icon: '⏳' },
             { id: 'notes', label: 'Notes', icon: '📝' }
@@ -4538,70 +4575,159 @@
         </div>
     </div>
 
-                <div class="card">
-                    <h2>Create Invoice</h2>
-                    <form onsubmit="createInvoice(event)">
-                        <div class="form-group">
-                            <label>Customer</label>
-                            <select id="invoiceCustomer" onchange="toggleInvoiceCustomerInput()" required>
-                                <option value="">-- Select Customer --</option>
-                                ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
-                                <option value="new">+ Add New Customer</option>
-                            </select>
-                        </div>
-                        <div id="newInvoiceCustomerFields" style="display:none;">
-                            <div class="form-group">
-                                <label>New Customer Name</label>
-                                <input type="text" id="newInvoiceCustomerName" placeholder="Enter customer name">
-                            </div>
-                            <div class="form-group">
-                                <label>Phone (Optional)</label>
-                                <input type="tel" id="newInvoiceCustomerPhone" placeholder="+255...">
-                            </div>
-                        </div>
-                        <div class="form-group">
-    <label>Due Date</label>
-    <input type="date" id="invoiceDueDate" style="width: 100%;" required>
-</div>
-<div class="form-group">
-    <label>Items</label>
-    <input type="text" id="invoiceItems" placeholder="Item 1, Item 2, Item 3" required>
-</div>
-                        <div class="form-group">
-                            <label>Amount</label>
-                            <input type="number" id="invoiceAmount" placeholder="0.00" step="0.01" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Status</label>
-                            <select id="invoiceStatus">
-                                <option>Pending</option>
-                                <option>Paid</option>
-                                <option>Overdue</option>
-                            </select>
-                        </div>
-                        <button type="submit">Create Invoice</button>
-                    </form>
-                </div>
-
-                <div class="card">
-    <h2>Unpaid Invoices (${state.invoices.filter(i => i.status !== 'Paid').length})</h2>
-    
-    ${state.invoices.filter(i => i.status !== 'Paid').length > 0 ? `
-        <div class="bulk-actions">
-            <input type="checkbox" id="selectAll_unpaid_invoices" onchange="toggleSelectAllUnpaidInvoices()" class="checkbox-select">
-            <label for="selectAll_unpaid_invoices">Select All</label>
-            <span style="color: #666; font-size: 12px; margin-left: 8px;">
-                ${getSelectedUnpaidInvoiceCount()} selected
-            </span>
-            <button class="btn-small btn-success" onclick="bulkMarkInvoicesPaid()" ${!hasSelectedUnpaidInvoices() ? 'disabled' : ''}>
-                ✓ Mark as Paid
+    <!-- Template Selection Tabs -->
+    <div class="card">
+        <h2>📋 Create Document</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px;">
+            <button class="transaction-tab ${state.activeInvoiceTab === 'invoice' ? 'mpesa active' : 'mpesa'}" 
+                    style="opacity: ${state.activeInvoiceTab === 'invoice' ? '1' : '0.6'};"
+                    onclick="switchInvoiceTab('invoice')">
+                📄 Invoice
             </button>
-            <button class="btn-small btn-danger" onclick="bulkDeleteUnpaidInvoices()" ${!hasSelectedUnpaidInvoices() ? 'disabled' : ''}>
-                🗑️ Delete Selected
+            <button class="transaction-tab ${state.activeInvoiceTab === 'receipt' ? 'crdb active' : 'crdb'}" 
+                    style="opacity: ${state.activeInvoiceTab === 'receipt' ? '1' : '0.6'};"
+                    onclick="switchInvoiceTab('receipt')">
+                🧾 Receipt
             </button>
         </div>
+
+        ${state.activeInvoiceTab === 'invoice' ? `
+            <!-- Invoice Creation Form -->
+            <form onsubmit="createInvoice(event)">
+                <div class="form-group">
+                    <label>Customer</label>
+                    <select id="invoiceCustomer" onchange="toggleInvoiceCustomerInput()" required>
+                        <option value="">-- Select Customer --</option>
+                        ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+                        <option value="new">+ Add New Customer</option>
+                    </select>
+                </div>
+                <div id="newInvoiceCustomerFields" style="display:none;">
+                    <div class="form-group">
+                        <label>New Customer Name</label>
+                        <input type="text" id="newInvoiceCustomerName" placeholder="Enter customer name">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone (Optional)</label>
+                        <input type="tel" id="newInvoiceCustomerPhone" placeholder="+255...">
+                    </div>
+                    <div class="form-group">
+                        <label>Email (Optional)</label>
+                        <input type="email" id="newInvoiceCustomerEmail" placeholder="customer@email.com">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Due Date</label>
+                    <input type="date" id="invoiceDueDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Payment Terms</label>
+                    <input type="text" id="invoiceTerms" placeholder="Due within 7 days" value="Due within 7 days">
+                </div>
+                <<div class="form-group">
+    <label>Items/Services</label>
+    <div id="invoiceItemsList">
+        <div class="invoice-item-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input type="text" class="item-description" placeholder="Item description" style="flex: 2;" required>
+            <input type="number" class="item-amount" placeholder="0.00" step="0.01" style="flex: 1;" required>
+            <button type="button" class="btn-small btn-danger" onclick="removeInvoiceItem(this)" style="width: auto; padding: 8px 12px;">✕</button>
+        </div>
+    </div>
+    <button type="button" class="btn-secondary" onclick="addInvoiceItem()" style="margin-top: 8px;">+ Add Item</button>
+</div>
+<div class="form-group">
+    <label>Subtotal (Auto-calculated)</label>
+    <input type="text" id="invoiceSubtotal" readonly value="0.00 Tsh" style="background: rgba(0,0,0,0.05);">
+</div>
+                <div class="form-group">
+                    <label>Tax Rate (%)</label>
+                    <input type="number" id="invoiceTaxRate" placeholder="0" step="0.01" value="0" min="0" max="100">
+                </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <input type="text" id="invoicePaymentMethod" placeholder="Bank Transfer / Mobile Money" value="Bank Transfer / Mobile Money">
+                </div>
+                <div class="form-group">
+                    <label>Notes (Optional)</label>
+                    <textarea id="invoiceNotes" placeholder="Thank you for your business..."></textarea>
+                </div>
+                <button type="submit">Create Invoice</button>
+            </form>
+        ` : `
+            <!-- Receipt Creation Form -->
+<form onsubmit="createReceipt(event)">
+    <div class="form-group">
+        <label>Received From</label>
+        <select id="receiptCustomer" onchange="updateReceiptFromCustomer()" required>
+            <option value="">-- Select Customer --</option>
+            ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+            <option value="manual">✏️ Enter Manually</option>
+        </select>
+    </div>
+    <div id="manualReceiptCustomerField" style="display:none;">
+        <div class="form-group">
+            <label>Customer Name</label>
+            <input type="text" id="manualReceiptCustomerName" placeholder="Enter customer name">
+        </div>
+        <div class="form-group">
+            <label>Customer Email (Optional)</label>
+            <input type="email" id="manualReceiptCustomerEmail" placeholder="customer@email.com">
+        </div>
+    </div>
+    <div class="form-group" id="invoiceSelectionGroup" style="display:none;">
+        <label>Related Invoice (Optional)</label>
+        <select id="receiptInvoice" onchange="updateReceiptFromInvoice()">
+            <option value="">-- No Invoice --</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Description</label>
+        <textarea id="receiptDescription" placeholder="Payment for services rendered" required></textarea>
+    </div>
+                <div class="form-group">
+                    <label>Amount Paid</label>
+                    <input type="number" id="receiptAmount" placeholder="0.00" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="receiptPaymentMethod">
+                        <option>Cash</option>
+                        <option>M-Pesa</option>
+                        <option>Bank Transfer</option>
+                        <option>Card</option>
+                        <option>Airtel Money</option>
+                        <option>Halopesa</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reference Number (Optional)</label>
+                    <input type="text" id="receiptReference" placeholder="REF123XYZ">
+                </div>
+                <button type="submit">Create Receipt</button>
+            </form>
+        `}
+    </div>
+
+    <!-- Unpaid Invoices -->
+    <div class="card">
+        <h2>Unpaid Invoices (${state.invoices.filter(i => i.status !== 'Paid').length})</h2>
         
-        ${state.invoices.filter(i => i.status !== 'Paid').map((inv, origIdx) => {
+        ${state.invoices.filter(i => i.status !== 'Paid').length > 0 ? `
+            <div class="bulk-actions">
+                <input type="checkbox" id="selectAll_unpaid_invoices" onchange="toggleSelectAllUnpaidInvoices()" class="checkbox-select">
+                <label for="selectAll_unpaid_invoices">Select All</label>
+                <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                    ${getSelectedUnpaidInvoiceCount()} selected
+                </span>
+                <button class="btn-small btn-success" onclick="bulkMarkInvoicesPaid()" ${!hasSelectedUnpaidInvoices() ? 'disabled' : ''}>
+                    ✓ Mark as Paid
+                </button>
+                <button class="btn-small btn-danger" onclick="bulkDeleteUnpaidInvoices()" ${!hasSelectedUnpaidInvoices() ? 'disabled' : ''}>
+                    🗑️ Delete Selected
+                </button>
+            </div>
+            
+            ${state.invoices.filter(i => i.status !== 'Paid').map((inv, origIdx) => {
                 const actualIndex = state.invoices.findIndex(i => i === inv);
                 return `
                 <div class="item">
@@ -4622,7 +4748,7 @@
                                 <span style="font-weight: 700; color: #000;">Amount: 💰 ${formatNumber(inv.amount)} Tsh</span>
                             </div>
                             <div class="flex-gap" style="margin-top:8px;">
-                                <button class="btn-small" onclick="downloadInvoicePDF(${actualIndex})">📥 PDF</button>
+                                <button class="btn-small" onclick="downloadInvoicePDF(${actualIndex})">📥 Invoice PDF</button>
                                 <button class="btn-small" onclick="toggleInvoiceStatus(${actualIndex})">Change Status</button>
                                 <button class="btn-small btn-danger" onclick="deleteInvoice(${actualIndex})">Delete</button>
                             </div>
@@ -4631,25 +4757,26 @@
                 </div>
             `;
             }).join('')}
-    ` : '<p style="text-align: center; color: #666;">No unpaid invoices</p>'}
-</div>
+        ` : '<p style="text-align: center; color: #666;">No unpaid invoices</p>'}
+    </div>
 
-<div class="card">
-    <h2>Paid Invoices (${state.invoices.filter(i => i.status === 'Paid').length})</h2>
-    
-    ${state.invoices.filter(i => i.status === 'Paid').length > 0 ? `
-        <div class="bulk-actions">
-            <input type="checkbox" id="selectAll_paid_invoices" onchange="toggleSelectAllPaidInvoices()" class="checkbox-select">
-            <label for="selectAll_paid_invoices">Select All</label>
-            <span style="color: #666; font-size: 12px; margin-left: 8px;">
-                ${getSelectedPaidInvoiceCount()} selected
-            </span>
-            <button class="btn-small btn-danger" onclick="bulkDeletePaidInvoices()" ${!hasSelectedPaidInvoices() ? 'disabled' : ''}>
-                🗑️ Delete Selected
-            </button>
-        </div>
+    <!-- Paid Invoices -->
+    <div class="card">
+        <h2>Paid Invoices (${state.invoices.filter(i => i.status === 'Paid').length})</h2>
         
-        ${state.invoices.filter(i => i.status === 'Paid').map((inv, origIdx) => {
+        ${state.invoices.filter(i => i.status === 'Paid').length > 0 ? `
+            <div class="bulk-actions">
+                <input type="checkbox" id="selectAll_paid_invoices" onchange="toggleSelectAllPaidInvoices()" class="checkbox-select">
+                <label for="selectAll_paid_invoices">Select All</label>
+                <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                    ${getSelectedPaidInvoiceCount()} selected
+                </span>
+                <button class="btn-small btn-danger" onclick="bulkDeletePaidInvoices()" ${!hasSelectedPaidInvoices() ? 'disabled' : ''}>
+                    🗑️ Delete Selected
+                </button>
+            </div>
+            
+            ${state.invoices.filter(i => i.status === 'Paid').map((inv, origIdx) => {
                 const actualIndex = state.invoices.findIndex(i => i === inv);
                 return `
                 <div class="item">
@@ -4659,16 +4786,16 @@
                                onchange="toggleSelectPaidInvoice(${actualIndex})">
                         <div style="flex: 1;">
                             <div class="item-header">
-                                <span class="item-title">${inv.number}</span>
+                                <span class="item-title">📄 ${inv.number}</span>
                                 <span class="badge badge-success">Paid</span>
                             </div>
                             <div class="item-subtitle">
                                 ${inv.customer}<br>
-                                Due: ${inv.dueDate}<br>
+                                Paid: ${inv.date}<br>
                                 <span style="font-weight: 700; color: #000;">Amount: 💰 ${formatNumber(inv.amount)} Tsh</span>
                             </div>
                             <div class="flex-gap" style="margin-top:8px;">
-                                <button class="btn-small" onclick="downloadInvoicePDF(${actualIndex})">📥 PDF</button>
+                                <button class="btn-small" onclick="downloadInvoicePDF(${actualIndex})">📥 Invoice PDF</button>
                                 <button class="btn-small btn-danger" onclick="deleteInvoice(${actualIndex})">Delete</button>
                             </div>
                         </div>
@@ -4676,9 +4803,53 @@
                 </div>
             `;
             }).join('')}
-    ` : '<p style="text-align: center; color: #666;">No paid invoices</p>'}
-</div>
-            `;
+        ` : '<p style="text-align: center; color: #666;">No paid invoices</p>'}
+    </div>
+
+    <!-- Receipts -->
+    <div class="card">
+        <h2>Receipts (${(state.receipts || []).length})</h2>
+        
+        ${(state.receipts && state.receipts.length > 0) ? `
+            <div class="bulk-actions">
+                <input type="checkbox" id="selectAll_receipts" onchange="toggleSelectAllReceipts()" class="checkbox-select">
+                <label for="selectAll_receipts">Select All</label>
+                <span style="color: #666; font-size: 12px; margin-left: 8px;">
+                    ${getSelectedReceiptCount()} selected
+                </span>
+                <button class="btn-small btn-danger" onclick="bulkDeleteReceipts()" ${!hasSelectedReceipts() ? 'disabled' : ''}>
+                    🗑️ Delete Selected
+                </button>
+            </div>
+            
+            ${(state.receipts || []).map((receipt, idx) => `
+                <div class="item">
+                    <div style="display: flex; gap: 12px; align-items: start;">
+                        <input type="checkbox" class="checkbox-select" 
+                               ${state.selectedItems.receipts && state.selectedItems.receipts[idx] ? 'checked' : ''}
+                               onchange="toggleSelectReceipt(${idx})">
+                        <div style="flex: 1;">
+                            <div class="item-header">
+                                <span class="item-title">🧾 ${receipt.number}</span>
+                                <span class="badge badge-success">Receipt</span>
+                            </div>
+                            <div class="item-subtitle">
+                                ${receipt.customer}<br>
+                                Date: ${receipt.date} ${receipt.time}<br>
+                                <span style="font-weight: 700; color: #000;">Amount: 💰 ${formatNumber(receipt.amount)} Tsh</span>
+                                ${receipt.linkedInvoice ? `<br>Linked to: ${receipt.linkedInvoice}` : ''}
+                            </div>
+                            <div class="flex-gap" style="margin-top:8px;">
+                                <button class="btn-small" onclick="downloadReceiptPDF(${idx})">📥 Receipt PDF</button>
+                                <button class="btn-small btn-danger" onclick="deleteReceipt(${idx})">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        ` : '<p style="text-align: center; color: #666;">No receipts yet</p>'}
+    </div>
+    `;
         }
 
         function toggleSelectAllUnpaidInvoices() {
@@ -4847,6 +5018,456 @@
             }
         }
 
+        function switchInvoiceTab(tab) {
+            state.activeInvoiceTab = tab;
+            saveData();
+            render();
+        }
+
+        function toggleReceiptCustomerInput() {
+            const select = document.getElementById('receiptCustomer');
+            const fields = document.getElementById('newReceiptCustomerFields');
+            if (select && fields) {
+                if (select.value === 'new') {
+                    fields.style.display = 'block';
+                } else {
+                    fields.style.display = 'none';
+                }
+            }
+        }
+
+        function addInvoiceItem() {
+            const container = document.getElementById('invoiceItemsList');
+            const newRow = document.createElement('div');
+            newRow.className = 'invoice-item-row';
+            newRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
+            newRow.innerHTML = `
+        <input type="text" class="item-description" placeholder="Item description" style="flex: 2;" required>
+        <input type="number" class="item-amount" placeholder="0.00" step="0.01" style="flex: 1;" required oninput="calculateInvoiceSubtotal()">
+        <button type="button" class="btn-small btn-danger" onclick="removeInvoiceItem(this)" style="width: auto; padding: 8px 12px;">✕</button>
+    `;
+            container.appendChild(newRow);
+
+            // Add event listener to first input too
+            const firstAmount = container.querySelector('.item-amount');
+            if (firstAmount && !firstAmount.hasAttribute('oninput')) {
+                firstAmount.setAttribute('oninput', 'calculateInvoiceSubtotal()');
+            }
+        }
+
+        function updateReceiptFromCustomer() {
+            const select = document.getElementById('receiptCustomer');
+            const manualField = document.getElementById('manualReceiptCustomerField');
+            const invoiceGroup = document.getElementById('invoiceSelectionGroup');
+            const invoiceSelect = document.getElementById('receiptInvoice');
+
+            if (select.value === 'manual') {
+                manualField.style.display = 'block';
+                invoiceGroup.style.display = 'none';
+                return;
+            }
+
+            manualField.style.display = 'none';
+
+            if (select.value === '') {
+                invoiceGroup.style.display = 'none';
+                return;
+            }
+
+            const customer = state.customers[select.value];
+            if (!customer) return;
+
+            // Find invoices for this customer
+            const customerInvoices = state.invoices.filter(inv =>
+                inv.customer === customer.name && inv.status !== 'Paid'
+            );
+
+            if (customerInvoices.length > 0) {
+                invoiceGroup.style.display = 'block';
+                invoiceSelect.innerHTML = '<option value="">-- No Invoice --</option>' +
+                    customerInvoices.map((inv, idx) => {
+                        const actualIndex = state.invoices.indexOf(inv);
+                        return `<option value="${actualIndex}">${inv.number} - ${formatNumber(inv.amount)} Tsh (Due: ${inv.dueDate})</option>`;
+                    }).join('');
+
+                // Auto-select first invoice
+                if (customerInvoices.length === 1) {
+                    invoiceSelect.selectedIndex = 1;
+                    updateReceiptFromInvoice();
+                }
+            } else {
+                invoiceGroup.style.display = 'none';
+            }
+        }
+
+        function updateReceiptFromInvoice() {
+            const invoiceSelect = document.getElementById('receiptInvoice');
+            const descField = document.getElementById('receiptDescription');
+            const amountField = document.getElementById('receiptAmount');
+
+            if (!invoiceSelect.value) return;
+
+            const invoice = state.invoices[invoiceSelect.value];
+            if (!invoice) return;
+
+            // Format items properly
+            let itemsDescription = '';
+            if (Array.isArray(invoice.items)) {
+                itemsDescription = invoice.items.map(item =>
+                    `${item.description} (${formatNumber(item.amount)} Tsh)`
+                ).join(', ');
+            } else {
+                itemsDescription = String(invoice.items);
+            }
+
+            descField.value = `Payment for ${itemsDescription} (Invoice ${invoice.number})`;
+            amountField.value = invoice.amount.toFixed(2);
+        }
+
+        function removeInvoiceItem(button) {
+            const container = document.getElementById('invoiceItemsList');
+            if (container.children.length > 1) {
+                button.parentElement.remove();
+                calculateInvoiceSubtotal();
+            } else {
+                showToast('At least one item is required', 'error');
+            }
+        }
+
+        function calculateInvoiceSubtotal() {
+            const amounts = document.querySelectorAll('.item-amount');
+            let subtotal = 0;
+            amounts.forEach(input => {
+                const val = parseFloat(input.value) || 0;
+                subtotal += val;
+            });
+
+            const subtotalField = document.getElementById('invoiceSubtotal');
+            if (subtotalField) {
+                subtotalField.value = formatNumber(subtotal) + ' Tsh';
+            }
+
+            // Update total with tax
+            const taxRate = parseFloat(document.getElementById('invoiceTaxRate')?.value || 0) / 100;
+            const tax = subtotal * taxRate;
+            const total = subtotal + tax;
+
+            // You can add a total display field if needed
+        }
+
+        async function createReceipt(e) {
+            e.preventDefault();
+
+            const customerSelect = document.getElementById('receiptCustomer').value;
+            let customer;
+            let customerName = '';
+            let customerEmail = '';
+
+            if (customerSelect === 'manual') {
+                customerName = document.getElementById('manualReceiptCustomerName')?.value.trim();
+                customerEmail = document.getElementById('manualReceiptCustomerEmail')?.value.trim();
+
+                if (!customerName) return showToast('Please enter customer name', 'error');
+
+                // Optionally add to customers list
+                customer = {
+                    id: generateID('customers'),
+                    name: customerName,
+                    email: customerEmail,
+                    phone: '',
+                    address: '',
+                    totalPurchases: 0
+                };
+                // Don't auto-add manual entries to avoid clutter
+                // state.customers.push(customer);
+            } else {
+                customer = state.customers[customerSelect];
+                customerName = customer.name;
+                customerEmail = customer.email || '';
+            }
+
+            const amount = parseFloat(document.getElementById('receiptAmount').value);
+            if (isNaN(amount) || amount <= 0) {
+                return showToast('Please enter a valid amount', 'error');
+            }
+
+            const now = new Date();
+            const paymentMethod = document.getElementById('receiptPaymentMethod').value;
+            const reference = document.getElementById('receiptReference')?.value.trim();
+
+            // Check if linked to an invoice
+            const invoiceSelect = document.getElementById('receiptInvoice');
+            let linkedInvoice = null;
+            if (invoiceSelect && invoiceSelect.value) {
+                linkedInvoice = state.invoices[invoiceSelect.value];
+                // Mark invoice as paid
+                if (linkedInvoice) {
+                    linkedInvoice.status = 'Paid';
+                    showToast('Invoice marked as paid', 'success');
+                }
+            }
+
+            const receipt = {
+                id: generateID('receipts'),
+                number: 'RCPT-' + Date.now().toString().slice(-6),
+                customer: customerName,
+                customerEmail: customerEmail,
+                date: getTodayDateString(),
+                time: now.toLocaleTimeString(),
+                timestamp: now.getTime(),
+                description: document.getElementById('receiptDescription').value.trim(),
+                amount: amount,
+                paymentMethod: paymentMethod + (reference ? ' (Ref: ' + reference + ')' : ''),
+                linkedInvoice: linkedInvoice ? linkedInvoice.number : null
+            };
+
+            if (!state.receipts) state.receipts = [];
+            state.receipts.push(receipt);
+
+            saveData();
+            render();
+            showToast("Receipt created successfully!", "success");
+
+            if (syncEnabled) syncInBackground();
+        }
+
+        function downloadReceiptPDF(idx) {
+            const receipt = state.receipts[idx];
+            if (!receipt) return showToast("Receipt not found", "error");
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'pt', format: [226.77, 396.85] });
+            const margin = 20;
+            const centerX = 226.77 / 2;
+            let y = 30;
+
+            // Draw zigzag borders
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(1);
+            const zigzagSize = 8;
+            const zigzagCount = Math.floor(226.77 / zigzagSize);
+
+            for (let i = 0; i < zigzagCount; i++) {
+                const x1 = i * zigzagSize;
+                const x2 = (i + 0.5) * zigzagSize;
+                const x3 = (i + 1) * zigzagSize;
+                if (i % 2 === 0) {
+                    doc.line(x1, 10, x2, 5);
+                    doc.line(x2, 5, x3, 10);
+                } else {
+                    doc.line(x1, 10, x2, 15);
+                    doc.line(x2, 15, x3, 10);
+                }
+            }
+
+            doc.line(10, 10, 10, 396.85 - 10);
+            doc.line(226.77 - 10, 10, 226.77 - 10, 396.85 - 10);
+
+            const profile = getUserProfileData();
+
+            // Header
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(profile.businessName, centerX, y, { align: 'center' });
+            y += 18;
+
+            doc.setFontSize(7);
+            doc.setFont(undefined, 'normal');
+            if (profile.address) {
+                const addressLines = doc.splitTextToSize(profile.address, 186.77);
+                addressLines.forEach(line => {
+                    doc.text(line, centerX, y, { align: 'center' });
+                    y += 10;
+                });
+            }
+            if (profile.phone) {
+                doc.text(`Tel: ${profile.phone}`, centerX, y, { align: 'center' });
+                y += 10;
+            }
+            if (profile.email) {
+                doc.text(`Email: ${profile.email}`, centerX, y, { align: 'center' });
+                y += 10;
+            }
+            y += 8;
+
+            doc.setLineWidth(0.5);
+            doc.line(margin, y, 226.77 - margin, y);
+            y += 15;
+
+            // Receipt Title
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('PAYMENT RECEIPT', centerX, y, { align: 'center' });
+            y += 18;
+
+            // Receipt Details
+            doc.setFontSize(8);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Receipt No: ${receipt.number}`, margin, y);
+            y += 11;
+            doc.text(`Date: ${receipt.date}`, margin, y);
+            y += 11;
+            doc.text(`Time: ${receipt.time}`, margin, y);
+            y += 16;
+
+            doc.line(margin, y, 226.77 - margin, y);
+            y += 13;
+
+            // Received From
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(7);
+            doc.text('RECEIVED FROM', margin, y);
+            y += 11;
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            doc.text(receipt.customer, margin, y);
+            if (receipt.customerEmail) {
+                y += 11;
+                doc.setFontSize(7);
+                doc.text(receipt.customerEmail, margin, y);
+            }
+            y += 16;
+
+            // Description
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(7);
+            doc.text('DESCRIPTION', margin, y);
+            y += 11;
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(8);
+            const descLines = doc.splitTextToSize(receipt.description, 186.77);
+            descLines.forEach(line => {
+                if (y > 320) return; // Prevent overflow
+                doc.text(line, margin, y);
+                y += 10;
+            });
+            y += 8;
+
+            doc.line(margin, y, 226.77 - margin, y);
+            y += 13;
+
+            // Amount
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(7);
+            doc.text('AMOUNT PAID', margin, y);
+            y += 14;
+            doc.setFontSize(14);
+            doc.text(`${formatNumber(receipt.amount)} Tsh`, centerX, y, { align: 'center' });
+            y += 16;
+
+            doc.setFontSize(7);
+            doc.setFont(undefined, 'normal');
+            const paymentLines = doc.splitTextToSize(`Payment Method: ${receipt.paymentMethod}`, 186.77);
+            paymentLines.forEach(line => {
+                doc.text(line, centerX, y, { align: 'center' });
+                y += 10;
+            });
+            y += 10;
+
+            // Linked Invoice
+            if (receipt.linkedInvoice) {
+                doc.setFontSize(7);
+                doc.text(`Related Invoice: ${receipt.linkedInvoice}`, centerX, y, { align: 'center' });
+                y += 12;
+            }
+
+            doc.line(margin, y, 226.77 - margin, y);
+            y += 13;
+
+            // Footer
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(8);
+            doc.text('The Ultimate Business Architecture - TUBA', centerX, y, { align: 'center' });
+            y += 11;
+            doc.setFontSize(7);
+            doc.setFont(undefined, 'normal');
+            doc.text(`© ${new Date().getFullYear()}`, centerX, y, { align: 'center' });
+
+
+            // Bottom zigzag
+            const bottomY = 396.85 - 10;
+            for (let i = 0; i < zigzagCount; i++) {
+                const x1 = i * zigzagSize;
+                const x2 = (i + 0.5) * zigzagSize;
+                const x3 = (i + 1) * zigzagSize;
+                if (i % 2 === 0) {
+                    doc.line(x1, bottomY, x2, bottomY + 5);
+                    doc.line(x2, bottomY + 5, x3, bottomY);
+                } else {
+                    doc.line(x1, bottomY, x2, bottomY - 5);
+                    doc.line(x2, bottomY - 5, x3, bottomY);
+                }
+            }
+
+            doc.save(`${receipt.number}.pdf`);
+            showToast("Receipt PDF downloaded", "success");
+        }
+        function deleteReceipt(idx) {
+            showConfirm("Delete this receipt?", async function () {
+                state.receipts.splice(idx, 1);
+                saveData();
+                render();
+                showToast("Receipt deleted", "success");
+
+                if (syncEnabled) syncInBackground();
+            });
+        }
+        function toggleSelectAllReceipts() {
+            if (!state.selectedItems.receipts) state.selectedItems.receipts = {};
+
+            const receipts = state.receipts || [];
+
+            // Check if all receipts are currently selected
+            const allSelected = receipts.every((receipt, idx) => state.selectedItems.receipts[idx]);
+
+            // Toggle: if all selected, unselect all; otherwise, select all
+            const newState = !allSelected;
+
+            receipts.forEach((receipt, idx) => {
+                state.selectedItems.receipts[idx] = newState;
+            });
+
+            saveData();
+            render(); // RE-RENDER TO SHOW CHECKED ITEMS
+        }
+
+        function toggleSelectReceipt(index) {
+            if (!state.selectedItems.receipts) state.selectedItems.receipts = {};
+            state.selectedItems.receipts[index] = !state.selectedItems.receipts[index];
+            saveData();
+            render(); // RE-RENDER TO UPDATE CHECKBOXES AND COUNT
+        }
+
+        function hasSelectedReceipts() {
+            return state.selectedItems.receipts && Object.values(state.selectedItems.receipts).some(v => v);
+        }
+
+        function getSelectedReceiptCount() {
+            if (!state.selectedItems.receipts) return 0;
+            return Object.values(state.selectedItems.receipts).filter(v => v).length;
+        }
+
+        function bulkDeleteReceipts() {
+            const selected = Object.keys(state.selectedItems.receipts || {})
+                .filter(i => state.selectedItems.receipts[i])
+                .map(i => parseInt(i));
+
+            if (selected.length === 0) return showToast('No receipts selected', 'info');
+
+            showConfirm(`Delete ${selected.length} selected receipts?`, async function () {
+                selected.sort((a, b) => b - a).forEach(i => {
+                    state.receipts.splice(i, 1);
+                });
+
+                state.selectedItems.receipts = {};
+                saveData();
+                render();
+                showToast(`${selected.length} receipts deleted`, 'success');
+
+                if (syncEnabled) syncInBackground();
+            });
+        }
+
         function toggleInvoiceStatus(idx) {
             const inv = state.invoices[idx];
             if (!inv) return;
@@ -4872,59 +5493,305 @@
                 const newName = document.getElementById('newInvoiceCustomerName')?.value.trim();
                 if (!newName) return showToast('Please enter customer name', 'error');
                 const newPhone = document.getElementById('newInvoiceCustomerPhone')?.value.trim();
-                customer = { name: newName, email: '', phone: newPhone, address: '', totalPurchases: 0 };
-                state.customers.push(customer);
+                const newEmail = document.getElementById('newInvoiceCustomerEmail')?.value.trim();
+
+                // Check if customer already exists
+                const existingCustomer = state.customers.find(c => c.name.toLowerCase() === newName.toLowerCase());
+
+                if (existingCustomer) {
+                    customer = existingCustomer;
+                } else {
+                    customer = {
+                        id: generateID('customers'),
+                        name: newName,
+                        email: newEmail,
+                        phone: newPhone,
+                        address: '',
+                        totalPurchases: 0
+                    };
+                    state.customers.push(customer);
+                    showToast('New customer added to customers list', 'info');
+                }
             } else {
                 customer = state.customers[customerSelect];
             }
 
-            const amount = parseFloat(document.getElementById('invoiceAmount').value);
-            if (isNaN(amount) || amount <= 0) {
-                return showToast('Please enter a valid amount', 'error');
+            // Collect all items
+            const itemRows = document.querySelectorAll('.invoice-item-row');
+            const items = [];
+            let subtotal = 0;
+
+            itemRows.forEach(row => {
+                const desc = row.querySelector('.item-description').value.trim();
+                const amount = parseFloat(row.querySelector('.item-amount').value) || 0;
+
+                if (desc && amount > 0) {
+                    items.push({ description: desc, amount: amount });
+                    subtotal += amount;
+                }
+            });
+
+            if (items.length === 0) {
+                return showToast('Please add at least one item with an amount', 'error');
             }
+
+            const taxRate = parseFloat(document.getElementById('invoiceTaxRate')?.value || 0) / 100;
+            const taxAmount = subtotal * taxRate;
+            const total = subtotal + taxAmount;
 
             const now = new Date();
             const invoice = {
+                id: generateID('invoices'),
                 number: 'INV-' + Date.now().toString().slice(-6),
                 customer: customer.name,
+                customerEmail: customer.email || '',
+                customerAddress: customer.address || '',
+                customerPhone: customer.phone || '',
                 date: getTodayDateString(),
+                time: now.toLocaleTimeString(),
+                timestamp: now.getTime(),
                 dueDate: document.getElementById('invoiceDueDate').value,
-                items: document.getElementById('invoiceItems').value.trim(),
-                amount: amount,
-                status: document.getElementById('invoiceStatus').value
+                terms: document.getElementById('invoiceTerms')?.value.trim() || 'Due within 7 days',
+                items: items,
+                subtotal: subtotal,
+                taxRate: taxRate * 100,
+                taxAmount: taxAmount,
+                amount: total,
+                paymentMethod: document.getElementById('invoicePaymentMethod')?.value.trim() || 'Bank Transfer',
+                notes: document.getElementById('invoiceNotes')?.value.trim() || '',
+                status: 'Pending'
             };
 
             state.invoices.push(invoice);
             saveData();
             render();
-            showToast("Invoice created", "success");
+            showToast("Invoice created successfully!", "success");
 
-            // Sync in background
             if (syncEnabled) syncInBackground();
         }
 
         function downloadInvoicePDF(i) {
             const inv = state.invoices[i];
             if (!inv) return showToast("Invoice not found", "error");
+
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-            const left = 40; let y = 40;
+            const pageWidth = 595.28;
+            const margin = 50;
+            const usableWidth = pageWidth - margin * 2;
+            let y = 50;
+
             const profile = getUserProfileData();
-            doc.setFontSize(20); doc.text(profile.businessName, left, y);
-            doc.setFontSize(11); doc.text(`${profile.address} | ${profile.phone} | ${profile.email}`, left, y + 18);
-            doc.setFontSize(12); doc.text(`Invoice: ${inv.number}`, 420, y); doc.text(`Date: ${inv.date}`, 420, y + 16); doc.text(`Due: ${inv.dueDate}`, 420, y + 32);
-            y += 64;
-            doc.setDrawColor(200); doc.line(left, y, 555, y); y += 18;
-            doc.setFontSize(11); doc.text("Item(s)", left, y); doc.text("Amount", 480, y); y += 10; doc.line(left, y, 555, y); y += 18;
-            const items = inv.items.split(',').map(s => s.trim()).filter(Boolean);
-            items.forEach(it => { doc.text(it, left, y); y += 14; });
-            y += 6;
-            y += 6;
-            doc.line(left, y, 555, y); y += 18;
-            doc.setFontSize(12);
+
+            // Header with gradient gray background
+            doc.setFillColor(245, 245, 245);
+            doc.rect(0, 0, pageWidth, 70, 'F');
+            doc.setFillColor(230, 230, 230);
+            doc.rect(0, 70, pageWidth, 70, 'F');
+
+            // Company name
+            doc.setTextColor(40, 40, 40);
+            doc.setFontSize(26);
             doc.setFont(undefined, 'bold');
-            doc.text(`Total: ${formatNumber(inv.amount)} Tsh`, 420, y);
-            y += 40; doc.setFontSize(10); doc.text("Thank you for your business.", left, y);
+            doc.text(profile.businessName || 'Your Business Name', margin, 45);
+
+            // Company details - show all profile info
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(80, 80, 80);
+            let headerY = 70;
+
+            if (profile.address) {
+                doc.text(`Address: ${profile.address}`, margin, headerY);
+                headerY += 14;
+            }
+            if (profile.phone) {
+                doc.text(`Phone: ${profile.phone}`, margin, headerY);
+                headerY += 14;
+            }
+            if (profile.email) {
+                doc.text(`Email: ${profile.email}`, margin, headerY);
+                headerY += 14;
+            }
+
+            // Add a subtle line separator
+            doc.setDrawColor(150, 150, 150);
+            doc.setLineWidth(2);
+            doc.line(margin, headerY + 5, pageWidth - margin, headerY + 5);
+
+            // Invoice details (right side)
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text('INVOICE', pageWidth - margin, 45, { align: 'right' });
+
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${inv.number}`, pageWidth - margin, 65, { align: 'right' });
+            doc.text(`Date: ${inv.date}`, pageWidth - margin, 80, { align: 'right' });
+            doc.text(`Due: ${inv.dueDate}`, pageWidth - margin, 95, { align: 'right' });
+
+            y = 165;
+            doc.setTextColor(0, 0, 0);
+
+            // Bill To section
+            doc.setFillColor(248, 248, 248);
+            doc.roundedRect(margin, y, (usableWidth / 2) - 10, 100, 5, 5, 'F');
+
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(107, 114, 128);
+            doc.text('BILL TO', margin + 15, y + 20);
+
+            doc.setTextColor(0, 0, 0);
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(11);
+            doc.text(inv.customer, margin + 15, y + 40);
+
+            let billY = y + 55;
+            if (inv.customerEmail) {
+                doc.setFontSize(9);
+                doc.setTextColor(107, 114, 128);
+                doc.text(inv.customerEmail, margin + 15, billY);
+                billY += 12;
+            }
+            if (inv.customerPhone) {
+                doc.text(inv.customerPhone, margin + 15, billY);
+                billY += 12;
+            }
+            if (inv.customerAddress) {
+                doc.text(inv.customerAddress, margin + 15, billY);
+            }
+
+            // Payment Terms section
+            doc.setFillColor(248, 248, 248);
+            doc.roundedRect(margin + (usableWidth / 2) + 10, y, (usableWidth / 2) - 10, 80, 5, 5, 'F');
+
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(107, 114, 128);
+            doc.text('PAYMENT TERMS', margin + (usableWidth / 2) + 25, y + 20);
+
+            doc.setTextColor(0, 0, 0);
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(10);
+            doc.text(inv.terms || 'Due within 7 days', margin + (usableWidth / 2) + 25, y + 40);
+
+            doc.setFont(undefined, 'bold');
+            doc.text('Payment Method', margin + (usableWidth / 2) + 25, y + 60);
+            doc.setFont(undefined, 'normal');
+            doc.text(inv.paymentMethod || 'Bank Transfer', margin + (usableWidth / 2) + 25, y + 75);
+
+            y += 120;
+
+            // Items table
+            doc.setFillColor(100, 100, 100);
+            doc.rect(margin, y, usableWidth, 25, 'F');
+
+            doc.setTextColor(255, 255, 255);
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(10);
+            doc.text('Item / Service', margin + 10, y + 16);
+            doc.text('Amount', pageWidth - margin - 10, y + 16, { align: 'right' });
+
+            y += 25;
+            doc.setTextColor(0, 0, 0);
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(10);
+
+            y += 25;
+            doc.setTextColor(0, 0, 0);
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(10);
+
+            // Parse items properly
+            let items = [];
+            if (Array.isArray(inv.items)) {
+                items = inv.items;
+            } else if (typeof inv.items === 'string') {
+                try {
+                    // Try to parse as JSON first
+                    items = JSON.parse(inv.items);
+                } catch (e) {
+                    // If not JSON, split by comma
+                    items = inv.items.split(',').map(s => ({ description: s.trim(), amount: 0 })).filter(i => i.description);
+                }
+            } else if (typeof inv.items === 'object') {
+                items = [inv.items];
+            }
+
+            items.forEach((item, idx) => {
+                if (idx % 2 === 0) {
+                    doc.setFillColor(248, 249, 250);
+                    doc.rect(margin, y, usableWidth, 20, 'F');
+                }
+
+                const description = item.description || String(item);
+                const amount = item.amount || 0;
+
+                doc.text(description, margin + 10, y + 14);
+                if (amount > 0) {
+                    doc.text(`${formatNumber(amount)} Tsh`, pageWidth - margin - 10, y + 14, { align: 'right' });
+                }
+                y += 20;
+            });
+
+            y += 10;
+
+            // Totals section
+            const totalsX = pageWidth - margin - 150;
+
+            if (inv.subtotal !== undefined) {
+                doc.setDrawColor(200, 200, 200);
+                doc.line(totalsX - 20, y, pageWidth - margin, y);
+                y += 15;
+
+                doc.setFont(undefined, 'normal');
+                doc.text('Subtotal:', totalsX, y);
+                doc.text(`${formatNumber(inv.subtotal)} Tsh`, pageWidth - margin, y, { align: 'right' });
+                y += 18;
+
+                if (inv.taxAmount && inv.taxAmount > 0) {
+                    doc.text(`Tax (${inv.taxRate}%):`, totalsX, y);
+                    doc.text(`${formatNumber(inv.taxAmount)} Tsh`, pageWidth - margin, y, { align: 'right' });
+                    y += 18;
+                }
+            }
+
+            doc.setDrawColor(100, 100, 100);
+            doc.setLineWidth(2);
+            doc.line(totalsX - 20, y, pageWidth - margin, y);
+            y += 18;
+
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(12);
+            doc.text('Total Due:', totalsX, y);
+            doc.text(`${formatNumber(inv.amount)} Tsh`, pageWidth - margin, y, { align: 'right' });
+
+            // Notes
+            if (inv.notes) {
+                y += 40;
+                doc.setFontSize(9);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(107, 114, 128);
+                doc.text('Notes:', margin, y);
+                y += 12;
+                doc.setFont(undefined, 'normal');
+                const noteLines = doc.splitTextToSize(inv.notes, usableWidth);
+                noteLines.forEach(line => {
+                    doc.text(line, margin, y);
+                    y += 12;
+                });
+            }
+
+            // Footer
+            doc.setFillColor(80, 80, 80);
+            doc.rect(0, 792 - 50, pageWidth, 50, 'F');
+            doc.setFontSize(11);
+            doc.setTextColor(255, 255, 255);
+            doc.setFont(undefined, 'bold');
+            doc.text('The Ultimate Business Architecture', pageWidth / 2, 792 - 28, { align: 'center' });
+            doc.setFontSize(14);
+            doc.text('- TUBA -', pageWidth / 2, 792 - 12, { align: 'center' });
             doc.save(`${inv.number}.pdf`);
             showToast("Invoice PDF downloaded", "success");
         }
@@ -4969,23 +5836,36 @@
             const profile = getUserProfileData();
 
             // Header - Business Name
-            doc.setFontSize(14);
+            doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
             const centerX = 226.77 / 2;
-            doc.text(profile.businessName, centerX, y, { align: 'center' });
-            y += 18;
+            doc.text(profile.businessName || 'Your Business', centerX, y, { align: 'center' });
+            y += 20;
 
             // Business Info
             doc.setFontSize(8);
             doc.setFont(undefined, 'normal');
-            doc.text(profile.address, centerX, y, { align: 'center' });
-            y += 12;
-            doc.text(`Tel: ${profile.phone}`, centerX, y, { align: 'center' });
-            y += 12;
-            doc.text(`Email: ${profile.email}`, centerX, y, { align: 'center' });
-            y += 18;
+
+            if (profile.address) {
+                const addressLines = doc.splitTextToSize(profile.address, 186.77);
+                addressLines.forEach(line => {
+                    doc.text(line, centerX, y, { align: 'center' });
+                    y += 10;
+                });
+            }
+
+            if (profile.phone) {
+                doc.text(`Tel: ${profile.phone}`, centerX, y, { align: 'center' });
+                y += 10;
+            }
+
+            if (profile.email) {
+                doc.text(`Email: ${profile.email}`, centerX, y, { align: 'center' });
+                y += 10;
+            }
 
             // Separator line
+            y += 8;
             doc.setLineWidth(0.5);
             doc.line(margin, y, 226.77 - margin, y);
             y += 15;
@@ -6178,6 +7058,7 @@
                 expenses: state.expenses,
                 customers: state.customers,
                 invoices: state.invoices,
+                receipts: state.receipts || [],
                 categories: state.categories,
                 inventory: state.inventory,
                 notes: state.notes,
