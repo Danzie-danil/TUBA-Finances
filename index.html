@@ -1267,8 +1267,25 @@
         }
 
         async function loadUserProfile() {
-            if (!syncEnabled || !currentUser) return;
+            // First, check if we have local profile data
+            const localProfile = state.userProfile;
+            const hasLocalProfile = localProfile && localProfile.businessName && localProfile.phone && localProfile.address;
 
+            if (!syncEnabled || !currentUser) {
+                // Not signed in - use local profile if available
+                if (!hasLocalProfile) {
+                    // No local profile - set up for first-time entry
+                    state.profileEditMode = true;
+                    state.profileLoaded = false;
+                } else {
+                    // Has local profile
+                    state.profileEditMode = false;
+                    state.profileLoaded = true;
+                }
+                return;
+            }
+
+            // Signed in - check cloud profile
             try {
                 const { data, error } = await supabase
                     .from('user_profiles')
@@ -1282,6 +1299,7 @@
                 }
 
                 if (data) {
+                    // Cloud profile exists - use it
                     state.userProfile = {
                         businessName: data.business_name || "",
                         email: data.email || currentUser.email || "",
@@ -1289,15 +1307,51 @@
                         address: data.address || ""
                     };
                     state.profileEditMode = false;
-                    state.profileLoaded = true; // Mark as loaded
+                    state.profileLoaded = true;
                     saveData();
                 } else {
-                    // New user - show edit mode ONCE
-                    state.profileEditMode = true;
-                    state.profileLoaded = false;
+                    // No cloud profile
+                    if (hasLocalProfile) {
+                        // Has local profile - upload it to cloud
+                        console.log('📤 Uploading local profile to cloud...');
+                        await createProfileFromLocal();
+                    } else {
+                        // No profile at all - show edit mode
+                        state.profileEditMode = true;
+                        state.profileLoaded = false;
+                    }
                 }
             } catch (error) {
                 console.error('Load profile error:', error);
+            }
+        }
+
+        async function createProfileFromLocal() {
+            if (!syncEnabled || !currentUser) return;
+
+            try {
+                const { error } = await supabase
+                    .from('user_profiles')
+                    .insert({
+                        user_id: currentUser.id,
+                        business_name: state.userProfile.businessName,
+                        email: state.userProfile.email || currentUser.email,
+                        phone: state.userProfile.phone,
+                        address: state.userProfile.address
+                    });
+
+                if (error) {
+                    console.error('Error creating profile from local:', error);
+                    return false;
+                }
+
+                console.log('✅ Local profile uploaded to cloud');
+                state.profileLoaded = true;
+                saveData();
+                return true;
+            } catch (error) {
+                console.error('Create profile from local error:', error);
+                return false;
             }
         }
 
@@ -1324,47 +1378,43 @@
         }
 
         async function saveUserProfile(profileData) {
-            if (!syncEnabled || !currentUser) {
-                showToast('Please sign in to save profile', 'error');
-                return false;
-            }
+            // Always save locally first
+            state.userProfile = { ...profileData };
+            state.profileLoaded = true;
+            saveData();
 
-            try {
-                updateSyncIndicator('syncing');
+            // If signed in, also save to cloud
+            if (syncEnabled && currentUser) {
+                try {
+                    updateSyncIndicator('syncing');
 
-                const { error } = await supabase
-                    .from('user_profiles')
-                    .upsert({
-                        user_id: currentUser.id,
-                        business_name: profileData.businessName,
-                        email: profileData.email,
-                        phone: profileData.phone,
-                        address: profileData.address,
-                        updated_at: new Date().toISOString()
-                    }, {
-                        onConflict: 'user_id'
-                    });
+                    const { error } = await supabase
+                        .from('user_profiles')
+                        .upsert({
+                            user_id: currentUser.id,
+                            business_name: profileData.businessName,
+                            email: profileData.email,
+                            phone: profileData.phone,
+                            address: profileData.address,
+                            updated_at: new Date().toISOString()
+                        }, {
+                            onConflict: 'user_id'
+                        });
 
+                    if (error) throw error;
 
-                if (error) throw error;
-
-                state.userProfile = { ...profileData };
-                saveData();
-                updateSyncIndicator('synced');
-
-                // Mark profile as loaded after first save
-                if (!state.profileLoaded) {
-                    state.profileLoaded = true;
-                    saveData();
+                    updateSyncIndicator('synced');
+                    console.log('✅ Profile saved to cloud');
+                } catch (error) {
+                    console.error('Save profile to cloud error:', error);
+                    updateSyncIndicator('synced');
+                    showToast('Profile saved locally (cloud sync failed)', 'info');
                 }
-                return true;
-
-            } catch (error) {
-                console.error('Save profile error:', error);
-                updateSyncIndicator('synced');
-                showToast('Error saving profile: ' + error.message, 'error');
-                return false;
+            } else {
+                console.log('✅ Profile saved locally');
             }
+
+            return true;
         }
 
         function getUserProfileData() {
@@ -2482,8 +2532,91 @@
         }
 
         function renderAccount() {
+            // Get profile data (works offline or online)
+            const profile = getUserProfileData();
+
+            // Check if profile is incomplete
+            const isProfileIncomplete = !profile.businessName || !profile.phone || !profile.address;
+
             if (!currentUser) {
+                // NOT SIGNED IN VIEW
                 return `
+            ${isProfileIncomplete && state.profileEditMode ? `
+                <div class="alert-box" style="animation: highlightFade 2s ease-out;">
+                    <strong>📋 Complete Your Profile!</strong><br>
+                    Please fill in your business information below for personalized invoices and reports.
+                </div>
+            ` : ''}
+            
+            <div class="card" id="userProfileCard">
+                <h2>👤 User Profile (Offline Mode)</h2>
+                <div class="alert-info" style="margin-bottom: 16px;">
+                    <strong>ℹ️ Offline Profile:</strong> Your profile is saved locally. Sign in to sync across devices.
+                </div>
+                <form onsubmit="updateUserProfile(event)">
+                    <div class="form-group">
+                        <label>Business Name</label>
+                        <input 
+                            type="text"
+                            id="profileBusinessName"
+                            value="${profile.businessName}"
+                            placeholder="Enter business name"
+                            ${state.profileEditMode ? '' : 'readonly'}
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input 
+                            type="email" 
+                            id="profileEmail" 
+                            value="${profile.email}" 
+                            placeholder="youremail@domain.com" 
+                            ${state.profileEditMode ? '' : 'readonly'}
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input 
+                            type="tel" 
+                            id="profilePhone" 
+                            value="${profile.phone}" 
+                            placeholder="+00000000000" 
+                            ${state.profileEditMode ? '' : 'readonly'}
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <input 
+                            type="text" 
+                            id="profileAddress" 
+                            value="${profile.address}" 
+                            placeholder="your Address" 
+                            ${state.profileEditMode ? '' : 'readonly'}
+                            required>
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px;">
+                        <button 
+                            type="submit" 
+                            class="btn-success" 
+                            style="flex: 1; ${state.profileEditMode ? '' : 'opacity: 0.5; cursor: not-allowed;'}"
+                            ${state.profileEditMode ? '' : 'disabled'}>
+                            💾 Save Profile
+                        </button>
+                        
+                        ${!state.profileEditMode ? `
+                            <button 
+                                type="button" 
+                                class="btn" 
+                                style="flex: 1;"
+                                onclick="enableProfileEdit()">
+                                ✏️ Edit
+                            </button>
+                        ` : ''}
+                    </div>
+                </form>
+            </div>
+            
             <div class="card">
                 <h2>☁️ Cloud Sync</h2>
                 <p style="margin-bottom: 16px; color: #666;">
@@ -2540,21 +2673,13 @@
         `;
             }
 
-            // Signed in view
-            const profile = getUserProfileData();
-
-            // Check if profile is incomplete (empty values)
-            const isProfileIncomplete =
-                !profile.businessName ||
-                !profile.phone ||
-                !profile.address;
-
+            // SIGNED IN VIEW
             return `
         <div class="card">
             <h2>☁️ Account</h2>
             <div class="alert-success">
                 <div style="font-size: 14px; margin-bottom: 8px;">
-                    ✓ Connected to Cloud
+                    ✔ Connected to Cloud
                 </div>
                 <div style="font-size: 13px;">
                     📧 ${currentUser.email}
@@ -2682,7 +2807,9 @@
             const success = await saveUserProfile(profileData);
 
             if (success) {
-                showToast('Profile updated successfully!', 'success');
+                state.profileEditMode = false;
+                saveData();
+                showToast('Profile saved successfully!', 'success');
                 render();
             }
         }
@@ -4664,7 +4791,7 @@
                     <label>Payment Terms</label>
                     <input type="text" id="invoiceTerms" placeholder="Due within 7 days" value="Due within 7 days">
                 </div>
-                <<div class="form-group">
+                <div class="form-group">
     <label>Items/Services</label>
     <div id="invoiceItemsList">
         <div class="invoice-item-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
