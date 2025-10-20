@@ -7723,79 +7723,178 @@
         initSupabase();
 
         // ============================================
-        // TUBA SWIPE NAVIGATION v1.0
-        // Enables left/right swipe to change tabs
+        // TUBA SWIPE NAVIGATION v2.0
+        // Enables left/right swipe with smooth transitions
         // ============================================
-        
-        (function() {
-            console.log('👆 Initializing swipe navigation...');
-            
+
+        (function () {
+            console.log('👆 Initializing smooth swipe navigation...');
+
             let touchStartX = 0;
             let touchEndX = 0;
             let touchStartY = 0;
             let touchEndY = 0;
-            const SWIPE_THRESHOLD = 100; // Minimum swipe distance in pixels
+            let isSwiping = false;
+            const SWIPE_THRESHOLD = 80; // Minimum swipe distance in pixels
             const VERTICAL_THRESHOLD = 50; // Maximum vertical movement to count as horizontal swipe
-            
+
+            // Add smooth transition CSS
+            const style = document.createElement('style');
+            style.textContent = `
+                .content {
+                    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                
+                .content.swipe-exit-left {
+                    opacity: 0;
+                    transform: translateX(-30px);
+                }
+                
+                .content.swipe-exit-right {
+                    opacity: 0;
+                    transform: translateX(30px);
+                }
+                
+                .content.swipe-enter-left {
+                    opacity: 0;
+                    transform: translateX(30px);
+                }
+                
+                .content.swipe-enter-right {
+                    opacity: 0;
+                    transform: translateX(-30px);
+                }
+                
+                .content.swipe-active {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+                
+                /* Smooth bottom nav highlight */
+                .bottom-nav {
+                    transition: all 0.3s ease;
+                }
+                
+                .nav-item {
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                
+                .nav-item.active {
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+            `;
+            document.head.appendChild(style);
+
             // Get tab order from tabs array
             const tabOrder = tabs.map(t => t.id);
-            
+
             function getCurrentTabIndex() {
                 return tabOrder.indexOf(state.activeTab);
             }
-            
-            function switchToTabByIndex(index) {
-                if (index >= 0 && index < tabOrder.length) {
-                    const newTab = tabOrder[index];
-                    console.log(`📱 Swiping to: ${newTab}`);
-                    switchTab(newTab);
+
+            function switchToTabByIndexWithAnimation(index, direction) {
+                if (index < 0 || index >= tabOrder.length || isSwiping) {
+                    return;
                 }
+
+                isSwiping = true;
+                const newTab = tabOrder[index];
+                const content = document.querySelector('.content');
+
+                if (!content) {
+                    switchTab(newTab);
+                    isSwiping = false;
+                    return;
+                }
+
+                // Exit animation
+                content.classList.remove('swipe-active', 'swipe-enter-left', 'swipe-enter-right');
+                content.classList.add(direction === 'left' ? 'swipe-exit-left' : 'swipe-exit-right');
+
+                // Switch tab after exit animation starts
+                setTimeout(() => {
+                    state.activeTab = newTab;
+                    render();
+
+                    // Enter animation
+                    const newContent = document.querySelector('.content');
+                    if (newContent) {
+                        newContent.classList.remove('swipe-active');
+                        newContent.classList.add(direction === 'left' ? 'swipe-enter-right' : 'swipe-enter-left');
+
+                        // Force reflow
+                        void newContent.offsetWidth;
+
+                        // Activate
+                        requestAnimationFrame(() => {
+                            newContent.classList.remove('swipe-enter-left', 'swipe-enter-right');
+                            newContent.classList.add('swipe-active');
+
+                            setTimeout(() => {
+                                isSwiping = false;
+                            }, 300);
+                        });
+                    } else {
+                        isSwiping = false;
+                    }
+                }, 150);
+
+                console.log(`📱 Smooth swipe to: ${newTab}`);
             }
-            
+
             function handleSwipe() {
                 const swipeDistanceX = touchEndX - touchStartX;
                 const swipeDistanceY = Math.abs(touchEndY - touchStartY);
-                
+
                 // Check if it's a horizontal swipe (not vertical)
                 if (swipeDistanceY > VERTICAL_THRESHOLD) {
-                    console.log('↕️ Vertical scroll detected, ignoring swipe');
                     return;
                 }
-                
+
                 const currentIndex = getCurrentTabIndex();
-                
+
                 if (swipeDistanceX > SWIPE_THRESHOLD) {
                     // Swipe right - go to previous tab
                     console.log('👉 Swipe right detected');
-                    switchToTabByIndex(currentIndex - 1);
+                    switchToTabByIndexWithAnimation(currentIndex - 1, 'right');
                 } else if (swipeDistanceX < -SWIPE_THRESHOLD) {
                     // Swipe left - go to next tab
                     console.log('👈 Swipe left detected');
-                    switchToTabByIndex(currentIndex + 1);
+                    switchToTabByIndexWithAnimation(currentIndex + 1, 'left');
                 }
             }
-            
+
             // Add touch event listeners to the main content area
             const app = document.getElementById('app');
             if (!app) {
                 console.error('❌ App element not found');
                 return;
             }
-            
+
             app.addEventListener('touchstart', (e) => {
+                if (isSwiping) return;
                 touchStartX = e.changedTouches[0].screenX;
                 touchStartY = e.changedTouches[0].screenY;
             }, { passive: true });
-            
+
             app.addEventListener('touchend', (e) => {
+                if (isSwiping) return;
                 touchEndX = e.changedTouches[0].screenX;
                 touchEndY = e.changedTouches[0].screenY;
                 handleSwipe();
             }, { passive: true });
-            
-            console.log('✅ Swipe navigation initialized!');
-            console.log('   👈 Swipe left = Next tab');
-            console.log('   👉 Swipe right = Previous tab');
+
+            // Initialize content with active class
+            setTimeout(() => {
+                const content = document.querySelector('.content');
+                if (content) {
+                    content.classList.add('swipe-active');
+                }
+            }, 100);
+
+            console.log('✅ Smooth swipe navigation initialized!');
+            console.log('   👈 Swipe left = Next tab (smooth)');
+            console.log('   👉 Swipe right = Previous tab (smooth)');
             console.log(`   📊 Tab order: ${tabOrder.join(' → ')}`);
         })();
 
