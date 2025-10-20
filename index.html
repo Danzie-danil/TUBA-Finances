@@ -8832,6 +8832,346 @@
 
         console.log('✅ UI enhancements loaded successfully!');
 
+
+        // ============================================
+        // TUBA AUTHENTICATION FIX PATCH v1.0
+        // Auto-applied on 2025-10-20T19:50:55.516Z
+        // Fixes 404 error during registration
+        // ============================================
+
+        (function () {
+            console.log('🔧 Applying authentication fix patch...');
+
+            // Override signUp function with enhanced error handling
+            window.signUp = async function (email, password) {
+                try {
+                    console.log('📧 Attempting to sign up:', email);
+
+                    // Validate inputs
+                    if (!email || !password) {
+                        showToast('Please provide email and password', 'error');
+                        return null;
+                    }
+
+                    if (password.length < 6) {
+                        showToast('Password must be at least 6 characters', 'error');
+                        return null;
+                    }
+
+                    // Check if supabase is initialized
+                    if (!supabase) {
+                        console.error('❌ Supabase not initialized');
+                        showToast('Database connection error. Please refresh the page.', 'error');
+                        return null;
+                    }
+
+                    // Attempt sign up with enhanced options
+                    const { data, error } = await supabase.auth.signUp({
+                        email: email.trim(),
+                        password: password,
+                        options: {
+                            emailRedirectTo: window.location.origin,
+                            data: {
+                                created_at: new Date().toISOString(),
+                                app_version: '2.0'
+                            }
+                        }
+                    });
+
+                    if (error) {
+                        console.error('❌ Sign up error:', error);
+
+                        // Handle specific error codes
+                        if (error.message.includes('User already registered') || error.message.includes('already been registered')) {
+                            showToast('This email is already registered. Try signing in instead.', 'error');
+                        } else if (error.message.includes('Invalid email')) {
+                            showToast('Please enter a valid email address', 'error');
+                        } else if (error.status === 404 || error.message.includes('404')) {
+                            showToast('⚠️ Authentication service configuration error', 'error');
+                            console.error('🔍 Possible causes:');
+                            console.error('   1. Invalid Supabase URL');
+                            console.error('   2. Wrong API key');
+                            console.error('   3. Email auth not enabled in Supabase dashboard');
+                            console.error('   4. Project paused or deleted');
+                            console.error('   → Check your Supabase dashboard: https://supabase.com/dashboard');
+                        } else if (error.message.includes('Email not confirmed')) {
+                            showToast('Please confirm your email address', 'info');
+                        } else {
+                            showToast('Sign up error: ' + error.message, 'error');
+                        }
+
+                        return null;
+                    }
+
+                    console.log('✅ Sign up response:', data);
+
+                    // Check if email confirmation is required
+                    if (data.user && !data.session) {
+                        showToast('✅ Account created! Please check your email to confirm.', 'success');
+                        console.log('📧 Email confirmation required. Check your inbox.');
+                    } else if (data.user && data.session) {
+                        showToast('✅ Account created and logged in successfully!', 'success');
+                        currentUser = data.user;
+                        syncEnabled = true;
+                        updateSyncIndicator('synced');
+
+                        // Initialize user profile
+                        await loadUserProfile();
+                        render();
+                    } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+                        showToast('This email is already registered. Please sign in instead.', 'info');
+                    }
+
+                    return data;
+
+                } catch (error) {
+                    console.error('❌ Sign up exception:', error);
+                    showToast('Unexpected error during sign up. Please try again.', 'error');
+                    return null;
+                }
+            };
+
+            // Override handleSignUp function
+            window.handleSignUp = async function () {
+                const email = document.getElementById('signupEmail')?.value;
+                const password = document.getElementById('signupPassword')?.value;
+                const confirm = document.getElementById('signupPasswordConfirm')?.value;
+
+                if (!email || !password || !confirm) {
+                    return showToast('Please fill in all fields', 'error');
+                }
+
+                // Email validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    return showToast('Please enter a valid email address', 'error');
+                }
+
+                if (password !== confirm) {
+                    return showToast('Passwords do not match', 'error');
+                }
+
+                if (password.length < 6) {
+                    return showToast('Password must be at least 6 characters', 'error');
+                }
+
+                // Disable buttons during sign up
+                const signupForm = document.getElementById('signupForm');
+                if (signupForm) {
+                    const buttons = signupForm.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.6';
+                        btn.style.cursor = 'not-allowed';
+                    });
+                }
+
+                try {
+                    await window.signUp(email, password);
+                } finally {
+                    // Re-enable buttons
+                    if (signupForm) {
+                        const buttons = signupForm.querySelectorAll('button');
+                        buttons.forEach(btn => {
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                            btn.style.cursor = 'pointer';
+                        });
+                    }
+                }
+            };
+
+            // Enhanced handleSignIn with better error handling
+            const originalHandleSignIn = window.handleSignIn;
+            window.handleSignIn = async function () {
+                const email = document.getElementById('loginEmail')?.value;
+                const password = document.getElementById('loginPassword')?.value;
+
+                if (!email || !password) {
+                    return showToast('Please fill in all fields', 'error');
+                }
+
+                // Email validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    return showToast('Please enter a valid email address', 'error');
+                }
+
+                // Disable button during sign in
+                const loginForm = document.getElementById('loginForm');
+                if (loginForm) {
+                    const buttons = loginForm.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.6';
+                        btn.style.cursor = 'not-allowed';
+                    });
+                }
+
+                try {
+                    const result = await signIn(email, password);
+                    if (result) {
+                        render();
+                    }
+                } catch (error) {
+                    console.error('Handle sign in error:', error);
+                } finally {
+                    // Re-enable buttons
+                    if (loginForm) {
+                        const buttons = loginForm.querySelectorAll('button');
+                        buttons.forEach(btn => {
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                            btn.style.cursor = 'pointer';
+                        });
+                    }
+                }
+            };
+
+            // Enhanced signIn function with better error handling
+            const originalSignIn = window.signIn;
+            window.signIn = async function (email, password) {
+                try {
+                    console.log('🔐 Attempting to sign in:', email);
+
+                    const { data, error } = await supabase.auth.signInWithPassword({
+                        email: email.trim(),
+                        password: password
+                    });
+
+                    if (error) {
+                        console.error('❌ Sign in error:', error);
+
+                        if (error.message.includes('Invalid login credentials')) {
+                            showToast('Invalid email or password', 'error');
+                        } else if (error.message.includes('Email not confirmed')) {
+                            showToast('Please confirm your email address first', 'error');
+                        } else if (error.status === 404) {
+                            showToast('Authentication service error. Check your connection.', 'error');
+                        } else {
+                            showToast('Sign in error: ' + error.message, 'error');
+                        }
+
+                        currentUser = null;
+                        syncEnabled = false;
+                        return null;
+                    }
+
+                    currentUser = data.user;
+                    syncEnabled = true;
+
+                    showToast('✅ Signed in successfully!', 'success');
+
+                    // Load user profile first
+                    await loadUserProfile();
+
+                    // Check if local data exists
+                    const localHasData = state.sales.length > 0 || state.products.length > 0;
+
+                    try {
+                        if (localHasData) {
+                            await smartMergeData();
+                            showToast('Local and cloud data merged successfully', 'success');
+                        } else {
+                            await pullDataFromSupabase();
+                            showToast('Cloud data loaded', 'success');
+                        }
+                    } catch (syncError) {
+                        console.error('Sync error after sign in:', syncError);
+                        showToast('Signed in but sync failed. Try manual sync.', 'error');
+                    }
+
+                    return data;
+                } catch (error) {
+                    console.error('Sign in exception:', error);
+                    showToast('Sign in error: ' + error.message, 'error');
+                    currentUser = null;
+                    syncEnabled = false;
+                    return null;
+                }
+            };
+
+            // Diagnostic function - run this in console to test connection
+            window.testSupabaseConnection = async function () {
+                console.log('🔍 Running Supabase diagnostics...');
+                console.log('==========================================');
+                console.log('URL:', SUPABASE_URL);
+                console.log('Key:', SUPABASE_ANON_KEY.substring(0, 30) + '...');
+                console.log('Supabase initialized:', !!supabase);
+                console.log('Current user:', currentUser?.email || 'Not logged in');
+                console.log('Sync enabled:', syncEnabled);
+                console.log('==========================================');
+
+                if (!supabase) {
+                    console.error('❌ Supabase not initialized!');
+                    console.error('→ Check if the Supabase script loaded correctly');
+                    return false;
+                }
+
+                try {
+                    // Test session
+                    console.log('Testing session...');
+                    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+                    if (sessionError) {
+                        console.error('❌ Session test failed:', sessionError);
+                    } else {
+                        console.log('✅ Session test passed');
+                    }
+
+                    // Test direct auth endpoint
+                    console.log('Testing auth endpoint...');
+                    const response = await fetch(SUPABASE_URL + '/auth/v1/health', {
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY
+                        }
+                    });
+
+                    console.log('Auth endpoint status:', response.status);
+
+                    if (response.status === 404) {
+                        console.error('❌ 404 Error - Possible issues:');
+                        console.error('   1. Incorrect Supabase URL');
+                        console.error('   2. Project paused or deleted');
+                        console.error('   3. Invalid API key');
+                        console.error('→ Go to: https://supabase.com/dashboard');
+                        console.error('→ Verify your project settings');
+                        return false;
+                    } else if (response.ok) {
+                        console.log('✅ Auth endpoint accessible');
+                    }
+
+                    console.log('==========================================');
+                    console.log('✅ Diagnostics complete');
+                    return true;
+
+                } catch (error) {
+                    console.error('❌ Connection test exception:', error);
+                    console.error('→ Check your internet connection');
+                    console.error('→ Verify Supabase project is active');
+                    return false;
+                }
+            };
+
+            // Auto-run diagnostics if there's a connection issue
+            setTimeout(() => {
+                if (!supabase || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+                    console.error('⚠️ Supabase configuration incomplete!');
+                    console.error('Run testSupabaseConnection() in console for diagnostics');
+                }
+            }, 2000);
+
+            console.log('✅ Authentication fix patch applied successfully!');
+            console.log('💡 Available commands:');
+            console.log('   • testSupabaseConnection() - Test your Supabase setup');
+            console.log('');
+            console.log('🔧 Troubleshooting steps:');
+            console.log('   1. Run: testSupabaseConnection()');
+            console.log('   2. Check Supabase dashboard: https://supabase.com/dashboard');
+            console.log('   3. Verify Email auth is enabled');
+            console.log('   4. Check if email confirmation is required');
+        })();
+
     </script>
 </body>
 
