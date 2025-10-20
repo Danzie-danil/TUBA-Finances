@@ -7721,6 +7721,84 @@
 
         // Initialize
         initSupabase();
+
+        // ============================================
+        // TUBA SWIPE NAVIGATION v1.0
+        // Enables left/right swipe to change tabs
+        // ============================================
+        
+        (function() {
+            console.log('👆 Initializing swipe navigation...');
+            
+            let touchStartX = 0;
+            let touchEndX = 0;
+            let touchStartY = 0;
+            let touchEndY = 0;
+            const SWIPE_THRESHOLD = 100; // Minimum swipe distance in pixels
+            const VERTICAL_THRESHOLD = 50; // Maximum vertical movement to count as horizontal swipe
+            
+            // Get tab order from tabs array
+            const tabOrder = tabs.map(t => t.id);
+            
+            function getCurrentTabIndex() {
+                return tabOrder.indexOf(state.activeTab);
+            }
+            
+            function switchToTabByIndex(index) {
+                if (index >= 0 && index < tabOrder.length) {
+                    const newTab = tabOrder[index];
+                    console.log(`📱 Swiping to: ${newTab}`);
+                    switchTab(newTab);
+                }
+            }
+            
+            function handleSwipe() {
+                const swipeDistanceX = touchEndX - touchStartX;
+                const swipeDistanceY = Math.abs(touchEndY - touchStartY);
+                
+                // Check if it's a horizontal swipe (not vertical)
+                if (swipeDistanceY > VERTICAL_THRESHOLD) {
+                    console.log('↕️ Vertical scroll detected, ignoring swipe');
+                    return;
+                }
+                
+                const currentIndex = getCurrentTabIndex();
+                
+                if (swipeDistanceX > SWIPE_THRESHOLD) {
+                    // Swipe right - go to previous tab
+                    console.log('👉 Swipe right detected');
+                    switchToTabByIndex(currentIndex - 1);
+                } else if (swipeDistanceX < -SWIPE_THRESHOLD) {
+                    // Swipe left - go to next tab
+                    console.log('👈 Swipe left detected');
+                    switchToTabByIndex(currentIndex + 1);
+                }
+            }
+            
+            // Add touch event listeners to the main content area
+            const app = document.getElementById('app');
+            if (!app) {
+                console.error('❌ App element not found');
+                return;
+            }
+            
+            app.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            }, { passive: true });
+            
+            app.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
+                handleSwipe();
+            }, { passive: true });
+            
+            console.log('✅ Swipe navigation initialized!');
+            console.log('   👈 Swipe left = Next tab');
+            console.log('   👉 Swipe right = Previous tab');
+            console.log(`   📊 Tab order: ${tabOrder.join(' → ')}`);
+        })();
+
         updateHeaderDate();
 
         // Load local data IMMEDIATELY - don't wait
