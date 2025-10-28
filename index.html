@@ -12,7 +12,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#000000">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TUBA">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="msapplication-TileColor" content="#000000">
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="format-detection" content="telephone=no">
     <title>TUBA</title>
     <link rel="manifest" href="manifest.json">
     <style>
@@ -21,6 +26,146 @@
             padding: 0;
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        /* Mobile-specific enhancements */
+        html {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
+            padding-bottom: 70px;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+
+        /* Pull-to-refresh indicator */
+        .pull-to-refresh {
+            position: fixed;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(145deg, #1a1a1a, #000000);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .pull-to-refresh.show {
+            top: 20px;
+        }
+
+        .pull-to-refresh.loading {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: translateX(-50%) rotate(0deg); }
+            100% { transform: translateX(-50%) rotate(360deg); }
+        }
+
+        /* Enhanced touch interactions */
+        button, .btn, .nav-item, .stat-card, .item, .quick-nav-btn {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            cursor: pointer;
+        }
+
+        /* Improved button feedback for mobile */
+        button:active, .btn:active, .nav-item:active, .stat-card:active {
+            transform: scale(0.98);
+            transition: transform 0.1s ease;
+        }
+
+        /* Safe area support for notched devices */
+        .header {
+            padding-top: max(16px, env(safe-area-inset-top));
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
+        }
+
+        .bottom-nav {
+            padding-bottom: max(0px, env(safe-area-inset-bottom));
+            padding-left: max(0px, env(safe-area-inset-left));
+            padding-right: max(0px, env(safe-area-inset-right));
+        }
+
+        /* Splash screen styles */
+        .splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(145deg, #1a1a1a, #000000);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+
+        .splash-screen.hide {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .splash-logo {
+            width: 120px;
+            height: 120px;
+            background: url('tuba-icon.png') center/contain no-repeat;
+            margin-bottom: 20px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .splash-text {
+            color: white;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .splash-subtitle {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            text-align: center;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-top: 20px;
         }
 
         .privacy-blur {
@@ -94,6 +239,9 @@
             align-items: center;
             position: relative;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: max(16px, env(safe-area-inset-top));
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
         }
 
         .header h1 {
@@ -468,6 +616,9 @@
             overflow-x: auto;
             box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.15);
             z-index: 100;
+            padding-bottom: max(0px, env(safe-area-inset-bottom));
+            padding-left: max(0px, env(safe-area-inset-left));
+            padding-right: max(0px, env(safe-area-inset-right));
         }
 
         .nav-item {
@@ -1290,6 +1441,19 @@
 </head>
 
 <body>
+    <!-- Splash Screen -->
+    <div class="splash-screen" id="splashScreen">
+        <div class="splash-logo"></div>
+        <div class="splash-text">TUBA</div>
+        <div class="splash-subtitle">Business Management App</div>
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Pull to Refresh Indicator -->
+    <div class="pull-to-refresh" id="pullToRefresh">
+        ↓
+    </div>
+
     <!-- Side Navigation Drawer -->
     <div class="side-nav-overlay" id="sideNavOverlay" onclick="toggleSideNav()"></div>
     <div class="side-nav" id="sideNav">
@@ -1456,10 +1620,25 @@
 
         function removeDuplicatesByID(arr) {
             const seen = new Set();
+            const seenHashes = new Set();
+            
             return arr.filter(item => {
                 if (!item.id) return true;
+                
+                // Check for ID duplicates
                 if (seen.has(item.id)) return false;
+                
+                // Check for content duplicates (same data, different IDs)
+                const content = { ...item };
+                delete content.id;
+                delete content.created_at;
+                delete content.updated_at;
+                const contentHash = JSON.stringify(content);
+                
+                if (seenHashes.has(contentHash)) return false;
+                
                 seen.add(item.id);
+                seenHashes.add(contentHash);
                 return true;
             });
         }
@@ -1780,6 +1959,7 @@
         async function smartMergeData() {
             try {
                 updateSyncIndicator('syncing');
+                console.log('🔄 Starting smart merge...');
 
                 // Save local data BEFORE pulling from cloud
                 const localData = {
@@ -1792,52 +1972,90 @@
                     notes: [...(state.notes || [])]
                 };
 
-                // Pull cloud data
-                await pullDataFromSupabase();
-                const cloudData = {
-                    sales: [...(state.sales || [])],
-                    products: [...(state.products || [])],
-                    expenses: [...(state.expenses || [])],
-                    customers: [...(state.customers || [])],
-                    transactions: [...(state.transactions || [])],
-                    unpaidEntries: [...(state.unpaidEntries || [])],
-                    notes: [...(state.notes || [])]
-                };
+                console.log('📱 Local data counts:', {
+                    sales: localData.sales.length,
+                    products: localData.products.length,
+                    expenses: localData.expenses.length,
+                    customers: localData.customers.length,
+                    transactions: localData.transactions.length,
+                    unpaidEntries: localData.unpaidEntries.length,
+                    notes: localData.notes.length
+                });
 
-                // Improved merge function - prioritizes cloud data for existing IDs
-                const mergeByID = (local, cloud) => {
+                // Fetch cloud data directly from Supabase (don't overwrite state yet)
+                const cloudData = await fetchCloudDataDirect();
+                
+                console.log('☁️ Cloud data counts:', {
+                    sales: cloudData.sales.length,
+                    products: cloudData.products.length,
+                    expenses: cloudData.expenses.length,
+                    customers: cloudData.customers.length,
+                    transactions: cloudData.transactions.length,
+                    unpaidEntries: cloudData.unpaidEntries.length,
+                    notes: cloudData.notes.length
+                });
+
+                // Enhanced merge function with better duplicate detection
+                const mergeByID = (local, cloud, dataType) => {
                     const idMap = new Map();
+                    const seenHashes = new Set();
 
-                    // Add cloud items first (they take priority)
+                    // Helper function to create content hash for duplicate detection
+                    const createContentHash = (item) => {
+                        const content = { ...item };
+                        delete content.id;
+                        delete content.created_at;
+                        delete content.updated_at;
+                        return JSON.stringify(content);
+                    };
+
+                    // Add cloud items first (they take priority for same IDs)
                     cloud.forEach(item => {
-                        if (!item.id) item.id = generateID(getTypeFromItem(item));
+                        if (!item.id) item.id = generateID(dataType);
+                        const contentHash = createContentHash(item);
+                        
                         idMap.set(item.id, item);
+                        seenHashes.add(contentHash);
                     });
 
-                    // Add local items only if ID doesn't exist
+                    // Add local items only if ID doesn't exist AND content is unique
                     local.forEach(item => {
-                        if (!item.id) item.id = generateID(getTypeFromItem(item));
-                        if (!idMap.has(item.id)) {
+                        if (!item.id) item.id = generateID(dataType);
+                        const contentHash = createContentHash(item);
+                        
+                        // Only add if both ID and content are unique
+                        if (!idMap.has(item.id) && !seenHashes.has(contentHash)) {
                             idMap.set(item.id, item);
+                            seenHashes.add(contentHash);
                         }
                     });
 
                     return Array.from(idMap.values());
                 };
 
-                // Merge each array
-                state.sales = mergeByID(localData.sales, cloudData.sales);
-                state.products = mergeByID(localData.products, cloudData.products);
-                state.expenses = mergeByID(localData.expenses, cloudData.expenses);
-                state.customers = mergeByID(localData.customers, cloudData.customers);
-                state.transactions = mergeByID(localData.transactions, cloudData.transactions);
-                state.unpaidEntries = mergeByID(localData.unpaidEntries, cloudData.unpaidEntries);
-                state.notes = mergeByID(localData.notes, cloudData.notes);
+                // Merge each array with proper data type identification
+                state.sales = mergeByID(localData.sales, cloudData.sales, 'sale');
+                state.products = mergeByID(localData.products, cloudData.products, 'product');
+                state.expenses = mergeByID(localData.expenses, cloudData.expenses, 'expense');
+                state.customers = mergeByID(localData.customers, cloudData.customers, 'customer');
+                state.transactions = mergeByID(localData.transactions, cloudData.transactions, 'transaction');
+                state.unpaidEntries = mergeByID(localData.unpaidEntries, cloudData.unpaidEntries, 'unpaid');
+                state.notes = mergeByID(localData.notes, cloudData.notes, 'note');
+
+                console.log('🔀 Merged data counts:', {
+                    sales: state.sales.length,
+                    products: state.products.length,
+                    expenses: state.expenses.length,
+                    customers: state.customers.length,
+                    transactions: state.transactions.length,
+                    unpaidEntries: state.unpaidEntries.length,
+                    notes: state.notes.length
+                });
 
                 // Save merged data locally
                 saveData();
 
-                // Push merged data back to cloud
+                // Push merged data back to cloud (clear and push to avoid server-side duplicates)
                 await clearAndPushAllData();
                 updateSyncIndicator('synced');
 
@@ -1846,6 +2064,50 @@
                 console.error('Smart merge error:', error);
                 updateSyncIndicator('synced');
                 throw error;
+            }
+        }
+
+        // Helper function to fetch cloud data without overwriting local state
+        async function fetchCloudDataDirect() {
+            if (!syncEnabled || !currentUser) return {
+                sales: [], products: [], expenses: [], customers: [],
+                transactions: [], unpaidEntries: [], notes: []
+            };
+
+            try {
+                const [
+                    { data: products },
+                    { data: sales },
+                    { data: expenses },
+                    { data: customers },
+                    { data: transactions },
+                    { data: unpaidEntries },
+                    { data: notes }
+                ] = await Promise.all([
+                    supabase.from('products').select('*').eq('user_id', currentUser.id),
+                    supabase.from('sales').select('*').eq('user_id', currentUser.id),
+                    supabase.from('expenses').select('*').eq('user_id', currentUser.id),
+                    supabase.from('customers').select('*').eq('user_id', currentUser.id),
+                    supabase.from('transactions').select('*').eq('user_id', currentUser.id),
+                    supabase.from('unpaid_entries').select('*').eq('user_id', currentUser.id),
+                    supabase.from('notes').select('*').eq('user_id', currentUser.id)
+                ]);
+
+                return {
+                    sales: sales || [],
+                    products: products || [],
+                    expenses: expenses || [],
+                    customers: customers || [],
+                    transactions: transactions || [],
+                    unpaidEntries: unpaidEntries || [],
+                    notes: notes || []
+                };
+            } catch (error) {
+                console.error('Error fetching cloud data:', error);
+                return {
+                    sales: [], products: [], expenses: [], customers: [],
+                    transactions: [], unpaidEntries: [], notes: []
+                };
             }
         }
 
@@ -9347,6 +9609,216 @@
             console.log('   2. Check Supabase dashboard: https://supabase.com/dashboard');
             console.log('   3. Verify Email auth is enabled');
             console.log('   4. Check if email confirmation is required');
+        })();
+
+        // Mobile App Enhancements
+        (function() {
+            'use strict';
+
+            // Splash Screen Management
+            function hideSplashScreen() {
+                const splashScreen = document.getElementById('splashScreen');
+                if (splashScreen) {
+                    setTimeout(() => {
+                        splashScreen.classList.add('hide');
+                        setTimeout(() => {
+                            splashScreen.style.display = 'none';
+                        }, 500);
+                    }, 2000);
+                }
+            }
+
+            // Pull to Refresh Functionality
+            let startY = 0;
+            let currentY = 0;
+            let pullDistance = 0;
+            let isPulling = false;
+            const pullThreshold = 80;
+            const pullToRefreshElement = document.getElementById('pullToRefresh');
+
+            function handleTouchStart(e) {
+                if (window.scrollY === 0) {
+                    startY = e.touches[0].clientY;
+                    isPulling = true;
+                }
+            }
+
+            function handleTouchMove(e) {
+                if (!isPulling) return;
+
+                currentY = e.touches[0].clientY;
+                pullDistance = currentY - startY;
+
+                if (pullDistance > 0 && pullDistance < 150) {
+                    e.preventDefault();
+                    const opacity = Math.min(pullDistance / pullThreshold, 1);
+                    pullToRefreshElement.style.opacity = opacity;
+                    
+                    if (pullDistance > pullThreshold) {
+                        pullToRefreshElement.classList.add('show');
+                        pullToRefreshElement.innerHTML = '↻';
+                    } else {
+                        pullToRefreshElement.classList.remove('show');
+                        pullToRefreshElement.innerHTML = '↓';
+                    }
+                }
+            }
+
+            function handleTouchEnd(e) {
+                if (!isPulling) return;
+
+                if (pullDistance > pullThreshold) {
+                    pullToRefreshElement.classList.add('loading');
+                    pullToRefreshElement.innerHTML = '↻';
+                    
+                    // Simulate refresh
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    pullToRefreshElement.classList.remove('show');
+                    pullToRefreshElement.style.opacity = '0';
+                }
+
+                isPulling = false;
+                pullDistance = 0;
+            }
+
+            // PWA Installation
+            let deferredPrompt;
+            let installButton;
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                showInstallButton();
+            });
+
+            function showInstallButton() {
+                // Create install button if it doesn't exist
+                if (!installButton) {
+                    installButton = document.createElement('button');
+                    installButton.innerHTML = '📱 Install App';
+                    installButton.className = 'btn btn-success';
+                    installButton.style.cssText = `
+                        position: fixed;
+                        bottom: 80px;
+                        right: 16px;
+                        z-index: 1000;
+                        padding: 8px 12px;
+                        font-size: 12px;
+                        width: auto;
+                        border-radius: 20px;
+                    `;
+                    installButton.onclick = installApp;
+                    document.body.appendChild(installButton);
+                }
+            }
+
+            async function installApp() {
+                if (!deferredPrompt) return;
+
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                
+                if (outcome === 'accepted') {
+                    console.log('PWA installed successfully');
+                    showToast('App installed successfully!', 'success');
+                } else {
+                    console.log('PWA installation declined');
+                }
+
+                deferredPrompt = null;
+                if (installButton) {
+                    installButton.remove();
+                    installButton = null;
+                }
+            }
+
+            // Service Worker Registration
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', async () => {
+                    try {
+                        const registration = await navigator.serviceWorker.register('/sw.js');
+                        console.log('SW registered: ', registration);
+                        
+                        // Check for updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    showToast('New version available! Refresh to update.', 'info');
+                                }
+                            });
+                        });
+                    } catch (error) {
+                        console.log('SW registration failed: ', error);
+                    }
+                });
+            }
+
+            // Enhanced Touch Feedback
+            function addTouchFeedback() {
+                const touchElements = document.querySelectorAll('button, .btn, .nav-item, .stat-card, .item, .quick-nav-btn');
+                
+                touchElements.forEach(element => {
+                    element.addEventListener('touchstart', function() {
+                        this.style.transform = 'scale(0.98)';
+                        this.style.transition = 'transform 0.1s ease';
+                    });
+                    
+                    element.addEventListener('touchend', function() {
+                        this.style.transform = '';
+                    });
+                    
+                    element.addEventListener('touchcancel', function() {
+                        this.style.transform = '';
+                    });
+                });
+            }
+
+            // Prevent zoom on double tap
+            let lastTouchEnd = 0;
+            document.addEventListener('touchend', function (event) {
+                const now = (new Date()).getTime();
+                if (now - lastTouchEnd <= 300) {
+                    event.preventDefault();
+                }
+                lastTouchEnd = now;
+            }, false);
+
+            // Initialize mobile features
+            document.addEventListener('DOMContentLoaded', function() {
+                hideSplashScreen();
+                addTouchFeedback();
+                
+                // Add touch event listeners for pull to refresh
+                document.addEventListener('touchstart', handleTouchStart, { passive: false });
+                document.addEventListener('touchmove', handleTouchMove, { passive: false });
+                document.addEventListener('touchend', handleTouchEnd, { passive: false });
+                
+                // Handle orientation changes
+                window.addEventListener('orientationchange', function() {
+                    setTimeout(() => {
+                        window.scrollTo(0, 1);
+                    }, 500);
+                });
+                
+                // Handle app state changes
+                document.addEventListener('visibilitychange', function() {
+                    if (document.visibilityState === 'visible') {
+                        // App became visible - could refresh data here
+                        console.log('App became visible');
+                    }
+                });
+            });
+
+            // Expose functions globally for debugging
+            window.mobileApp = {
+                installApp,
+                hideSplashScreen,
+                addTouchFeedback
+            };
         })();
 
     </script>
