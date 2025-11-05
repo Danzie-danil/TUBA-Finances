@@ -1,130 +1,195 @@
-// sw.js - iOS-Compatible Service Worker for TUBA
-const CACHE_VERSION = 'v1.0.1';
-const CACHE_NAME = `tuba-mobile-${CACHE_VERSION}`;
-const STATIC_CACHE = `tuba-static-${CACHE_VERSION}`;
-const DYNAMIC_CACHE = `tuba-dynamic-${CACHE_VERSION}`;
+// sw.js - Service Worker for TUBA Mobile App
+const CACHE_NAME = 'tuba-mobile-v1.0';
+const STATIC_CACHE = 'tuba-static-v1.0';
+const DYNAMIC_CACHE = 'tuba-dynamic-v1.0';
 
-// Only cache files that actually exist
+// Static assets to cache immediately
 const STATIC_ASSETS = [
-  './',
-  './index.html',
-  './tuba-icon.png'
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/tuba-icon.png',
+  '/tuba-duplicate-cleaner.js'
 ];
 
-// Install event
+// Install event - cache static assets
 self.addEventListener('install', event => {
-  console.log('[SW] Installing...');
+  console.log('[SW] Installing service worker...');
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then(cache => {
         console.log('[SW] Caching static assets');
-        // Use addAll with error handling for iOS
-        return Promise.all(
-          STATIC_ASSETS.map(url => {
-            return cache.add(url).catch(err => {
-              console.warn(`[SW] Failed to cache ${url}:`, err);
-            });
-          })
-        );
+        return cache.addAll(STATIC_ASSETS);
       })
-      .then(() => self.skipWaiting())
+      .then(() => {
+        console.log('[SW] Static assets cached successfully');
+        return self.skipWaiting();
+      })
       .catch(error => {
-        console.error('[SW] Install failed:', error);
+        console.error('[SW] Failed to cache static assets:', error);
       })
   );
 });
 
-// Activate event
+// Activate event - clean old caches and claim clients
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating...');
+  console.log('[SW] Activating service worker...');
   event.waitUntil(
-    caches.keys()
-      .then(cacheNames => {
-        return Promise.all(
-          cacheNames.map(cacheName => {
-            if (cacheName.startsWith('tuba-') && cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
-              console.log('[SW] Deleting old cache:', cacheName);
-              return caches.delete(cacheName);
-            }
-          })
-        );
-      })
-      .then(() => self.clients.claim())
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
+            console.log('[SW] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => {
+      console.log('[SW] Service worker activated');
+      return self.clients.claim();
+    })
   );
 });
 
-// Fetch event - Network first, fall back to cache (better for iOS)
+// Fetch event - implement cache-first strategy with network fallback
 self.addEventListener('fetch', event => {
   const { request } = event;
-  
-  // Skip non-GET requests
-  if (request.method !== 'GET') {
-    return;
-  }
+  const url = new URL(request.url);
 
-  // Skip chrome-extension and non-http(s) requests
-  if (!request.url.startsWith('http')) {
-    return;
-  }
+  // Handle same-origin requests
+  if (url.origin === location.origin) {
+    event.respondWith(
+      caches.match(request)
+        .then(cachedResponse => {
+          if (cachedResponse) {
+            console.log('[SW] Serving from cache:', request.url);
+            return cachedResponse;
+          }
 
-  event.respondWith(
-    fetch(request)
-      .then(response => {
-        // Don't cache non-successful responses
-        if (!response || response.status !== 200 || response.type === 'error') {
-          return response;
-        }
+          // Not in cache, fetch from network
+          return fetch(request)
+            .then(networkResponse => {
+              // Don't cache non-successful responses
+              if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+                return networkResponse;
+              }
 
-        // Clone for caching
-        const responseToCache = response.clone();
-        
-        caches.open(DYNAMIC_CACHE)
-          .then(cache => {
-            cache.put(request, responseToCache);
-          })
-          .catch(err => {
-            console.warn('[SW] Cache put failed:', err);
-          });
+              // Clone the response for caching
+              const responseToCache = networkResponse.clone();
 
-        return response;
-      })
-      .catch(() => {
-        // Network failed, try cache
-        return caches.match(request)
-          .then(cachedResponse => {
-            if (cachedResponse) {
-              console.log('[SW] Serving from cache:', request.url);
-              return cachedResponse;
-            }
-            
-            // Return index.html for navigation requests
-            if (request.mode === 'navigate') {
-              return caches.match('./index.html');
-            }
-            
-            throw new Error('No cached response found');
-          });
-      })
-  );
-});
+              caches.open(DYNAMIC_CACHE)
+                .then(cache => {
+                  console.log('[SW] Caching new resource:', request.url);
+                  cache.put(request, responseToCache);
+                });
 
-// Message handling for manual cache updates
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-  
-  if (event.data && event.data.type === 'CLEAR_CACHE') {
-    event.waitUntil(
-      caches.keys().then(cacheNames => {
-        return Promise.all(
-          cacheNames.map(cacheName => {
-            if (cacheName.startsWith('tuba-')) {
-              return caches.delete(cacheName);
-            }
-          })
-        );
-      })
+              return networkResponse;
+            })
+            .catch(error => {
+              console.error('[SW] Network request failed:', error);
+
+              // Return offline fallback for HTML requests
+              if (request.headers.get('accept').includes('text/html')) {
+                return caches.match('/index.html');
+              }
+
+              throw error;
+            });
+        })
     );
   }
 });
+
+// Background sync for offline data
+self.addEventListener('sync', event => {
+  console.log('[SW] Background sync triggered:', event.tag);
+
+  if (event.tag === 'background-sync') {
+    event.waitUntil(
+      // Handle offline data synchronization
+      syncOfflineData()
+    );
+  }
+});
+
+// Push notification handling
+self.addEventListener('push', event => {
+  console.log('[SW] Push notification received');
+
+  const options = {
+    body: event.data ? event.data.text() : 'New update available',
+    icon: '/tuba-icon.png',
+    badge: '/tuba-icon.png',
+    vibrate: [100, 50, 100],
+    data: {
+      dateOfArrival: Date.now(),
+      primaryKey: 1
+    },
+    actions: [
+      {
+        action: 'explore',
+        title: 'Open App',
+        icon: '/tuba-icon.png'
+      },
+      {
+        action: 'close',
+        title: 'Close',
+        icon: '/tuba-icon.png'
+      }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification('TUBA', options)
+  );
+});
+
+// Notification click handling
+self.addEventListener('notificationclick', event => {
+  console.log('[SW] Notification clicked:', event.action);
+
+  event.notification.close();
+
+  if (event.action === 'explore') {
+    event.waitUntil(
+      clients.openWindow('/')
+    );
+  }
+});
+
+// Helper function for offline data sync
+async function syncOfflineData() {
+  try {
+    // Get offline data from IndexedDB or localStorage
+    const offlineData = await getOfflineData();
+
+    if (offlineData && offlineData.length > 0) {
+      // Sync data with server when online
+      for (const data of offlineData) {
+        await syncDataToServer(data);
+      }
+
+      // Clear offline data after successful sync
+      await clearOfflineData();
+      console.log('[SW] Offline data synced successfully');
+    }
+  } catch (error) {
+    console.error('[SW] Failed to sync offline data:', error);
+  }
+}
+
+// Placeholder functions for offline data management
+async function getOfflineData() {
+  // Implementation would depend on your data storage strategy
+  return [];
+}
+
+async function syncDataToServer(data) {
+  // Implementation for syncing data to server
+  return Promise.resolve();
+}
+
+async function clearOfflineData() {
+  // Implementation for clearing offline data
+  return Promise.resolve();
+}
