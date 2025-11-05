@@ -78,19 +78,32 @@
         }
 
         @keyframes spin {
-            0% { transform: translateX(-50%) rotate(0deg); }
-            100% { transform: translateX(-50%) rotate(360deg); }
+            0% {
+                transform: translateX(-50%) rotate(0deg);
+            }
+
+            100% {
+                transform: translateX(-50%) rotate(360deg);
+            }
         }
 
         /* Enhanced touch interactions */
-        button, .btn, .nav-item, .stat-card, .item, .quick-nav-btn {
+        button,
+        .btn,
+        .nav-item,
+        .stat-card,
+        .item,
+        .quick-nav-btn {
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
             cursor: pointer;
         }
 
         /* Improved button feedback for mobile */
-        button:active, .btn:active, .nav-item:active, .stat-card:active {
+        button:active,
+        .btn:active,
+        .nav-item:active,
+        .stat-card:active {
             transform: scale(0.98);
             transition: transform 0.1s ease;
         }
@@ -109,65 +122,6 @@
         }
 
         /* Splash screen styles */
-        .splash-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(145deg, #1a1a1a, #000000);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            opacity: 1;
-            transition: opacity 0.5s ease;
-        }
-
-        .splash-screen.hide {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .splash-logo {
-            width: 120px;
-            height: 120px;
-            background: url('tuba-icon.png') center/contain no-repeat;
-            margin-bottom: 20px;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        .splash-text {
-            color: white;
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-        }
-
-        .splash-subtitle {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 14px;
-            text-align: center;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        /* Loading spinner */
-        .loading-spinner {
-            width: 30px;
-            height: 30px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-top: 3px solid white;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-top: 20px;
-        }
-
         .privacy-blur {
             filter: blur(8px);
             -webkit-filter: blur(8px);
@@ -1441,14 +1395,6 @@
 </head>
 
 <body>
-    <!-- Splash Screen -->
-    <div class="splash-screen" id="splashScreen">
-        <div class="splash-logo"></div>
-        <div class="splash-text">TUBA</div>
-        <div class="splash-subtitle">Business Management App</div>
-        <div class="loading-spinner"></div>
-    </div>
-
     <!-- Pull to Refresh Indicator -->
     <div class="pull-to-refresh" id="pullToRefresh">
         ↓
@@ -1621,22 +1567,22 @@
         function removeDuplicatesByID(arr) {
             const seen = new Set();
             const seenHashes = new Set();
-            
+
             return arr.filter(item => {
                 if (!item.id) return true;
-                
+
                 // Check for ID duplicates
                 if (seen.has(item.id)) return false;
-                
+
                 // Check for content duplicates (same data, different IDs)
                 const content = { ...item };
                 delete content.id;
                 delete content.created_at;
                 delete content.updated_at;
                 const contentHash = JSON.stringify(content);
-                
+
                 if (seenHashes.has(contentHash)) return false;
-                
+
                 seen.add(item.id);
                 seenHashes.add(contentHash);
                 return true;
@@ -1984,7 +1930,7 @@
 
                 // Fetch cloud data directly from Supabase (don't overwrite state yet)
                 const cloudData = await fetchCloudDataDirect();
-                
+
                 console.log('☁️ Cloud data counts:', {
                     sales: cloudData.sales.length,
                     products: cloudData.products.length,
@@ -2013,7 +1959,7 @@
                     cloud.forEach(item => {
                         if (!item.id) item.id = generateID(dataType);
                         const contentHash = createContentHash(item);
-                        
+
                         idMap.set(item.id, item);
                         seenHashes.add(contentHash);
                     });
@@ -2022,7 +1968,7 @@
                     local.forEach(item => {
                         if (!item.id) item.id = generateID(dataType);
                         const contentHash = createContentHash(item);
-                        
+
                         // Only add if both ID and content are unique
                         if (!idMap.has(item.id) && !seenHashes.has(contentHash)) {
                             idMap.set(item.id, item);
@@ -9612,22 +9558,10 @@
         })();
 
         // Mobile App Enhancements
-        (function() {
+        (function () {
             'use strict';
 
             // Splash Screen Management
-            function hideSplashScreen() {
-                const splashScreen = document.getElementById('splashScreen');
-                if (splashScreen) {
-                    setTimeout(() => {
-                        splashScreen.classList.add('hide');
-                        setTimeout(() => {
-                            splashScreen.style.display = 'none';
-                        }, 500);
-                    }, 2000);
-                }
-            }
-
             // Pull to Refresh Functionality
             let startY = 0;
             let currentY = 0;
@@ -9653,7 +9587,7 @@
                     e.preventDefault();
                     const opacity = Math.min(pullDistance / pullThreshold, 1);
                     pullToRefreshElement.style.opacity = opacity;
-                    
+
                     if (pullDistance > pullThreshold) {
                         pullToRefreshElement.classList.add('show');
                         pullToRefreshElement.innerHTML = '↻';
@@ -9670,7 +9604,7 @@
                 if (pullDistance > pullThreshold) {
                     pullToRefreshElement.classList.add('loading');
                     pullToRefreshElement.innerHTML = '↻';
-                    
+
                     // Simulate refresh
                     setTimeout(() => {
                         window.location.reload();
@@ -9720,7 +9654,7 @@
 
                 deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
-                
+
                 if (outcome === 'accepted') {
                     console.log('PWA installed successfully');
                     showToast('App installed successfully!', 'success');
@@ -9735,13 +9669,24 @@
                 }
             }
 
-            // Service Worker Registration
+            // Service Worker Registration and Capacitor Initialization
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', async () => {
                     try {
+                        // Initialize Capacitor plugins if available
+                        if (window.Capacitor) {
+                            const { CapacitorApp } = await import('@capacitor/app');
+                            const { StatusBar, Style } = await import('@capacitor/status-bar');
+
+                            // Set status bar style
+                            await StatusBar.setStyle({ style: Style.Dark });
+
+                            console.log('Capacitor plugins initialized');
+                        }
+
                         const registration = await navigator.serviceWorker.register('/sw.js');
                         console.log('SW registered: ', registration);
-                        
+
                         // Check for updates
                         registration.addEventListener('updatefound', () => {
                             const newWorker = registration.installing;
@@ -9760,18 +9705,18 @@
             // Enhanced Touch Feedback
             function addTouchFeedback() {
                 const touchElements = document.querySelectorAll('button, .btn, .nav-item, .stat-card, .item, .quick-nav-btn');
-                
+
                 touchElements.forEach(element => {
-                    element.addEventListener('touchstart', function() {
+                    element.addEventListener('touchstart', function () {
                         this.style.transform = 'scale(0.98)';
                         this.style.transition = 'transform 0.1s ease';
                     });
-                    
-                    element.addEventListener('touchend', function() {
+
+                    element.addEventListener('touchend', function () {
                         this.style.transform = '';
                     });
-                    
-                    element.addEventListener('touchcancel', function() {
+
+                    element.addEventListener('touchcancel', function () {
                         this.style.transform = '';
                     });
                 });
@@ -9788,24 +9733,23 @@
             }, false);
 
             // Initialize mobile features
-            document.addEventListener('DOMContentLoaded', function() {
-                hideSplashScreen();
+            document.addEventListener('DOMContentLoaded', function () {
                 addTouchFeedback();
-                
+
                 // Add touch event listeners for pull to refresh
                 document.addEventListener('touchstart', handleTouchStart, { passive: false });
                 document.addEventListener('touchmove', handleTouchMove, { passive: false });
                 document.addEventListener('touchend', handleTouchEnd, { passive: false });
-                
+
                 // Handle orientation changes
-                window.addEventListener('orientationchange', function() {
+                window.addEventListener('orientationchange', function () {
                     setTimeout(() => {
                         window.scrollTo(0, 1);
                     }, 500);
                 });
-                
+
                 // Handle app state changes
-                document.addEventListener('visibilitychange', function() {
+                document.addEventListener('visibilitychange', function () {
                     if (document.visibilityState === 'visible') {
                         // App became visible - could refresh data here
                         console.log('App became visible');
@@ -9816,12 +9760,295 @@
             // Expose functions globally for debugging
             window.mobileApp = {
                 installApp,
-                hideSplashScreen,
                 addTouchFeedback
             };
         })();
+        // ============================================
+        // ENHANCED OFFLINE SUPPORT & SERVICE WORKER
+        // Add this script to your HTML before </body>
+        // ============================================
 
+        (function () {
+            'use strict';
+
+            console.log('🔧 Initializing enhanced offline support...');
+
+            // Remove dynamic manifest generation
+            // Update manifest link to static file
+            const manifestLink = document.querySelector('link[rel="manifest"]');
+            if (manifestLink) {
+                manifestLink.setAttribute('href', '/manifest.json');
+            }
+
+            // Offline status management
+            let isOffline = !navigator.onLine;
+
+            function updateOfflineStatus() {
+                const wasOffline = isOffline;
+                isOffline = !navigator.onLine;
+
+                if (isOffline && !wasOffline) {
+                    showToast('📡 You are offline. App will continue working with cached data.', 'info');
+                    document.body.classList.add('offline-mode');
+
+                    // Disable sync indicator
+                    if (syncEnabled) {
+                        updateSyncIndicator('offline');
+                    }
+                } else if (!isOffline && wasOffline) {
+                    showToast('✅ Back online! Syncing data...', 'success');
+                    document.body.classList.remove('offline-mode');
+
+                    // Trigger sync if user is logged in
+                    if (syncEnabled && currentUser) {
+                        syncInBackground();
+                    }
+                }
+            }
+
+            // Listen for online/offline events
+            window.addEventListener('online', updateOfflineStatus);
+            window.addEventListener('offline', updateOfflineStatus);
+
+            // Check initial status
+            if (isOffline) {
+                console.log('📴 App loaded in offline mode');
+                showToast('📴 Offline mode - Using cached data', 'info');
+            }
+
+            // Enhanced Service Worker Registration
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', async () => {
+                    try {
+                        console.log('📝 Registering service worker...');
+
+                        const registration = await navigator.serviceWorker.register('/sw.js', {
+                            scope: '/'
+                        });
+
+                        console.log('✅ Service Worker registered:', registration.scope);
+
+                        // Handle updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            console.log('🔄 New service worker found');
+
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed') {
+                                    if (navigator.serviceWorker.controller) {
+                                        // New update available
+                                        console.log('📦 New version available');
+                                        showUpdateNotification(registration);
+                                    } else {
+                                        // First time install
+                                        console.log('✅ App ready for offline use');
+                                        showToast('✅ App is now available offline!', 'success');
+                                    }
+                                }
+                            });
+                        });
+
+                        // Handle service worker messages
+                        navigator.serviceWorker.addEventListener('message', event => {
+                            console.log('📨 Message from SW:', event.data);
+
+                            if (event.data.type === 'SYNC_STARTED') {
+                                showToast('🔄 Syncing data...', 'info');
+                            }
+                        });
+
+                        // Check if there's a waiting service worker
+                        if (registration.waiting) {
+                            showUpdateNotification(registration);
+                        }
+
+                        // Periodic check for updates (every 60 seconds)
+                        setInterval(() => {
+                            registration.update();
+                        }, 60000);
+
+                    } catch (error) {
+                        console.error('❌ Service Worker registration failed:', error);
+                        showToast('⚠️ Offline mode may not work properly', 'error');
+                    }
+                });
+            } else {
+                console.warn('⚠️ Service Workers not supported');
+                showToast('⚠️ Offline mode not available in this browser', 'error');
+            }
+
+            // Show update notification
+            function showUpdateNotification(registration) {
+                const updateBar = document.createElement('div');
+                updateBar.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(145deg, #1976d2, #0d47a1);
+            color: white;
+            padding: 12px 16px;
+            text-align: center;
+            z-index: 10000;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        `;
+
+                updateBar.innerHTML = `
+            <span>🆕 New version available!</span>
+            <button onclick="updateApp()" style="
+                background: white;
+                color: #1976d2;
+                border: none;
+                padding: 6px 16px;
+                border-radius: 4px;
+                font-weight: 600;
+                cursor: pointer;
+                font-size: 12px;
+            ">Update Now</button>
+        `;
+
+                document.body.prepend(updateBar);
+
+                // Store registration for update function
+                window.pendingServiceWorker = registration;
+            }
+
+            // Update app function
+            window.updateApp = function () {
+                if (window.pendingServiceWorker && window.pendingServiceWorker.waiting) {
+                    window.pendingServiceWorker.waiting.postMessage({ type: 'SKIP_WAITING' });
+
+                    // Reload page when service worker takes control
+                    navigator.serviceWorker.addEventListener('controllerchange', () => {
+                        window.location.reload();
+                    });
+                }
+            };
+
+            // Prefetch critical resources
+            function prefetchResources() {
+                const criticalResources = [
+                    '/index.html',
+                    '/manifest.json',
+                    '/tuba-icon.png'
+                ];
+
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({
+                        type: 'CACHE_URLS',
+                        urls: criticalResources
+                    });
+                }
+            }
+
+            // Call prefetch after a short delay
+            setTimeout(prefetchResources, 3000);
+
+            // Add offline mode styles
+            const offlineStyles = document.createElement('style');
+            offlineStyles.textContent = `
+        body.offline-mode::before {
+            content: '📴 Offline Mode';
+            position: fixed;
+            top: 60px;
+            right: 16px;
+            background: linear-gradient(145deg, #ff9800, #f57c00);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Disable sync-related buttons when offline */
+        body.offline-mode .header-btn[onclick*="sync"],
+        body.offline-mode button[onclick*="sync"] {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    `;
+            document.head.appendChild(offlineStyles);
+
+            // Override sync functions to check online status
+            const originalSyncAllData = window.syncAllData;
+            window.syncAllData = async function () {
+                if (!navigator.onLine) {
+                    showToast('❌ Cannot sync while offline', 'error');
+                    return;
+                }
+                return originalSyncAllData.apply(this, arguments);
+            };
+
+            const originalPullFromCloud = window.pullFromCloud;
+            window.pullFromCloud = async function () {
+                if (!navigator.onLine) {
+                    showToast('❌ Cannot pull data while offline', 'error');
+                    return;
+                }
+                return originalPullFromCloud.apply(this, arguments);
+            };
+
+            const originalPushToCloud = window.pushToCloud;
+            window.pushToCloud = async function () {
+                if (!navigator.onLine) {
+                    showToast('❌ Cannot push data while offline', 'error');
+                    return;
+                }
+                return originalPushToCloud.apply(this, arguments);
+            };
+
+            // Add visual indicator for sync status
+            const originalUpdateSyncIndicator = window.updateSyncIndicator;
+            window.updateSyncIndicator = function (status) {
+                if (!navigator.onLine && status !== 'offline') {
+                    status = 'offline';
+                }
+
+                const indicator = document.getElementById('syncIndicator');
+                if (!indicator) return;
+
+                if (status === 'offline') {
+                    indicator.textContent = '📴 Offline';
+                    indicator.className = 'sync-indicator show';
+                    indicator.style.background = 'linear-gradient(145deg, #ff9800, #f57c00)';
+                } else {
+                    if (originalUpdateSyncIndicator) {
+                        originalUpdateSyncIndicator(status);
+                    }
+                }
+            };
+
+            // Initial offline check
+            if (!navigator.onLine) {
+                document.body.classList.add('offline-mode');
+                updateSyncIndicator('offline');
+            }
+
+            console.log('✅ Enhanced offline support initialized');
+            console.log('📱 App is ready for offline use');
+
+        })();
+
+        // Add offline detection to existing functions
+        window.addEventListener('load', function () {
+            console.log('🚀 App loaded - Offline support active');
+            console.log('📡 Network status:', navigator.onLine ? 'Online' : 'Offline');
+        });
     </script>
+
 </body>
 
 </html>
