@@ -1,0 +1,25 @@
+{
+  "name": "TUBA - The Ultimate Business Architecture",
+  "short_name": "TUBA",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "description": "Complete business management solution",
+  "icons": [
+    {
+      "src": "./tuba-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./tuba-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
