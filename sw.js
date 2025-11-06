@@ -1,15 +1,24 @@
 // sw.js - Service Worker for TUBA Mobile App
 const CACHE_NAME = 'tuba-mobile-v1.0';
-const STATIC_CACHE = 'tuba-static-v1.0';
-const DYNAMIC_CACHE = 'tuba-dynamic-v1.0';
+const STATIC_CACHE = 'tuba-static-v1.1';
+const DYNAMIC_CACHE = 'tuba-dynamic-v1.1';
+// Ensure paths work under subdirectories (e.g., GitHub Pages project sites)
+const BASE_PATH = new URL(self.registration.scope).pathname; // e.g. '/repo/'
 
-// Static assets to cache immediately
+// Third-party CDN assets referenced by index.html that must be available offline
+const CDN_ASSETS = [
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
+];
+
+// Static assets to cache immediately (use subpath-aware URLs)
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/tuba-icon.png',
-  '/tuba-duplicate-cleaner.js'
+  BASE_PATH + 'index.html',
+  BASE_PATH + 'manifest.json',
+  BASE_PATH + 'tuba-icon.png',
+  ...CDN_ASSETS
 ];
 
 // Install event - cache static assets
@@ -53,51 +62,58 @@ self.addEventListener('activate', event => {
 
 // Fetch event - implement cache-first strategy with network fallback
 self.addEventListener('fetch', event => {
-  const { request } = event;
+  const request = event.request;
   const url = new URL(request.url);
 
-  // Handle same-origin requests
-  if (url.origin === location.origin) {
-    event.respondWith(
-      caches.match(request)
-        .then(cachedResponse => {
-          if (cachedResponse) {
-            console.log('[SW] Serving from cache:', request.url);
-            return cachedResponse;
-          }
-
-          // Not in cache, fetch from network
-          return fetch(request)
-            .then(networkResponse => {
-              // Don't cache non-successful responses
-              if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-                return networkResponse;
-              }
-
-              // Clone the response for caching
-              const responseToCache = networkResponse.clone();
-
-              caches.open(DYNAMIC_CACHE)
-                .then(cache => {
-                  console.log('[SW] Caching new resource:', request.url);
-                  cache.put(request, responseToCache);
-                });
-
-              return networkResponse;
-            })
-            .catch(error => {
-              console.error('[SW] Network request failed:', error);
-
-              // Return offline fallback for HTML requests
-              if (request.headers.get('accept').includes('text/html')) {
-                return caches.match('/index.html');
-              }
-
-              throw error;
-            });
-        })
-    );
+  // Only handle GET requests for offline caching; let others pass through
+  if (request.method !== 'GET') {
+    return; // default behavior
   }
+
+  event.respondWith((async () => {
+    // App-shell navigation fallback
+    if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
+      try {
+        const fresh = await fetch(request);
+        return fresh;
+      } catch {
+        const shell = await caches.match(BASE_PATH + 'index.html');
+        if (shell) return shell;
+      }
+    }
+
+    // Cache-first for all other requests (same-origin and cross-origin)
+    const cached = await caches.match(request);
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const networkResponse = await fetch(request);
+      // Cache successful or CORS/opaque responses so they are available offline later
+      if (networkResponse && (networkResponse.status === 200 || ['basic', 'cors', 'opaque'].includes(networkResponse.type))) {
+        const cache = await caches.open(DYNAMIC_CACHE);
+        cache.put(request, networkResponse.clone());
+      }
+      return networkResponse;
+    } catch (error) {
+      console.error('[SW] Network request failed:', error, 'for', request.url);
+
+      // Final fallback: try app shell for navigations; otherwise, return 503 Offline
+      if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
+        const shell = await caches.match(BASE_PATH + 'index.html');
+        if (shell) return shell;
+      }
+
+      // Attempt path-only match for same-origin static resources
+      if (url.origin === location.origin) {
+        const pathFallback = await caches.match(BASE_PATH + url.pathname.replace(BASE_PATH, ''));
+        if (pathFallback) return pathFallback;
+      }
+
+      return new Response('', { status: 503, statusText: 'Offline' });
+    }
+  })());
 });
 
 // Background sync for offline data
@@ -118,8 +134,8 @@ self.addEventListener('push', event => {
 
   const options = {
     body: event.data ? event.data.text() : 'New update available',
-    icon: '/tuba-icon.png',
-    badge: '/tuba-icon.png',
+    icon: BASE_PATH + 'tuba-icon.png',
+    badge: BASE_PATH + 'tuba-icon.png',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
@@ -129,12 +145,12 @@ self.addEventListener('push', event => {
       {
         action: 'explore',
         title: 'Open App',
-        icon: '/tuba-icon.png'
+        icon: BASE_PATH + 'tuba-icon.png'
       },
       {
         action: 'close',
         title: 'Close',
-        icon: '/tuba-icon.png'
+        icon: BASE_PATH + 'tuba-icon.png'
       }
     ]
   };
@@ -152,7 +168,7 @@ self.addEventListener('notificationclick', event => {
 
   if (event.action === 'explore') {
     event.waitUntil(
-      clients.openWindow('/')
+      clients.openWindow(BASE_PATH)
     );
   }
 });

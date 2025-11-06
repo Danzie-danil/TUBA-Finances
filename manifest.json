@@ -1,8 +1,8 @@
 {
-  "name": "TUBA - Business Management App",
+  "name": "TUBA - The Ultimate Business Architecture",
   "short_name": "TUBA",
   "description": "Complete business management solution for inventory, sales, and financial tracking",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#000000",

@@ -121,6 +121,19 @@
             padding-right: max(0px, env(safe-area-inset-right));
         }
 
+        /* Offline banner (non-overlay, sits between header and content) */
+        .offline-banner {
+            display: none;
+            width: 100%;
+            background: linear-gradient(145deg, #b71c1c, #7f0000);
+            color: #ffffff;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
         /* Splash screen styles */
         .privacy-blur {
             filter: blur(8px);
@@ -1506,6 +1519,9 @@
                     onclick="importData()">📥</button>
             </div>
         </div>
+
+        <!-- Offline status banner inserted below header so it does not overlay content -->
+        <div id="offlineBanner" class="offline-banner" role="status" aria-live="polite" aria-atomic="true"></div>
 
         <div class="content" id="app"></div>
         <div class="bottom-nav" id="bottomNav"></div>
@@ -9684,8 +9700,37 @@
                             console.log('Capacitor plugins initialized');
                         }
 
-                        const registration = await navigator.serviceWorker.register('/sw.js');
+                        const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
                         console.log('SW registered: ', registration);
+
+                        // Offline banner show/hide without overlaying text areas
+                        const offlineBannerEl = document.getElementById('offlineBanner');
+                        const updateOfflineBanner = () => {
+                            if (!offlineBannerEl) return;
+                            if (navigator.onLine) {
+                                offlineBannerEl.style.display = 'none';
+                                offlineBannerEl.textContent = '';
+                            } else {
+                                offlineBannerEl.textContent = "You’re offline — changes are saved locally and will sync.";
+                                offlineBannerEl.style.display = 'block';
+                            }
+                        };
+
+                        // Initial state and event listeners
+                        updateOfflineBanner();
+                        window.addEventListener('online', () => {
+                            updateOfflineBanner();
+                            try {
+                                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                                    navigator.serviceWorker.ready.then(reg => {
+                                        if (reg.sync && typeof reg.sync.register === 'function') {
+                                            reg.sync.register('background-sync').catch(() => {});
+                                        }
+                                    });
+                                }
+                            } catch (e) { /* no-op */ }
+                        });
+                        window.addEventListener('offline', updateOfflineBanner);
 
                         // Check for updates
                         registration.addEventListener('updatefound', () => {
