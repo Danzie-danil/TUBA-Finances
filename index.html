@@ -2468,7 +2468,7 @@
                     .from('receipts')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                if (receipts) state.receipts = receipts.map(r => ({
+                if (receipts && receipts.length > 0) state.receipts = receipts.map(r => ({
                     id: `RCPT-${r.timestamp}`,
                     number: r.number,
                     customer: r.customer,
@@ -2538,7 +2538,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 // Unpaid entries
-                if (unpaidEntries) state.unpaidEntries = unpaidEntries.map(u => ({
+                if (unpaidEntries && unpaidEntries.length > 0) state.unpaidEntries = unpaidEntries.map(u => ({
                     id: `U-${u.timestamp}`,
                     name: u.name,
                     type: u.type,
@@ -2554,7 +2554,7 @@
                     .from('transaction_floats')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                if (floats) {
+                if (floats && floats.length > 0) {
                     floats.forEach(f => {
                         if (state.transactionFloats[f.channel]) {
                             state.transactionFloats[f.channel].initial = parseFloat(f.initial_float);
