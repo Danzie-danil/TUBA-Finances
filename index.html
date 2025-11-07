@@ -1409,7 +1409,7 @@
             <div class="side-nav-section-title">Management</div>
             <div class="side-nav-item" onclick="navigateToTab('products')">
                 <span class="side-nav-icon">🛍️</span>
-                <span>Products</span>
+                <span>Products/Services</span>
             </div>
             <div class="side-nav-item" onclick="navigateToTab('categories')">
                 <span class="side-nav-icon">📑</span>
@@ -2348,23 +2348,23 @@
 
             try {
                 // SAFEGUARD: Check if we have local data that should be preserved
-                const hasLocalData = state.products.length > 0 || state.sales.length > 0 || 
-                                     state.expenses.length > 0 || state.customers.length > 0;
-                
+                const hasLocalData = state.products.length > 0 || state.sales.length > 0 ||
+                    state.expenses.length > 0 || state.customers.length > 0;
+
                 // Quick check: count total records in cloud
                 if (hasLocalData) {
                     const { count: cloudCount } = await supabase
                         .from('products')
                         .select('*', { count: 'exact', head: true })
                         .eq('user_id', currentUser.id);
-                    
+
                     if (cloudCount === 0) {
                         console.log('⚠️ Cloud data is empty, preserving local data');
                         console.log('💡 Use "Push to Cloud" if you want to upload your local data');
                         return; // Don't overwrite local data with empty cloud data
                     }
                 }
-                
+
                 console.log('📥 Pulling data from cloud...');
 
                 // Products
@@ -2833,7 +2833,7 @@
             { id: 'account', label: 'Account', icon: '👤' },  // ADD THIS LINE
             { id: 'sales', label: 'Sales', icon: '💰' },
             { id: 'transactions', label: 'Money', icon: '💳' },
-            { id: 'products', label: 'Products', icon: '🛍️' },
+            { id: 'products', label: 'Products/Services', icon: '🛍️' },
             { id: 'categories', label: 'Categories', icon: '📁' },
             { id: 'expenses', label: 'Expenses', icon: '💸' },
             { id: 'inventory', label: 'Stock', icon: '📦' },
@@ -2892,7 +2892,7 @@
             const stats = getStats();
             const lowStockProducts = state.products.filter(p => {
                 const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
-                return inv.stock <= inv.minAlert;
+                return (p.hasStock !== false) && (inv.stock <= inv.minAlert);
             });
 
             const unpaidCount = state.unpaidEntries.filter(e => !e.paid).length;
@@ -2975,7 +2975,7 @@
                     <div class="flex-gap">
                         <button class="btn-success btn-small" onclick="switchTab('sales')">➕ New Sale</button>
                         <button class="btn-danger btn-small" onclick="switchTab('expenses')">💸 Add Expense</button>
-                        <button class="btn-small" onclick="switchTab('products')">🛒 Manage Products</button>
+                        <button class="btn-small" onclick="switchTab('products')">🛒 Manage Products/Services</button>
                         <button class="btn-small" onclick="switchTab('transactions')">💳 Transactions</button>
                         <button class="btn-small" onclick="switchTab('invoices')" style="background: linear-gradient(145deg, #1976d2, #0d47a1); color: white;">📄 Invoices</button>
                         <button class="btn-small" onclick="switchTab('notes')" style="background: linear-gradient(145deg, #e65100, #bf360c); color: white;">📝 Notes</button>
@@ -3527,15 +3527,15 @@
         <div class="card">
             <h2>Add Sale</h2>
             <div class="card-header-buttons">
-                <button class="quick-nav-btn products" onclick="switchTab('products')">Products</button>
+                <button class="quick-nav-btn products" onclick="switchTab('products')">Products/Services</button>
                 <button class="quick-nav-btn categories" onclick="switchTab('categories')">Categories</button>
             </div>
             <form onsubmit="addSale(event)">
                 <div class="form-group">
-                    <label>Product</label>
+                    <label>Product/Service</label>
                     <select id="saleProduct" onchange="updateSaleTotal()" required>
                         <option value="">-- Select Product --</option>
-                        ${state.products.map((p, i) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || { stock: 0 }).stock})</option>`).join('')}
+                        ${state.products.map((p, i) => { const stockText = (p.hasStock === false) ? 'N/A' : ((state.inventory[p.name] || { stock: 0 }).stock); const typeTag = p.hasStock === false ? '[Service]' : '[Product]'; return `<option value="${i}">${p.name} - ${p.category} ${typeTag}${p.hasStock === false ? '' : ` (Stock: ${stockText})`}</option>`; }).join('')}
                     </select>
                 </div>
                 <div class="form-group">
@@ -3615,7 +3615,10 @@
                     </button>
                 </div>
 
-                ${filteredSales.slice().reverse().map((s, idx) => `
+                ${filteredSales.slice().reverse().map((s, idx) => {
+                    const isService = (state.products.find(p => p.name === s.productName)?.hasStock === false);
+                    const typeBadge = isService ? '<span class="badge badge-warning">Service</span>' : '<span class="badge badge-success">Product</span>';
+                    return `
                     <div class="item">
                         <div style="display: flex; gap: 12px; align-items: start;">
                             <input type="checkbox" class="checkbox-select" 
@@ -3623,7 +3626,7 @@
                                    onchange="toggleSelect('sales', '${s.id}')">
                             <div style="flex: 1;">
                                 <div class="item-header">
-                                    <span class="item-title">${s.productName}</span>
+                                    <span class="item-title">${s.productName} ${typeBadge}</span>
                                     <span style="color: #2e7d32; font-weight: 700;">💰 ${formatNumber(s.profit)} Tsh</span>
                                 </div>
                                 <div class="item-subtitle">
@@ -3639,7 +3642,7 @@
                             </div>
                         </div>
                     </div>
-                `).join('') || '<p style="text-align: center; color: #666;">No sales found</p>'}
+                `}).join('') || '<p style="text-align: center; color: #666;">No sales found</p>'}
             ` : ''}
 
             <button class="collapse-btn" onclick="toggleListExpanded('sales')">
@@ -3684,10 +3687,13 @@
                 filteredSales = filteredSales.filter(s => s.customer === state.filterCustomer);
             }
 
-            container.innerHTML = filteredSales.slice().reverse().slice(0, 50).map(s => `
+            container.innerHTML = filteredSales.slice().reverse().slice(0, 50).map(s => {
+                const isService = (state.products.find(p => p.name === s.productName)?.hasStock === false);
+                const typeBadge = isService ? '<span class="badge badge-warning">Service</span>' : '<span class="badge badge-success">Product</span>';
+                return `
         <div class="item">
             <div class="item-header">
-                <span class="item-title">${s.productName}</span>
+                <span class="item-title">${s.productName} ${typeBadge}</span>
                 <span style="color: #2e7d32; font-weight: 700;">💱 ${formatNumber(s.profit)} Tsh</span>
             </div>
             <div class="item-subtitle">
@@ -3700,7 +3706,7 @@
                 <button class="btn-small btn-danger" onclick="deleteSaleByTimestamp(${s.timestamp})">Delete</button>
             </div>
         </div>
-    `).join('') || '<p style="text-align: center; color: #666;">No sales found</p>';
+    `}).join('') || '<p style="text-align: center; color: #666;">No sales found</p>';
         }
 
         function updateFilterDateFrom(value) {
@@ -3946,8 +3952,9 @@
                 if (idx === -1) return showToast("Sale not found", "error");
                 const sale = state.sales[idx];
 
-                // Return stock to inventory
-                if (state.inventory[sale.productName]) {
+                // Return stock to inventory only if product tracks stock
+                const productForSale = state.products.find(p => p.name === sale.productName);
+                if (productForSale && productForSale.hasStock !== false && state.inventory[sale.productName]) {
                     state.inventory[sale.productName].stock += sale.quantity;
                 }
 
@@ -3982,18 +3989,21 @@
             const product = state.products[productIndex];
             if (!product) { infoDiv.innerHTML = ''; return; }
 
-            const inventoryItem = state.inventory[product.name] || { stock: 0, minAlert: 5 };
-            const availableStock = inventoryItem.stock;
-
-            if (quantity > availableStock) {
-                infoDiv.innerHTML = `
-                    <div class="alert-box-danger">
-                        <strong>⚠️ Insufficient Stock!</strong><br>
-                        Available: ${availableStock} units<br>
-                        Requested: ${quantity} units
-                    </div>
-                `;
-                return;
+            const isService = product.hasStock === false;
+            let availableStock = null;
+            if (!isService) {
+                const inventoryItem = state.inventory[product.name] || { stock: 0, minAlert: 5 };
+                availableStock = inventoryItem.stock;
+                if (quantity > availableStock) {
+                    infoDiv.innerHTML = `
+                        <div class="alert-box-danger">
+                            <strong>⚠️ Insufficient Stock!</strong><br>
+                            Available: ${availableStock} units<br>
+                            Requested: ${quantity} units
+                        </div>
+                    `;
+                    return;
+                }
             }
 
             const totalCost = product.cost * quantity;
@@ -4004,7 +4014,7 @@
                     <div class="info-row"><span>Price/unit:</span>
                         <input type="number" id="manualPrice" value="${product.price.toFixed(2)}" step="0.01" style="width:120px;text-align:right;padding:6px;border-radius:6px;border:1px solid #ddd;">
                     </div>
-                    <div class="info-row"><span>Available Stock:</span><span>${availableStock} units</span></div>
+                    ${isService ? `<div class=\"info-row\"><span>Item Type:</span><span>Service (no stock)</span></div>` : `<div class=\"info-row\"><span>Available Stock:</span><span>${availableStock} units</span></div>`}
                     <div class="info-row" style="font-weight:700;"><span>Total Cost:</span><span id="totalCost">💱 ${formatNumber(totalCost)} Tsh</span></div>
                     <div class="info-row" style="font-weight:700;"><span>Total Price:</span><span id="totalPrice">💱 ${formatNumber(product.price * quantity)} Tsh</span></div>
                     <div class="info-row" style="font-weight:700; color: #2e7d32;"><span>Profit:</span><span id="totalProfit">💱 ${formatNumber((product.price - product.cost) * quantity)} Tsh</span></div>
@@ -4024,6 +4034,7 @@
             if (productIndex === null || productIndex === '' || productIndex === undefined) return showToast('Please select a product', 'error');
             const product = state.products[productIndex];
             if (!product) return showToast('Product not found', 'error');
+            const isService = product.hasStock === false;
 
             const customerSelect = document.getElementById('saleCustomer')?.value;
             let customer;
@@ -4045,10 +4056,12 @@
             const manualPriceInput = document.getElementById('manualPrice');
             const pricePerUnit = manualPriceInput ? parseFloat(manualPriceInput.value) : product.price;
 
-            // Check stock
-            const inventoryItem = state.inventory[product.name] || { stock: 0, minAlert: 5 };
-            if (quantity > inventoryItem.stock) {
-                return showToast(`Insufficient stock! Available: ${inventoryItem.stock}`, 'error');
+            // Check stock only for stock-tracked products
+            if (!isService) {
+                const inventoryItem = state.inventory[product.name] || { stock: 0, minAlert: 5 };
+                if (quantity > inventoryItem.stock) {
+                    return showToast(`Insufficient stock! Available: ${inventoryItem.stock}`, 'error');
+                }
             }
 
             const now = new Date();
@@ -4080,8 +4093,8 @@
                 }
             }
 
-            // Update inventory
-            if (state.inventory && state.inventory[product.name]) {
+            // Update inventory only if product tracks stock
+            if (!isService && state.inventory && state.inventory[product.name]) {
                 state.inventory[product.name].stock = Math.max(0, (state.inventory[product.name].stock || 0) - quantity);
             }
 
@@ -4127,13 +4140,13 @@
                         </span>
                     </div>
                     <div class="float-balance-row">
-                        <span class="float-balance-label">Current Balance:</span>
+                        <span class="float-balance-label">Current Float Balance:</span>
                         <span class="float-balance-value ${floatDifference >= 0 ? 'positive' : 'negative'}">
                             💱 ${formatNumber(floatData.current)} Tsh
                         </span>
                     </div>
                     <div class="float-balance-row">
-                        <span class="float-balance-label">Difference:</span>
+                        <span class="float-balance-label"> Cash Balance:</span>
                         <span class="float-balance-value ${floatDifference >= 0 ? 'positive' : 'negative'}">
                             ${floatDifference >= 0 ? '+' : ''}${formatNumber(floatDifference)} Tsh
                         </span>
@@ -4351,14 +4364,14 @@
         function renderProducts() {
             return `
                 <div class="card">
-                    <h2>Add Product</h2>
+                    <h2>Add Product/Service</h2>
                     <div class="card-header-buttons">
                         <button class="quick-nav-btn back" onclick="switchTab('sales')">← Sales</button>
                     </div>
                     <form onsubmit="addProduct(event)">
                         <div class="form-group">
-                            <label>Product Name</label>
-                            <input type="text" id="productName" placeholder="Enter name" required>
+                            <label>Item Name</label>
+                            <input type="text" id="productName" placeholder="Enter item name" required>
                         </div>
                         <div class="form-group">
                             <label>Category</label>
@@ -4376,6 +4389,13 @@
                             <input type="number" id="productPrice" placeholder="0.00" step="0.01" required>
                         </div>
                         <div class="form-group">
+                            <label>Item Type</label>
+                            <select id="productHasStock" onchange="toggleInitialStock()">
+                                <option value="yes" selected>Product (has stock)</option>
+                                <option value="no">Service (no stock)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="initialStockGroup">
                             <label>Initial Stock</label>
                             <input type="number" id="productStock" placeholder="0" min="0" value="0">
                         </div>
@@ -4384,9 +4404,9 @@
                 </div>
 
                 <div class="card">
-                    <h2>All Products (${state.products.length})</h2>
+                    <h2>All Items (${state.products.length})</h2>
     <div class="search-box">
-        <input type="text" placeholder="🔍 Search products..." oninput="searchProducts(this.value)" id="productSearch">
+        <input type="text" placeholder="🔍 Search items..." oninput="searchProducts(this.value)" id="productSearch">
     </div>
     
     ${state.products.length > 0 ? `
@@ -4409,6 +4429,18 @@
             `;
         }
 
+        // Toggle visibility of initial stock based on has-stock selection
+        function toggleInitialStock() {
+            const select = document.getElementById('productHasStock');
+            const group = document.getElementById('initialStockGroup');
+            if (!select || !group) return;
+            if (select.value === 'no') {
+                group.style.display = 'none';
+            } else {
+                group.style.display = 'block';
+            }
+        }
+
         function renderProductsList(searchTerm = '') {
             let products = state.products;
             if (searchTerm) {
@@ -4420,7 +4452,7 @@
             }
 
             if (products.length === 0) {
-                return '<p style="text-align: center; color: #666;">No products found</p>';
+                return '<p style="text-align: center; color: #666;">No items found</p>';
             }
 
             return products.map((p, i) => {
@@ -4436,7 +4468,7 @@
                 <div style="flex: 1;">
                         <div class="item-title">${p.name}</div>
                         <div class="item-subtitle">
-                            Category: ${p.category} | Stock: ${inv.stock} units<br>
+                            Category: ${p.category} | ${p.hasStock === false ? 'Service (no stock)' : 'Stock: ' + inv.stock + ' units'}<br>
                             Margin: ${margin}%
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 14px;">
@@ -4466,6 +4498,7 @@
             const cost = parseFloat(document.getElementById('productCost').value);
             const price = parseFloat(document.getElementById('productPrice').value);
             const stock = parseInt(document.getElementById('productStock').value) || 0;
+            const hasStock = (document.getElementById('productHasStock')?.value !== 'no');
 
             if (cost < 0 || price < 0) {
                 return showToast('Cost and price must be positive', 'error');
@@ -4486,7 +4519,8 @@
                 name,
                 category,
                 cost,
-                price
+                price,
+                hasStock
             };
             state.products.push(product);
 
@@ -4495,11 +4529,13 @@
                 state.inventory = {};
             }
 
-            // Always set initial stock when adding new product
-            state.inventory[name] = {
-                stock: parseInt(stock) || 0,
-                minAlert: 5
-            };
+            // Only set initial stock for stock-tracked products
+            if (hasStock) {
+                state.inventory[name] = {
+                    stock: parseInt(stock) || 0,
+                    minAlert: 5
+                };
+            }
 
             saveData();
             render();
@@ -4529,8 +4565,12 @@
                 p.price = priceNum;
 
                 if (state.inventory && oldName !== p.name) {
-                    state.inventory[p.name] = state.inventory[oldName] || { stock: 0, minAlert: 5 };
-                    delete state.inventory[oldName];
+                    if (p.hasStock === false) {
+                        if (state.inventory[oldName]) delete state.inventory[oldName];
+                    } else {
+                        state.inventory[p.name] = state.inventory[oldName] || { stock: 0, minAlert: 5 };
+                        delete state.inventory[oldName];
+                    }
                 }
                 saveData();
                 render();
@@ -4542,7 +4582,7 @@
         }
 
         function deleteProductIndex(i) {
-            showConfirm("Delete this product?", async function () {
+            showConfirm("Delete this item?", async function () {
                 const p = state.products[i];
                 if (p && p.name && state.inventory && state.inventory[p.name]) delete state.inventory[p.name];
                 state.products.splice(i, 1);
@@ -4559,7 +4599,7 @@
                 <div class="card">
                     <h2>Add Category</h2>
                     <div class="card-header-buttons">
-                        <button class="quick-nav-btn back" onclick="switchTab('products')">← Products</button>
+                        <button class="quick-nav-btn back" onclick="switchTab('products')">← Products/Services</button>
                     </div>
                     <form onsubmit="addCategory(event)">
                         <div class="form-group">
@@ -4936,7 +4976,8 @@
         }
 
         function renderInventory() {
-            const lowStock = state.products.filter(p => {
+            const trackedProducts = state.products.filter(p => p.hasStock !== false);
+            const lowStock = trackedProducts.filter(p => {
                 const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
                 return inv.stock <= inv.minAlert;
             });
@@ -4949,8 +4990,8 @@
                 ` : ''}
 
                 <div class="card">
-                    <h2>Stock Levels (${state.products.length} Products)</h2>
-                    ${state.products.map(p => {
+                    <h2>Stock Levels (${trackedProducts.length} Items)</h2>
+                    ${trackedProducts.map(p => {
                 const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
                 const isLow = inv.stock <= inv.minAlert;
                 const stockValue = inv.stock * p.cost;
@@ -4976,7 +5017,7 @@
                                 </div>
                             </div>
                         `;
-            }).join('') || '<p style="text-align: center; color: #666;">No products yet</p>'}
+            }).join('') || '<p style="text-align: center; color: #666;">No stock-tracked items yet</p>'}
                 </div>
             `;
         }
@@ -9179,7 +9220,7 @@
                     <div class="flex-gap">
                         <button class="btn-success btn-small" onclick="switchTab('sales')">➕ New Sale</button>
                         <button class="btn-danger btn-small" onclick="switchTab('expenses')">💸 Add Expense</button>
-                        <button class="btn-small" onclick="switchTab('products')">🛒 Manage Products</button>
+                        <button class="btn-small" onclick="switchTab('products')">🛒 Manage Products/Services</button>
                         <button class="btn-small" onclick="switchTab('transactions')">💳 Transactions</button>
                         <button class="btn-small" onclick="switchTab('invoices')" style="background: linear-gradient(145deg, #1976d2, #0d47a1); color: white;">📄 Invoices</button>
                         <button class="btn-small" onclick="switchTab('notes')" style="background: linear-gradient(145deg, #e65100, #bf360c); color: white;">📝 Notes</button>
@@ -9634,7 +9675,7 @@
                                 if (navigator.serviceWorker && navigator.serviceWorker.ready) {
                                     navigator.serviceWorker.ready.then(reg => {
                                         if (reg.sync && typeof reg.sync.register === 'function') {
-                                            reg.sync.register('background-sync').catch(() => {});
+                                            reg.sync.register('background-sync').catch(() => { });
                                         }
                                     });
                                 }
