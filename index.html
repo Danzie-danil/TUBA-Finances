@@ -1567,6 +1567,7 @@
         }
         let currentUser = null;
         let syncEnabled = false;
+        let autoCloudPullDone = false;
 
         // Your existing code continues below...
         const SHOP_NAME = "";
@@ -1600,8 +1601,7 @@
                         currentUser = session.user;
                         syncEnabled = true;
                         updateSyncIndicator('synced');
-
-                        // Don't call render here - it's handled in signIn()
+                        await maybeAutoPullCloudData();
                     } else if (event === 'SIGNED_OUT') {
                         currentUser = null;
                         syncEnabled = false;
@@ -1611,6 +1611,7 @@
                         console.log('✅ Token refreshed');
                         currentUser = session.user;
                         syncEnabled = true;
+                        await maybeAutoPullCloudData();
                     }
                 });
 
@@ -1637,6 +1638,9 @@
                     // Load user profile
                     await loadUserProfile();
 
+                    // Auto-pull cloud data when local data is empty
+                    await maybeAutoPullCloudData();
+
                     // REMOVED: Automatic data pull on refresh that was clearing local data
                     // Users can manually sync using the sync button if needed
                     // await pullDataFromSupabase();
@@ -1649,6 +1653,42 @@
             } catch (error) {
                 console.error('Restore session error:', error);
                 return false;
+            }
+        }
+
+        function hasAnyLocalData() {
+            try {
+                const nonEmptyArrays = [
+                    state.products,
+                    state.sales,
+                    state.expenses,
+                    state.customers,
+                    state.invoices,
+                    state.receipts,
+                    state.notes,
+                    state.transactions,
+                    state.unpaidEntries,
+                    state.categories
+                ].some(arr => Array.isArray(arr) && arr.length > 0);
+
+                const hasInventory = state.inventory && Object.keys(state.inventory).length > 0;
+                return nonEmptyArrays || hasInventory;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        async function maybeAutoPullCloudData() {
+            if (!syncEnabled || !currentUser) return;
+            if (autoCloudPullDone) return;
+
+            const hasLocal = hasAnyLocalData();
+            if (!hasLocal) {
+                try {
+                    await pullDataFromSupabase();
+                } finally {
+                    autoCloudPullDone = true;
+                }
             }
         }
 
