@@ -49,43 +49,7 @@
             overscroll-behavior: contain;
         }
 
-        /* Pull-to-refresh indicator */
-        .pull-to-refresh {
-            position: fixed;
-            top: -60px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(145deg, #1a1a1a, #000000);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 18px;
-            z-index: 1000;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-        }
-
-        .pull-to-refresh.show {
-            top: 20px;
-        }
-
-        .pull-to-refresh.loading {
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: translateX(-50%) rotate(0deg);
-            }
-
-            100% {
-                transform: translateX(-50%) rotate(360deg);
-            }
-        }
+        /* Removed in-app pull-to-refresh styles */
 
         /* Enhanced touch interactions */
         button,
@@ -1408,10 +1372,7 @@
 </head>
 
 <body>
-    <!-- Pull to Refresh Indicator -->
-    <div class="pull-to-refresh" id="pullToRefresh">
-        ↓
-    </div>
+    <!-- Removed in-app pull-to-refresh indicator -->
 
     <!-- Side Navigation Drawer -->
     <div class="side-nav-overlay" id="sideNavOverlay" onclick="toggleSideNav()"></div>
@@ -1676,10 +1637,11 @@
                     // Load user profile
                     await loadUserProfile();
 
-                    // Load data from cloud
-                    await pullDataFromSupabase();
+                    // REMOVED: Automatic data pull on refresh that was clearing local data
+                    // Users can manually sync using the sync button if needed
+                    // await pullDataFromSupabase();
 
-                    console.log('✅ Session restored successfully');
+                    console.log('✅ Session restored successfully (local data preserved)');
                     return true;
                 }
 
@@ -2385,18 +2347,40 @@
             if (!syncEnabled || !currentUser) return;
 
             try {
+                // SAFEGUARD: Check if we have local data that should be preserved
+                const hasLocalData = state.products.length > 0 || state.sales.length > 0 || 
+                                     state.expenses.length > 0 || state.customers.length > 0;
+                
+                // Quick check: count total records in cloud
+                if (hasLocalData) {
+                    const { count: cloudCount } = await supabase
+                        .from('products')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('user_id', currentUser.id);
+                    
+                    if (cloudCount === 0) {
+                        console.log('⚠️ Cloud data is empty, preserving local data');
+                        console.log('💡 Use "Push to Cloud" if you want to upload your local data');
+                        return; // Don't overwrite local data with empty cloud data
+                    }
+                }
+                
+                console.log('📥 Pulling data from cloud...');
+
                 // Products
                 const { data: products } = await supabase
                     .from('products')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                if (products) state.products = products.map(p => ({
-                    id: `P-${p.name.replace(/\s+/g, '_')}_${Date.now()}`,
-                    name: p.name,
-                    category: p.category,
-                    cost: parseFloat(p.cost),
-                    price: parseFloat(p.price)
-                }));
+                if (products && products.length > 0) {
+                    state.products = products.map(p => ({
+                        id: `P-${p.name.replace(/\s+/g, '_')}_${Date.now()}`,
+                        name: p.name,
+                        category: p.category,
+                        cost: parseFloat(p.cost),
+                        price: parseFloat(p.price)
+                    }));
+                }
 
                 // Sales
                 const { data: sales } = await supabase
@@ -2404,28 +2388,30 @@
                     .select('*')
                     .eq('user_id', currentUser.id)
                     .order('timestamp', { ascending: false });
-                if (sales) state.sales = sales.map(s => ({
-                    id: `S-${s.timestamp}`,
-                    date: s.date,
-                    time: s.time,
-                    timestamp: s.timestamp,
-                    productName: s.product_name,
-                    customer: s.customer,
-                    quantity: s.quantity,
-                    costPerUnit: parseFloat(s.cost_per_unit),
-                    pricePerUnit: parseFloat(s.price_per_unit),
-                    totalCost: parseFloat(s.total_cost),
-                    totalPrice: parseFloat(s.total_price),
-                    profit: parseFloat(s.profit),
-                    payment: s.payment
-                }));
+                if (sales && sales.length > 0) {
+                    state.sales = sales.map(s => ({
+                        id: `S-${s.timestamp}`,
+                        date: s.date,
+                        time: s.time,
+                        timestamp: s.timestamp,
+                        productName: s.product_name,
+                        customer: s.customer,
+                        quantity: s.quantity,
+                        costPerUnit: parseFloat(s.cost_per_unit),
+                        pricePerUnit: parseFloat(s.price_per_unit),
+                        totalCost: parseFloat(s.total_cost),
+                        totalPrice: parseFloat(s.total_price),
+                        profit: parseFloat(s.profit),
+                        payment: s.payment
+                    }));
+                }
 
                 // Categories
                 const { data: categories } = await supabase
                     .from('categories')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                if (categories) state.categories = categories.map(c => c.name);
+                if (categories && categories.length > 0) state.categories = categories.map(c => c.name);
 
                 // Expenses
                 const { data: expenses } = await supabase
@@ -2433,7 +2419,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 // Expenses
-                if (expenses) state.expenses = expenses.map(e => ({
+                if (expenses && expenses.length > 0) state.expenses = expenses.map(e => ({
                     id: `E-${e.timestamp}`,
                     date: e.date,
                     time: e.time,
@@ -2451,7 +2437,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 // Customers
-                if (customers) state.customers = customers.map(c => ({
+                if (customers && customers.length > 0) state.customers = customers.map(c => ({
                     id: `C-${c.name.replace(/\s+/g, '_')}_${Date.now()}`,
                     name: c.name,
                     email: c.email || '',
@@ -2466,7 +2452,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 // Invoices
-                if (invoices) state.invoices = invoices.map(i => ({
+                if (invoices && invoices.length > 0) state.invoices = invoices.map(i => ({
                     id: `INV-${i.number}`,
                     number: i.number,
                     customer: i.customer,
@@ -2520,7 +2506,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 // Notes
-                if (notes) state.notes = notes.map(n => ({
+                if (notes && notes.length > 0) state.notes = notes.map(n => ({
                     id: `N-${n.timestamp}`,
                     title: n.title || '',
                     content: n.content,
@@ -2535,7 +2521,7 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 // Transactions
-                if (transactions) state.transactions = transactions.map(t => ({
+                if (transactions && transactions.length > 0) state.transactions = transactions.map(t => ({
                     id: `T-${t.timestamp}`,
                     channel: t.channel,
                     customerName: t.customer_name,
@@ -3222,9 +3208,7 @@
                 🔄 Smart Sync
             </button>
             
-            <button onclick="forceRefresh()" class="btn-secondary" style="margin-bottom: 12px;">
-                🔃 Refresh Dashboard
-            </button>
+            <!-- Removed in-app dashboard refresh button -->
 
             <button onclick="signOut()" class="btn-danger">
                 Sign Out
@@ -3428,27 +3412,7 @@
                 updateSyncIndicator('synced');
             }
         }
-        async function forceRefresh() {
-            updateSyncIndicator('syncing');
-
-            try {
-                // Clear local storage
-                localStorage.removeItem('financeManagerData');
-
-                // Pull fresh data from cloud
-                await pullDataFromSupabase();
-
-                // Re-render everything
-                render();
-
-                updateSyncIndicator('synced');
-                showToast('Dashboard refreshed!', 'success');
-            } catch (error) {
-                console.error('Refresh error:', error);
-                showToast('Refresh failed: ' + error.message, 'error');
-                updateSyncIndicator('synced');
-            }
-        }
+        // Removed in-app forceRefresh function
 
 
         async function handleSignIn() {
@@ -9578,61 +9542,7 @@
             'use strict';
 
             // Splash Screen Management
-            // Pull to Refresh Functionality
-            let startY = 0;
-            let currentY = 0;
-            let pullDistance = 0;
-            let isPulling = false;
-            const pullThreshold = 80;
-            const pullToRefreshElement = document.getElementById('pullToRefresh');
-
-            function handleTouchStart(e) {
-                if (window.scrollY === 0) {
-                    startY = e.touches[0].clientY;
-                    isPulling = true;
-                }
-            }
-
-            function handleTouchMove(e) {
-                if (!isPulling) return;
-
-                currentY = e.touches[0].clientY;
-                pullDistance = currentY - startY;
-
-                if (pullDistance > 0 && pullDistance < 150) {
-                    e.preventDefault();
-                    const opacity = Math.min(pullDistance / pullThreshold, 1);
-                    pullToRefreshElement.style.opacity = opacity;
-
-                    if (pullDistance > pullThreshold) {
-                        pullToRefreshElement.classList.add('show');
-                        pullToRefreshElement.innerHTML = '↻';
-                    } else {
-                        pullToRefreshElement.classList.remove('show');
-                        pullToRefreshElement.innerHTML = '↓';
-                    }
-                }
-            }
-
-            function handleTouchEnd(e) {
-                if (!isPulling) return;
-
-                if (pullDistance > pullThreshold) {
-                    pullToRefreshElement.classList.add('loading');
-                    pullToRefreshElement.innerHTML = '↻';
-
-                    // Simulate refresh
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
-                } else {
-                    pullToRefreshElement.classList.remove('show');
-                    pullToRefreshElement.style.opacity = '0';
-                }
-
-                isPulling = false;
-                pullDistance = 0;
-            }
+            // Removed in-app pull-to-refresh functionality
 
             // PWA Installation
             let deferredPrompt;
@@ -9781,10 +9691,7 @@
             document.addEventListener('DOMContentLoaded', function () {
                 addTouchFeedback();
 
-                // Add touch event listeners for pull to refresh
-                document.addEventListener('touchstart', handleTouchStart, { passive: false });
-                document.addEventListener('touchmove', handleTouchMove, { passive: false });
-                document.addEventListener('touchend', handleTouchEnd, { passive: false });
+                // Removed in-app pull-to-refresh event listeners
 
                 // Handle orientation changes
                 window.addEventListener('orientationchange', function () {
