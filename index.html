@@ -941,6 +941,16 @@
             }
         }
 
+        /* Inventory page date inputs: uniform and spaced */
+        #invFilterFrom,
+        #invFilterTo,
+        #invDate,
+        #invTime {
+            width: 100%;
+            max-width: 220px;
+            margin-top: 4px;
+        }
+
         .alert-box {
             background: linear-gradient(145deg, #fff3e0, #ffe0b2);
             border-left: 4px solid #e65100;
@@ -5421,7 +5431,7 @@
             const filters = `
                 <div class="card">
                     <h3>Filter</h3>
-                    <div class="grid-2" style="gap:8px;">
+                    <div class="grid-2" style="gap:12px;">
                         <div>
                             <label>Term</label>
                             <select id="invFilterTerm" onchange="updateInventoryFilter('termNumber', this.value)">${cycleOptions}</select>
@@ -5471,7 +5481,7 @@
             const cycleOptions = cycles.map(c => `<option value="${c.number}">Term ${c.number} ${c.title ? '– ' + c.title : ''}</option>`).join('');
 
             content.innerHTML = `
-                <div class="grid-2" style="gap:8px;">
+                <div class="grid-2" style="gap:12px;">
                     <div>
                         <label>Product</label>
                         <select id="invProductSelect">${productOptions}</select>
@@ -5514,24 +5524,24 @@
                     </div>
                 </div>
 
-                <div class="card" style="margin-top:12px;">
-                    <h3>Term</h3>
-                    <div class="flex-gap">
-                        <label style="display:flex;align-items:center;gap:8px;">
-                            <input id="invCreateNewTerm" type="checkbox" checked>
-                            Create new term (recommended)
-                        </label>
-                        <div>
-                            <label>Existing Term</label>
-                            <select id="invTermSelect"><option value="">—</option>${cycleOptions}</select>
-                        </div>
-                        <div>
-                            <label>New Term Title</label>
-                            <input id="invNewTermTitle" type="text" value="${defaultTitle}">
+                    <div class="card" style="margin-top:12px;">
+                        <h3>Term</h3>
+                        <div class="flex-gap">
+                            <label style="display:flex;align-items:center;gap:8px;">
+                                <input id="invCreateNewTerm" type="checkbox" checked>
+                                Create new term (recommended)
+                            </label>
+                            <div>
+                                <label>Existing Term</label>
+                                <select id="invTermSelect"><option value="">—</option>${cycleOptions}</select>
+                            </div>
+                            <div>
+                                <label>New Term Title</label>
+                                <input id="invNewTermTitle" type="text" value="${defaultTitle}">
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
 
             // Auto-update total cost
             setTimeout(() => {
