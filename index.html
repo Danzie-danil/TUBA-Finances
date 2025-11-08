@@ -1419,6 +1419,10 @@
                 <span class="side-nav-icon">📦</span>
                 <span>Inventory</span>
             </div>
+            <div class="side-nav-item" onclick="navigateToTab('inventoryPurchases')">
+                <span class="side-nav-icon">📦</span>
+                <span>Inventory</span>
+            </div>
             <div class="side-nav-item" onclick="navigateToTab('customers')">
                 <span class="side-nav-icon">👥</span>
                 <span>Customers</span>
@@ -1516,6 +1520,18 @@
         <div class="modal-content">
             <div class="modal-title">Set Initial Float</div>
             <div id="floatModalContent"></div>
+        </div>
+    </div>
+
+    <!-- Inventory Purchase Modal -->
+    <div class="modal" id="inventoryModal">
+        <div class="modal-content">
+            <div class="modal-title">Add Inventory Purchase</div>
+            <div id="inventoryModalContent"></div>
+            <div class="flex-gap" style="margin-top:12px;">
+                <button class="btn-success btn-small" onclick="addInventoryRecord()">Save Purchase</button>
+                <button class="btn-secondary btn-small" onclick="closeInventoryModal()">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -2239,6 +2255,38 @@
                     await supabase.from('notes').insert(notesData);
                 }
 
+                // Sync inventory purchase terms (cycles)
+                if (state.inventoryPurchaseCycles && state.inventoryPurchaseCycles.length > 0) {
+                    const cyclesData = state.inventoryPurchaseCycles.map(c => ({
+                        user_id: currentUser.id,
+                        cycle_number: c.number,
+                        title: c.title || '',
+                        start_date: c.startDate || null,
+                        end_date: c.endDate || null,
+                        notes: c.notes || ''
+                    }));
+                    await supabase.from('inventory_purchase_cycles').insert(cyclesData);
+                }
+
+                // Sync inventory purchases
+                if (state.inventoryPurchases && state.inventoryPurchases.length > 0) {
+                    const purchasesData = state.inventoryPurchases.map(p => ({
+                        user_id: currentUser.id,
+                        cycle_number: p.cycleNumber,
+                        item_name: p.itemName,
+                        quantity: p.quantity || 0,
+                        unit_cost: p.unitCost || p.buyingPrice || 0,
+                        total_cost: p.totalCost || p.buyingPrice || 0,
+                        purchase_date: p.purchaseDate,
+                        supplier_name: p.supplierName || '',
+                        supplier_phone: p.supplierPhone || p.supplierContact || '',
+                        supplier_address: p.supplierAddress || '',
+                        notes: p.notes || '',
+                        timestamp: p.timestamp
+                    }));
+                    await supabase.from('inventory_purchases').insert(purchasesData);
+                }
+
                 // Sync transactions
                 if (state.transactions.length > 0) {
                     const transactionsData = state.transactions.map(t => ({
@@ -2354,7 +2402,9 @@
                     supabase.from('transactions').delete().eq('user_id', currentUser.id),
                     supabase.from('unpaid_entries').delete().eq('user_id', currentUser.id),
                     supabase.from('transaction_floats').delete().eq('user_id', currentUser.id),
-                    supabase.from('settings').delete().eq('user_id', currentUser.id)
+                    supabase.from('settings').delete().eq('user_id', currentUser.id),
+                    supabase.from('inventory_purchase_cycles').delete().eq('user_id', currentUser.id),
+                    supabase.from('inventory_purchases').delete().eq('user_id', currentUser.id)
                 ]);
 
                 console.log('✅ Cloud data cleared');
@@ -2613,6 +2663,44 @@
                     state.monthlyTarget = parseFloat(settings.monthly_target || 0);
                 }
 
+                // Inventory purchase terms (cycles)
+                const { data: cloudCycles } = await supabase
+                    .from('inventory_purchase_cycles')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (cloudCycles && cloudCycles.length > 0) {
+                    state.inventoryPurchaseCycles = cloudCycles.map(c => ({
+                        id: generateID('invCycle'),
+                        number: c.cycle_number,
+                        title: c.title || '',
+                        startDate: c.start_date || '',
+                        endDate: c.end_date || '',
+                        notes: c.notes || ''
+                    }));
+                }
+
+                // Inventory purchases
+                const { data: cloudPurchases } = await supabase
+                    .from('inventory_purchases')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (cloudPurchases && cloudPurchases.length > 0) {
+                    state.inventoryPurchases = cloudPurchases.map(p => ({
+                        id: generateID('invPurchase'),
+                        cycleNumber: p.cycle_number,
+                        itemName: p.item_name,
+                        quantity: parseInt(p.quantity || 0, 10),
+                        unitCost: parseFloat(p.unit_cost || 0),
+                        totalCost: parseFloat(p.total_cost || 0),
+                        purchaseDate: p.purchase_date || '',
+                        supplierName: p.supplier_name || '',
+                        supplierPhone: p.supplier_phone || '',
+                        supplierAddress: p.supplier_address || '',
+                        notes: p.notes || '',
+                        timestamp: p.timestamp
+                    }));
+                }
+
                 calculateFloatBalances();
                 saveData();
                 setTimeout(() => {
@@ -2657,6 +2745,12 @@
                 airtel: { initial: 0, current: 0 },
                 halopesa: { initial: 0, current: 0 },
                 yas: { initial: 0, current: 0 }
+            },
+            inventoryFilters: {
+                termNumber: '',
+                supplier: '',
+                dateFrom: '',
+                dateTo: ''
             },
             searchTerm: '',
             filterDateFrom: '',
@@ -2877,8 +2971,9 @@
             { id: 'categories', label: 'Categories', icon: '📁' },
             { id: 'expenses', label: 'Expenses', icon: '💸' },
             { id: 'inventory', label: 'Stock', icon: '📦' },
+            { id: 'inventoryPurchases', label: 'Inventory', icon: '📦' },
             { id: 'customers', label: 'Customers', icon: '👥' },
-            { id: 'invoices', label: 'Invoices & Receipts', icon: '📄' }, ,
+            { id: 'invoices', label: 'Invoices & Receipts', icon: '📄' },
             { id: 'analytics', label: 'Analytics', icon: '📈' },
             { id: 'unpaid', label: 'Unpaid', icon: '⏳' },
             { id: 'notes', label: 'Notes', icon: '📝' }
@@ -5060,6 +5155,353 @@
             }).join('') || '<p style="text-align: center; color: #666;">No stock-tracked items yet</p>'}
                 </div>
             `;
+        }
+
+        // Unified Inventory Tab: Purchases + Stock
+        function renderInventoryTab() {
+            // Summary
+            const purchases = (state.inventoryPurchases || []);
+            const cycles = (state.inventoryPurchaseCycles || []);
+            const totalSpent = purchases.reduce((s, p) => s + (Number(p.totalCost) || Number(p.buyingPrice) || 0), 0);
+            const uniqueSuppliers = Array.from(new Set(purchases.map(p => (p.supplierName || '').trim()).filter(Boolean))).length;
+
+            // Filters
+            const filter = state.inventoryFilters || {};
+            const cycleOptions = cycles.length > 0
+                ? `<option value="">All Terms</option>` + cycles.map(c => `<option value="${c.number}">Term ${c.number} ${c.title ? '– ' + c.title : ''}</option>`).join('')
+                : '<option value="">No terms yet</option>';
+
+            // Filtered purchases
+            const filtered = purchases.filter(p => {
+                const matchTerm = !filter.termNumber || String(p.cycleNumber) === String(filter.termNumber);
+                const matchSupplier = !filter.supplier || (p.supplierName || '').toLowerCase().includes(filter.supplier.toLowerCase());
+                const df = filter.dateFrom ? new Date(filter.dateFrom).getTime() : null;
+                const dt = filter.dateTo ? new Date(filter.dateTo).getTime() : null;
+                const ts = p.timestamp || (p.purchaseDate ? new Date(p.purchaseDate).getTime() : 0);
+                const matchDate = (!df || ts >= df) && (!dt || ts <= dt);
+                return matchTerm && matchSupplier && matchDate;
+            });
+
+            // Group by term
+            const groupedHTML = cycles.map(cycle => {
+                const cps = filtered.filter(p => p.cycleNumber === cycle.number);
+                const cycleTotal = cps.reduce((sum, p) => sum + (Number(p.totalCost) || Number(p.buyingPrice) || 0), 0);
+                const cycleStart = cycle.startDate || (cps[0]?.purchaseDate) || '';
+                const nextCycle = cycles.find(c => c.number === cycle.number + 1);
+                const cycleEnd = cycle.endDate || (nextCycle?.startDate) || '';
+                let lastedText = '';
+                if (cycleStart && cycleEnd) {
+                    const days = Math.round((new Date(cycleEnd).getTime() - new Date(cycleStart).getTime()) / (1000 * 60 * 60 * 24));
+                    if (!isNaN(days)) lastedText = `Lasted: ${days} day${days === 1 ? '' : 's'}`;
+                }
+                return `
+                    <div class="card">
+                        <div class="flex-between">
+                            <h2>Term ${cycle.number} ${cycle.title ? '– ' + cycle.title : ''}</h2>
+                            <div class="flex-gap">
+                                <span class="badge">Items: ${cps.length}</span>
+                                <span class="badge">Spent: ${formatNumber(cycleTotal)} Tsh</span>
+                                ${lastedText ? `<span class="badge">${lastedText}</span>` : ''}
+                                <button class="btn-small" onclick="downloadInventoryCyclePDF(${cycle.number})">📥 Term PDF</button>
+                            </div>
+                        </div>
+                        ${cps.length === 0 ? '<p style="color:#666">No purchases in this term</p>' : cps.map(p => `
+                            <div class="item">
+                                <div class="item-header">
+                                    <span class="item-title">${p.itemName} × ${p.quantity || 1}</span>
+                                    <span class="item-subtitle">${p.purchaseDate || ''} ${p.time || ''}</span>
+                                </div>
+                                <div class="item-subtitle">
+                                    Unit: ${formatNumber(p.unitCost || p.buyingPrice)} Tsh | Total: ${formatNumber(p.totalCost || (p.buyingPrice || 0))} Tsh<br>
+                                    Supplier: ${p.supplierName || ''} ${p.supplierPhone ? '(' + p.supplierPhone + ')' : ''}<br>
+                                    ${p.supplierAddress || ''}
+                                    ${p.notes ? `<br>Notes: ${p.notes}` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }).join('');
+
+            // Build UI
+            const summary = `
+                <div class="card">
+                    <div class="flex-between">
+                        <h2>Inventory</h2>
+                        <div class="flex-gap">
+                            <button class="btn-success" onclick="openInventoryModal()">➕ Add Inventory Purchase</button>
+                            <button class="btn-small" onclick="generateInventoryReport('csv')">📥 Generate Report (CSV)</button>
+                            <button class="btn-small" onclick="downloadInventoryPurchasesReportPDF()">📄 Generate Report (PDF)</button>
+                        </div>
+                    </div>
+                    <div class="flex-gap" style="margin-top:8px;">
+                        <span class="badge">Purchases: ${purchases.length}</span>
+                        <span class="badge">Suppliers: ${uniqueSuppliers}</span>
+                        <span class="badge">Total Spent: ${formatNumber(totalSpent)} Tsh</span>
+                    </div>
+                </div>`;
+
+            const filters = `
+                <div class="card">
+                    <h3>Filter</h3>
+                    <div class="grid-2" style="gap:8px;">
+                        <div>
+                            <label>Term</label>
+                            <select id="invFilterTerm" onchange="updateInventoryFilter('termNumber', this.value)">${cycleOptions}</select>
+                        </div>
+                        <div>
+                            <label>Supplier</label>
+                            <input id="invFilterSupplier" type="text" value="${filter.supplier || ''}" placeholder="Supplier name" oninput="updateInventoryFilter('supplier', this.value)">
+                        </div>
+                        <div>
+                            <label>From</label>
+                            <input id="invFilterFrom" type="date" value="${filter.dateFrom || ''}" onchange="updateInventoryFilter('dateFrom', this.value)">
+                        </div>
+                        <div>
+                            <label>To</label>
+                            <input id="invFilterTo" type="date" value="${filter.dateTo || ''}" onchange="updateInventoryFilter('dateTo', this.value)">
+                        </div>
+                    </div>
+                </div>`;
+
+            // Embed the existing stock view
+            const stock = renderInventory();
+
+            return summary + filters + (groupedHTML || '<p style="text-align:center;color:#666;">No terms yet. Add an inventory purchase to create a new term.</p>') + stock;
+        }
+
+        function updateInventoryFilter(key, value) {
+            state.inventoryFilters = state.inventoryFilters || {};
+            state.inventoryFilters[key] = value;
+            saveData();
+            render();
+        }
+
+        function openInventoryModal() {
+            const modal = document.getElementById('inventoryModal');
+            const content = document.getElementById('inventoryModalContent');
+            if (!modal || !content) return;
+            const products = state.products || [];
+            const productOptions = products.length > 0
+                ? products.map(p => `<option value="${p.name}">${p.name}</option>`).join('')
+                : '<option value="">No products found</option>';
+            const cycles = state.inventoryPurchaseCycles || [];
+            const nextTermNumber = (cycles?.length || 0) + 1;
+            const defaultTitle = new Date().toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + ' Term';
+            const cycleOptions = cycles.map(c => `<option value="${c.number}">Term ${c.number} ${c.title ? '– ' + c.title : ''}</option>`).join('');
+
+            content.innerHTML = `
+                <div class="grid-2" style="gap:8px;">
+                    <div>
+                        <label>Product</label>
+                        <select id="invProductSelect">${productOptions}</select>
+                    </div>
+                    <div>
+                        <label>Quantity</label>
+                        <input id="invQuantity" type="number" min="1" step="1" value="1">
+                    </div>
+                    <div>
+                        <label>Unit Cost (Tsh)</label>
+                        <input id="invUnitCost" type="number" min="0" step="0.01" placeholder="0.00">
+                    </div>
+                    <div>
+                        <label>Total Cost (auto)</label>
+                        <input id="invTotalCost" type="number" min="0" step="0.01" placeholder="0.00" disabled>
+                    </div>
+                    <div>
+                        <label>Supplier Name</label>
+                        <input id="invSupplierName" type="text" placeholder="Supplier name">
+                    </div>
+                    <div>
+                        <label>Supplier Phone</label>
+                        <input id="invSupplierPhone" type="text" placeholder="Phone">
+                    </div>
+                    <div class="grid-span-2">
+                        <label>Supplier Address</label>
+                        <input id="invSupplierAddress" type="text" placeholder="Address">
+                    </div>
+                    <div>
+                        <label>Date</label>
+                        <input id="invDate" type="date" value="${getTodayDateString()}">
+                    </div>
+                    <div>
+                        <label>Time</label>
+                        <input id="invTime" type="time" value="${new Date().toISOString().slice(11,16)}">
+                    </div>
+                    <div class="grid-span-2">
+                        <label>Notes (optional)</label>
+                        <input id="invNotes" type="text" placeholder="Notes">
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top:12px;">
+                    <h3>Term</h3>
+                    <div class="flex-gap">
+                        <label style="display:flex;align-items:center;gap:8px;">
+                            <input id="invCreateNewTerm" type="checkbox" checked>
+                            Create new term (recommended)
+                        </label>
+                        <div>
+                            <label>Existing Term</label>
+                            <select id="invTermSelect"><option value="">—</option>${cycleOptions}</select>
+                        </div>
+                        <div>
+                            <label>New Term Title</label>
+                            <input id="invNewTermTitle" type="text" value="${defaultTitle}">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Auto-update total cost
+            setTimeout(() => {
+                const qtyEl = document.getElementById('invQuantity');
+                const unitEl = document.getElementById('invUnitCost');
+                const totalEl = document.getElementById('invTotalCost');
+                function updateTotal() {
+                    const q = parseFloat(qtyEl.value || '0');
+                    const u = parseFloat(unitEl.value || '0');
+                    const t = (!isNaN(q) && !isNaN(u)) ? (q * u) : 0;
+                    totalEl.value = t.toFixed(2);
+                }
+                qtyEl?.addEventListener('input', updateTotal);
+                unitEl?.addEventListener('input', updateTotal);
+                updateTotal();
+            }, 0);
+
+            modal.classList.add('show');
+        }
+
+        function closeInventoryModal() {
+            const modal = document.getElementById('inventoryModal');
+            if (modal) modal.classList.remove('show');
+        }
+
+        function ensureTermCreated(purchaseDate, time, titleHint) {
+            state.inventoryPurchaseCycles = state.inventoryPurchaseCycles || [];
+            const nextNumber = (state.inventoryPurchaseCycles.length || 0) + 1;
+            const title = titleHint || (new Date(purchaseDate).toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + ' Term');
+            const cycle = {
+                id: generateID('invCycle'),
+                number: nextNumber,
+                title,
+                startDate: purchaseDate,
+                endDate: '',
+                notes: ''
+            };
+            state.inventoryPurchaseCycles.push(cycle);
+            return nextNumber;
+        }
+
+        async function addInventoryRecord() {
+            const productName = (document.getElementById('invProductSelect')?.value || '').trim();
+            const quantity = parseInt(document.getElementById('invQuantity')?.value || '0', 10);
+            const unitCost = parseFloat(document.getElementById('invUnitCost')?.value || '0');
+            const totalCost = parseFloat(document.getElementById('invTotalCost')?.value || '0');
+            const supplierName = (document.getElementById('invSupplierName')?.value || '').trim();
+            const supplierPhone = (document.getElementById('invSupplierPhone')?.value || '').trim();
+            const supplierAddress = (document.getElementById('invSupplierAddress')?.value || '').trim();
+            const purchaseDate = document.getElementById('invDate')?.value || getTodayDateString();
+            const time = document.getElementById('invTime')?.value || new Date().toISOString().slice(11,16);
+            const notes = (document.getElementById('invNotes')?.value || '').trim();
+            const createNew = !!(document.getElementById('invCreateNewTerm')?.checked);
+            const selectedTerm = document.getElementById('invTermSelect')?.value || '';
+            const newTermTitle = (document.getElementById('invNewTermTitle')?.value || '').trim();
+
+            if (!productName) return showToast('Select a product', 'error');
+            if (!quantity || quantity <= 0) return showToast('Enter a valid quantity', 'error');
+            if (isNaN(unitCost) || unitCost <= 0) return showToast('Enter unit cost', 'error');
+
+            // Determine term number
+            let cycleNumber = selectedTerm ? parseInt(selectedTerm, 10) : null;
+            if (createNew || !cycleNumber) {
+                cycleNumber = ensureTermCreated(purchaseDate, time, newTermTitle);
+            }
+
+            const timestamp = Date.now();
+            const record = {
+                id: generateID('invPurchase'),
+                cycleNumber,
+                itemName: productName,
+                quantity,
+                unitCost,
+                totalCost: (isNaN(totalCost) || totalCost === 0) ? (quantity * unitCost) : totalCost,
+                supplierName,
+                supplierPhone,
+                supplierAddress,
+                purchaseDate,
+                time,
+                notes,
+                timestamp
+            };
+
+            state.inventoryPurchases = state.inventoryPurchases || [];
+            state.inventoryPurchases.push(record);
+
+            // Update product stock locally
+            updateProductStock(productName, quantity);
+
+            // Record as an expense (office money usage)
+            const expense = {
+                id: generateID('expenses'),
+                date: purchaseDate,
+                time,
+                timestamp,
+                description: `Inventory: ${productName} × ${quantity}`,
+                category: 'Inventory Purchase',
+                amount: record.totalCost,
+                payment: 'cash',
+                comment: `Term ${cycleNumber}`
+            };
+            state.expenses.push(expense);
+
+            saveData();
+            closeInventoryModal();
+            render();
+            showToast('Inventory purchase saved', 'success');
+
+            if (syncEnabled) syncInBackground();
+        }
+
+        function updateProductStock(productName, quantity) {
+            if (!productName || !quantity) return;
+            state.inventory = state.inventory || {};
+            const inv = state.inventory[productName] || { stock: 0, minAlert: 5 };
+            inv.stock = (parseInt(inv.stock || 0, 10) + parseInt(quantity || 0, 10));
+            state.inventory[productName] = inv;
+        }
+
+        function generateInventoryReport(format = 'csv') {
+            const purchases = state.inventoryPurchases || [];
+            const cycles = state.inventoryPurchaseCycles || [];
+            if (format === 'csv') {
+                const headers = ['Product','Quantity','UnitCost','TotalCost','Supplier','Phone','Address','Term','Date','Time'];
+                const rows = purchases.map(p => [
+                    p.itemName,
+                    p.quantity || 0,
+                    (p.unitCost || p.buyingPrice || 0),
+                    (p.totalCost || p.buyingPrice || 0),
+                    p.supplierName || '',
+                    p.supplierPhone || p.supplierContact || '',
+                    p.supplierAddress || '',
+                    p.cycleNumber,
+                    p.purchaseDate || '',
+                    p.time || ''
+                ]);
+                const csv = [headers.join(','), ...rows.map(r => r.map(v => String(v).replace(/\n/g,' ').replace(/,/g,';')).join(','))].join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Inventory_Report_${getTodayDateString()}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                showToast('CSV report downloaded', 'success');
+            } else {
+                downloadInventoryPurchasesReportPDF();
+            }
         }
 
         function adjustStock(productName, amount) {
@@ -7933,6 +8375,7 @@
                 case 'categories': app.innerHTML = renderCategories(); break;
                 case 'expenses': app.innerHTML = renderExpenses(); break;
                 case 'inventory': app.innerHTML = renderInventory(); break;
+                case 'inventoryPurchases': app.innerHTML = renderInventoryTab(); break;
                 case 'customers': app.innerHTML = renderCustomers(); break;
                 case 'invoices': app.innerHTML = renderInvoices(); break;
                 case 'analytics':
