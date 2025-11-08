@@ -3670,14 +3670,20 @@
                     <label>Product/Service</label>
                     <select id="saleProduct" onchange="updateSaleTotal()" required>
                         <option value="">-- Select Product --</option>
-                        ${state.products.map((p, i) => { const stockText = (p.hasStock === false) ? 'N/A' : ((state.inventory[p.name] || { stock: 0 }).stock); const typeTag = p.hasStock === false ? '[Service]' : '[Product]'; return `<option value="${i}">${p.name} - ${p.category} ${typeTag}${p.hasStock === false ? '' : ` (Stock: ${stockText})`}</option>`; }).join('')}
+                        ${state.products
+                            .map((p, i) => ({ p, i }))
+                            .sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)))
+                            .map(({ p, i }) => { const stockText = (p.hasStock === false) ? 'N/A' : ((state.inventory[p.name] || { stock: 0 }).stock); const typeTag = p.hasStock === false ? '[Service]' : '[Product]'; return `<option value="${i}">${p.name} - ${p.category} ${typeTag}${p.hasStock === false ? '' : ` (Stock: ${stockText})`}</option>`; }).join('')}
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Customer</label>
                     <select id="saleCustomer" onchange="toggleCustomerInput()">
                         <option value="">-- Walk-in --</option>
-                        ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+                        ${state.customers
+                            .map((c, i) => ({ c, i }))
+                            .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
+                            .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
                         <option value="new">+ Add New Customer</option>
                     </select>
                 </div>
@@ -3730,7 +3736,10 @@
                     <label>Customer</label>
                     <select onchange="updateFilterCustomer(this.value)">
                         <option value="">All Customers</option>
-                        ${[...new Set(state.sales.map(s => s.customer))].map(c =>
+                        ${[...new Set(state.sales.map(s => s.customer))]
+                .filter(c => !!c)
+                .sort((a,b)=>String(a).localeCompare(String(b)))
+                .map(c =>
                 `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
             ).join('')}
                     </select>
@@ -4512,7 +4521,7 @@
                             <label>Category</label>
                             <select id="productCategory" required>
                                 <option value="">-- Select Category --</option>
-                                ${state.categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                                ${state.categories.slice().sort((a,b)=>String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join('')}
                             </select>
                         </div>
                         <div class="form-group">
@@ -4991,7 +5000,10 @@
                         <input type="date" placeholder="To" onchange="updateFilterDateTo(this.value)" value="${state.filterDateTo || ''}">
                         <select onchange="updateFilterCategory(this.value)">
                             <option value="">All Categories</option>
-                            ${[...new Set(state.expenses.map(e => e.category))].map(c =>
+                            ${[...new Set(state.expenses.map(e => e.category))]
+                .filter(c => !!c)
+                .sort((a,b)=>String(a).localeCompare(String(b)))
+                .map(c =>
                 `<option value="${c}" ${state.filterCategory === c ? 'selected' : ''}>${c}</option>`
             ).join('')}
                         </select>
@@ -5281,9 +5293,12 @@
             const modal = document.getElementById('inventoryModal');
             const content = document.getElementById('inventoryModalContent');
             if (!modal || !content) return;
-            const products = state.products || [];
+            const products = (state.products || []).filter(p => p.hasStock !== false);
             const productOptions = products.length > 0
-                ? products.map(p => `<option value="${p.name}">${p.name}</option>`).join('')
+                ? products
+                    .slice()
+                    .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+                    .map(p => `<option value="${p.name}">${p.name}</option>`).join('')
                 : '<option value="">No products found</option>';
             const cycles = state.inventoryPurchaseCycles || [];
             const nextTermNumber = (cycles?.length || 0) + 1;
@@ -5775,7 +5790,10 @@
                     <label>Customer</label>
                     <select id="invoiceCustomer" onchange="toggleInvoiceCustomerInput()" required>
                         <option value="">-- Select Customer --</option>
-                        ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+                        ${state.customers
+                            .map((c, i) => ({ c, i }))
+                            .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
+                            .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
                         <option value="new">+ Add New Customer</option>
                     </select>
                 </div>
@@ -5837,7 +5855,10 @@
         <label>Received From</label>
         <select id="receiptCustomer" onchange="updateReceiptFromCustomer()" required>
             <option value="">-- Select Customer --</option>
-            ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+            ${state.customers
+                .map((c, i) => ({ c, i }))
+                .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
+                .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
             <option value="manual">✏️ Enter Manually</option>
         </select>
     </div>
@@ -7164,7 +7185,10 @@
                             <label>Customer</label>
                             <select id="unpaidCustomer">
                                 <option value="">-- Select Customer --</option>
-                                ${state.customers.map((c, i) => `<option value="${i}">${c.name}</option>`).join('')}
+                                ${state.customers
+                                    .map((c, i) => ({ c, i }))
+                                    .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
+                                    .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
                             </select>
                         </div>
                         <div class="form-group">
@@ -8742,7 +8766,10 @@
                     <label>Product</label>
                     <select id="saleProduct" onchange="handleProductSelection()" required>
                         <option value="">-- Select Product --</option>
-                        ${state.products.map((p, i) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || { stock: 0 }).stock})</option>`).join('')}
+                        ${state.products
+                            .map((p, i) => ({ p, i }))
+                            .sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)))
+                            .map(({ p, i }) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || { stock: 0 }).stock})</option>`).join('')}
                         <option value="new" style="background: #e3f2fd; font-weight: 600;">+ Add New Product</option>
                     </select>
                 </div>
@@ -8756,7 +8783,7 @@
                         <label>Category</label>
                         <select id="newProductCategory" onchange="handleCategorySelection()">
                             <option value="">-- Select Category --</option>
-                            ${state.categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                            ${state.categories.slice().sort((a,b)=>String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join('')}
                             <option value="new" style="background: #fff3e0; font-weight: 600;">+ Add New Category</option>
                         </select>
                     </div>
