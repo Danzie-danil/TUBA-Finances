@@ -3049,32 +3049,33 @@
             return { dataUrl, format };
         }
 
-        // Draw logo with rounded enclosure/border
+        // Draw logo inside a circular placeholder, clipped to the circle and filling it
         function drawLogo(doc, x, y, size, options = {}) {
             const logo = getLogoForPdf();
             if (!logo) return false;
 
             const {
-                borderRadius = Math.min(8, size / 2),
                 borderColor = [180, 180, 180],
-                borderWidth = 1,
-                backgroundColor = [255, 255, 255],
-                padding = 3
+                borderWidth = 1
             } = options;
 
-            try {
-                // Background rounded box
-                doc.setFillColor(...backgroundColor);
-                doc.roundedRect(x, y, size, size, borderRadius, borderRadius, 'F');
+            const cx = x + size / 2;
+            const cy = y + size / 2;
+            const r = size / 2;
 
-                // Border
+            try {
+                // Clip to circle and draw image to fully fill the circle
+                doc.saveGraphicsState();
+                doc.beginPath();
+                doc.circle(cx, cy, r);
+                doc.clip();
+                doc.addImage(logo.dataUrl, logo.format, x, y, size, size);
+                doc.restoreGraphicsState();
+
+                // Circle border on top
                 doc.setDrawColor(...borderColor);
                 doc.setLineWidth(borderWidth);
-                doc.roundedRect(x, y, size, size, borderRadius, borderRadius, 'S');
-
-                // Image (contained inside with padding)
-                const innerSize = Math.max(0, size - padding * 2);
-                doc.addImage(logo.dataUrl, logo.format, x + padding, y + padding, innerSize, innerSize);
+                doc.circle(cx, cy, r, 'S');
                 return true;
             } catch (e) {
                 console.warn('Logo draw error:', e);
