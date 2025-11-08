@@ -2072,6 +2072,11 @@
                         delete content.id;
                         delete content.created_at;
                         delete content.updated_at;
+                        // Strip DB-only ownership/meta fields to compare local vs cloud consistently
+                        delete content.user_id;
+                        delete content.userId;
+                        delete content.inserted_at;
+                        delete content.deleted_at;
                         return JSON.stringify(content);
                     };
 
@@ -2100,13 +2105,22 @@
                 };
 
                 // Merge each array with proper data type identification
-                state.sales = mergeByID(localData.sales, cloudData.sales, 'sale');
-                state.products = mergeByID(localData.products, cloudData.products, 'product');
-                state.expenses = mergeByID(localData.expenses, cloudData.expenses, 'expense');
-                state.customers = mergeByID(localData.customers, cloudData.customers, 'customer');
-                state.transactions = mergeByID(localData.transactions, cloudData.transactions, 'transaction');
+                state.sales = mergeByID(localData.sales, cloudData.sales, 'sales');
+                state.products = mergeByID(localData.products, cloudData.products, 'products');
+                state.expenses = mergeByID(localData.expenses, cloudData.expenses, 'expenses');
+                state.customers = mergeByID(localData.customers, cloudData.customers, 'customers');
+                state.transactions = mergeByID(localData.transactions, cloudData.transactions, 'transactions');
                 state.unpaidEntries = mergeByID(localData.unpaidEntries, cloudData.unpaidEntries, 'unpaid');
-                state.notes = mergeByID(localData.notes, cloudData.notes, 'note');
+                state.notes = mergeByID(localData.notes, cloudData.notes, 'notes');
+
+                // Final pass: content-based deduplication per type
+                state.sales = deduplicateByContent(state.sales, 'sales');
+                state.products = deduplicateByContent(state.products, 'products');
+                state.expenses = deduplicateByContent(state.expenses, 'expenses');
+                state.customers = deduplicateByContent(state.customers, 'customers');
+                state.transactions = deduplicateByContent(state.transactions, 'transactions');
+                state.unpaidEntries = deduplicateByContent(state.unpaidEntries, 'unpaid');
+                state.notes = deduplicateByContent(state.notes, 'notes');
 
                 console.log('🔀 Merged data counts:', {
                     sales: state.sales.length,
@@ -3563,6 +3577,10 @@
 
             <button onclick="syncAllData()" class="btn" style="margin-bottom: 12px;">
                 🔄 Smart Sync
+            </button>
+
+            <button onclick="cleanDuplicatesFromUI()" class="btn-danger" style="margin-bottom: 12px;">
+                🧹 Clean Cloud Duplicates
             </button>
             
             <!-- Removed in-app dashboard refresh button -->
@@ -8758,22 +8776,16 @@
             showToast('🧹 Starting cleanup...', 'info');
             updateSyncIndicator('syncing');
 
-            const lists = ['sales', 'products', 'expenses', 'customers', 'transactions', 'unpaidEntries', 'notes'];
-            let localRemoved = 0;
-
-            lists.forEach(listName => {
-                if (!Array.isArray(state[listName])) return;
-                const before = state[listName].length;
-                state[listName] = removeDuplicatesByID(state[listName]);
-                const after = state[listName].length;
-                localRemoved += before - after;
-            });
-
-            saveData();
-            await pushAllDataToSupabase();
-
-            updateSyncIndicator('synced');
-            showToast(`✅ Removed ${localRemoved} duplicates!`, 'success');
+            // Delegate to comprehensive cleaner (content-based + clear-and-push)
+            try {
+                const result = await cleanAllDuplicates();
+                updateSyncIndicator('synced');
+                showToast(`✅ Removed ${result.totalRemoved} duplicates!`, 'success');
+            } catch (e) {
+                console.error('Cleanup error:', e);
+                updateSyncIndicator('synced');
+                showToast('❌ Cleanup failed', 'error');
+            }
         }
 
         function exportData() {
