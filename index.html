@@ -903,6 +903,18 @@
             cursor: pointer;
         }
 
+        /* Date input sizing: prevent overflow outside cards */
+        input[type="date"] {
+            width: 100%;
+            max-width: 220px; /* keep compact across devices */
+            box-sizing: border-box;
+        }
+        .form-group input[type="date"],
+        .filter-row input[type="date"] {
+            flex: 0 1 220px; /* allow shrink/grow but cap width */
+            min-width: 0;    /* avoid flex min-content overflow */
+        }
+
         .alert-box {
             background: linear-gradient(145deg, #fff3e0, #ffe0b2);
             border-left: 4px solid #e65100;
@@ -1131,6 +1143,11 @@
             .filter-row input,
             .filter-row select {
                 width: 100%;
+            }
+            .form-group input[type="date"],
+            .filter-row input[type="date"] {
+                max-width: 100%;
+                flex: 1 1 auto;
             }
         }
 
@@ -1748,6 +1765,19 @@
                         phone: data.phone || "",
                         address: data.address || ""
                     };
+                    if (data.logo_url) {
+                        state.userLogoPublicUrl = data.logo_url;
+                        try {
+                            const res = await fetch(data.logo_url);
+                            const blob = await res.blob();
+                            const reader = new FileReader();
+                            const base64 = await new Promise((resolve, reject) => { reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
+                            state.userLogoDataUrl = base64;
+                            state.userLogoMime = blob.type.includes('png') ? 'image/png' : 'image/jpeg';
+                        } catch (e) {
+                            console.warn('Failed to hydrate logo from URL:', e);
+                        }
+                    }
                     state.profileEditMode = false;
                     state.profileLoaded = true;
                     saveData();
@@ -1779,7 +1809,8 @@
                         business_name: state.userProfile.businessName,
                         email: state.userProfile.email || currentUser.email,
                         phone: state.userProfile.phone,
-                        address: state.userProfile.address
+                        address: state.userProfile.address,
+                        logo_url: state.userLogoPublicUrl || null
                     });
 
                 if (error) {
@@ -1838,6 +1869,7 @@
                             email: profileData.email,
                             phone: profileData.phone,
                             address: profileData.address,
+                            logo_url: state.userLogoPublicUrl || null,
                             updated_at: new Date().toISOString()
                         }, {
                             onConflict: 'user_id'
@@ -1907,6 +1939,11 @@
 
                 // Load user profile first
                 await loadUserProfile();
+
+                // Upload logo if selected locally
+                if (state.userLogoDataUrl) {
+                    try { await uploadLogoToSupabase(state.userLogoDataUrl, state.userLogoMime || 'image/png'); } catch (e) { console.warn('Logo upload after sign-in failed:', e); }
+                }
 
                 // Check if local data exists
                 const localHasData = state.sales.length > 0 || state.products.length > 0;
@@ -2765,6 +2802,10 @@
                 phone: "",
                 address: ""
             },
+            // User logo
+            userLogoDataUrl: '',
+            userLogoMime: '',
+            userLogoPublicUrl: '',
             profileEditMode: false,
             profileLoaded: false,
             privacyBlurred: true  // ADD THIS LINE
@@ -2871,6 +2912,92 @@
 
             // Always ensure IDs exist
             if (state.sales) ensureIDs();
+        }
+
+        // Logo helpers
+        function triggerLogoUpload() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/png,image/jpeg';
+            input.onchange = async (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                try {
+                    const resized = await resizeImageFile(file, 256);
+                    state.userLogoDataUrl = resized.dataUrl;
+                    state.userLogoMime = resized.mime;
+                    saveData();
+                    render();
+                    if (syncEnabled && currentUser) {
+                        await uploadLogoToSupabase(resized.dataUrl, resized.mime);
+                    }
+                    showToast('Logo saved', 'success');
+                } catch (err) {
+                    console.error('Logo upload error:', err);
+                    showToast('Failed to process logo', 'error');
+                }
+            };
+            input.click();
+        }
+
+        async function resizeImageFile(file, size = 256) {
+            const img = document.createElement('img');
+            const reader = new FileReader();
+            const mime = file.type.includes('png') ? 'image/png' : 'image/jpeg';
+            const dataUrl = await new Promise((resolve, reject) => {
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = dataUrl;
+            });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, size, size);
+            // contain image
+            const ratio = Math.min(size / img.width, size / img.height);
+            const w = Math.round(img.width * ratio);
+            const h = Math.round(img.height * ratio);
+            const x = Math.round((size - w) / 2);
+            const y = Math.round((size - h) / 2);
+            ctx.drawImage(img, x, y, w, h);
+            const outDataUrl = canvas.toDataURL(mime, 0.92);
+            return { dataUrl: outDataUrl, mime };
+        }
+
+        async function uploadLogoToSupabase(dataUrl, mime = 'image/png') {
+            try {
+                if (!supabase || !currentUser) return;
+                const blob = await (await fetch(dataUrl)).blob();
+                const ext = mime === 'image/png' ? 'png' : 'jpg';
+                const path = `${currentUser.id}/logo.${ext}`;
+                const { error: upErr } = await supabase.storage.from('logos').upload(path, blob, { upsert: true, contentType: mime });
+                if (upErr) { console.error('Supabase storage upload error:', upErr); return; }
+                const { data: pub } = supabase.storage.from('logos').getPublicUrl(path);
+                if (pub && pub.publicUrl) {
+                    state.userLogoPublicUrl = pub.publicUrl;
+                    saveData();
+                    // Persist into profile for portability
+                    try {
+                        await supabase.from('user_profiles').update({ logo_url: state.userLogoPublicUrl }).eq('user_id', currentUser.id);
+                    } catch (e) { console.warn('Failed to save logo_url to profile:', e); }
+                }
+            } catch (e) {
+                console.error('Upload logo error:', e);
+            }
+        }
+
+        function getLogoForPdf() {
+            const dataUrl = state.userLogoDataUrl || '';
+            if (!dataUrl) return null;
+            const format = dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            return { dataUrl, format };
         }
 
         function saveData() {
@@ -3302,6 +3429,18 @@
                         <input type="password" id="signupPasswordConfirm" placeholder="••••••••">
                     </div>
                     <button onclick="handleSignUp()">Create Account</button>
+                </div>
+
+                <div class="card" style="margin-top: 12px;">
+                    <h3>🖼️ Business Logo</h3>
+                    <p style="color:#666;font-size:13px;margin-bottom:8px;">Upload your logo (PNG/JPEG). It appears on all PDFs before your business name.</p>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <div id="logoPreview" style="width:64px;height:64px;border-radius:8px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                            ${state.userLogoDataUrl ? `<img src="${state.userLogoDataUrl}" alt="Logo" style="width:100%;height:100%;object-fit:contain;">` : '<span style="font-size:12px;color:#999;">No logo</span>'}
+                        </div>
+                        <button class="btn-secondary" onclick="triggerLogoUpload()">Upload Logo</button>
+                    </div>
+                    <small style="display:block;color:#888;margin-top:6px;">Recommended size: 256×256 px (auto-resized).</small>
                 </div>
 
                 <div class="alert-info">
@@ -5519,6 +5658,254 @@
             }
         }
 
+        // Inventory PDF generators
+        function downloadInventoryPurchasesReportPDF() {
+            try {
+                const { jsPDF } = window.jspdf || {};
+                if (!jsPDF) {
+                    console.error('jsPDF not loaded');
+                    showToast('PDF library not loaded', 'error');
+                    return;
+                }
+                const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const margin = 50;
+                const usableWidth = pageWidth - margin * 2;
+                let y = 120;
+
+                // Header (match Financial Report)
+                doc.setFillColor(26, 26, 26);
+                doc.rect(0, 0, pageWidth, 100, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(24);
+                doc.setFont(undefined, 'bold');
+                const profile = (typeof getUserProfileData === 'function') ? getUserProfileData() : (state.userProfile || { businessName: 'TUBA', address: '', phone: '', email: '' });
+                const logo = getLogoForPdf();
+                const titleX = logo ? (margin + 48) : margin;
+                if (logo) { try { doc.addImage(logo.dataUrl, logo.format, margin, 20, 36, 36); } catch (e) { console.warn('Logo draw error:', e); } }
+                doc.text(profile.businessName || 'TUBA', titleX, 45);
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.text(`${profile.address || ''} | ${profile.phone || ''} | ${profile.email || ''}`, margin, 70);
+                doc.setDrawColor(102, 126, 234);
+                doc.setLineWidth(3);
+                doc.line(margin, 85, pageWidth - margin, 85);
+
+                // Title
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(18);
+                doc.setFont(undefined, 'bold');
+                doc.text('Inventory Purchases Report', margin, y);
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(100, 100, 100);
+                doc.text(`Generated: ${getTodayDateString()}`, margin, y + 20);
+                y += 50;
+
+                const cycles = state.inventoryPurchaseCycles || [];
+                const purchases = state.inventoryPurchases || [];
+
+                const drawTable = (headers, rows, startY) => {
+                    const colCount = headers.length;
+                    const colWidth = usableWidth / colCount;
+                    let curY = startY;
+                    const rowHeight = 20;
+
+                    doc.setFillColor(102, 126, 234);
+                    doc.roundedRect(margin, curY, usableWidth, rowHeight, 3, 3, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont(undefined, 'bold');
+                    doc.setFontSize(10);
+                    for (let i = 0; i < colCount; i++) {
+                        const txtX = margin + i * colWidth + 8;
+                        doc.text(String(headers[i]), txtX, curY + 14);
+                    }
+                    curY += rowHeight + 2;
+
+                    doc.setFont(undefined, 'normal');
+                    doc.setFontSize(9);
+                    for (let r = 0; r < rows.length; r++) {
+                        if (curY + rowHeight > 750) {
+                            doc.addPage();
+                            curY = margin;
+                        }
+                        if (r % 2 === 0) {
+                            doc.setFillColor(248, 249, 250);
+                            doc.roundedRect(margin, curY, usableWidth, rowHeight, 2, 2, 'F');
+                        }
+                        doc.setTextColor(40, 40, 40);
+                        for (let c = 0; c < colCount; c++) {
+                            const txt = rows[r][c] === null || rows[r][c] === undefined ? '' : String(rows[r][c]);
+                            const txtX = margin + c * colWidth + 8;
+                            doc.text(txt, txtX, curY + 14, { maxWidth: colWidth - 16 });
+                        }
+                        curY += rowHeight;
+                    }
+                    return curY + 20;
+                };
+
+                if (cycles.length === 0) {
+                    doc.setFontSize(12);
+                    doc.setFont(undefined, 'normal');
+                    doc.text('No terms found.', margin, y);
+                } else {
+                    cycles.forEach(cycle => {
+                        const cps = purchases.filter(p => p.cycleNumber === cycle.number);
+                        const cycleTotal = cps.reduce((sum, p) => sum + (Number(p.totalCost) || Number(p.buyingPrice) || 0), 0);
+                        if (y > 650) { doc.addPage(); y = margin; }
+                        doc.setFontSize(14);
+                        doc.setFont(undefined, 'bold');
+                        doc.setTextColor(0, 0, 0);
+                        doc.text(`Term ${cycle.number} ${cycle.title ? '– ' + cycle.title : ''}`, margin, y);
+                        doc.setFontSize(10);
+                        doc.setFont(undefined, 'normal');
+                        doc.setTextColor(100, 100, 100);
+                        doc.text(`Items: ${cps.length} | Spent: ${formatNumber(cycleTotal)} Tsh`, margin, y + 16);
+                        y += 36;
+
+                        const headers = ['Date', 'Time', 'Item', 'Qty', 'Unit', 'Total', 'Supplier', 'Phone'];
+                        const rows = cps.map(p => [
+                            p.purchaseDate || '',
+                            p.time || '',
+                            p.itemName,
+                            String(p.quantity || 1),
+                            formatNumber(p.unitCost || p.buyingPrice || 0),
+                            formatNumber(p.totalCost || p.buyingPrice || 0),
+                            p.supplierName || '',
+                            p.supplierPhone || p.supplierContact || ''
+                        ]);
+                        y = drawTable(headers, rows, y);
+                    });
+                }
+
+                // Footer
+                const pageCount = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    doc.setFillColor(240, 240, 240);
+                    doc.rect(0, 792 - 30, pageWidth, 30, 'F');
+                    doc.setTextColor(100, 100, 100);
+                    doc.setFontSize(9);
+                    doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 11);
+                    doc.text(`The Ultimate Business Architecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
+                }
+
+                doc.save(`Inventory_Purchases_${getTodayDateString()}.pdf`);
+                showToast('Inventory report PDF downloaded', 'success');
+            } catch (e) {
+                console.error('Inventory PDF error:', e);
+                showToast('Failed to generate PDF', 'error');
+            }
+        }
+
+        function downloadInventoryCyclePDF(cycleNumber) {
+            try {
+                const { jsPDF } = window.jspdf || {};
+                if (!jsPDF) {
+                    console.error('jsPDF not loaded');
+                    showToast('PDF library not loaded', 'error');
+                    return;
+                }
+                const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const margin = 50;
+                const usableWidth = pageWidth - margin * 2;
+                let y = 120;
+
+                // Header (match Financial Report)
+                doc.setFillColor(26, 26, 26);
+                doc.rect(0, 0, pageWidth, 100, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(24);
+                doc.setFont(undefined, 'bold');
+                const profile = (typeof getUserProfileData === 'function') ? getUserProfileData() : (state.userProfile || { businessName: 'TUBA', address: '', phone: '', email: '' });
+                const logo = getLogoForPdf();
+                const titleX = logo ? (margin + 48) : margin;
+                if (logo) { try { doc.addImage(logo.dataUrl, logo.format, margin, 20, 36, 36); } catch (e) { console.warn('Logo draw error:', e); } }
+                doc.text(profile.businessName || 'TUBA', titleX, 45);
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.text(`${profile.address || ''} | ${profile.phone || ''} | ${profile.email || ''}`, margin, 70);
+                doc.setDrawColor(102, 126, 234);
+                doc.setLineWidth(3);
+                doc.line(margin, 85, pageWidth - margin, 85);
+
+                const cycle = (state.inventoryPurchaseCycles || []).find(c => c.number === cycleNumber);
+                const cps = (state.inventoryPurchases || []).filter(p => p.cycleNumber === cycleNumber);
+                const cycleTotal = cps.reduce((sum, p) => sum + (Number(p.totalCost) || Number(p.buyingPrice) || 0), 0);
+
+                // Title
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(18);
+                doc.setFont(undefined, 'bold');
+                doc.text(`Inventory Term ${cycleNumber} ${cycle?.title ? '– ' + cycle.title : ''}`, margin, y);
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(100, 100, 100);
+                doc.text(`Items: ${cps.length} | Spent: ${formatNumber(cycleTotal)} Tsh`, margin, y + 20);
+                y += 50;
+
+                const headers = ['Date', 'Time', 'Item', 'Qty', 'Unit', 'Total', 'Supplier', 'Phone'];
+                const rows = cps.map(p => [
+                    p.purchaseDate || '',
+                    p.time || '',
+                    p.itemName,
+                    String(p.quantity || 1),
+                    formatNumber(p.unitCost || p.buyingPrice || 0),
+                    formatNumber(p.totalCost || p.buyingPrice || 0),
+                    p.supplierName || '',
+                    p.supplierPhone || p.supplierContact || ''
+                ]);
+
+                // Table
+                const colCount = headers.length;
+                const colWidth = usableWidth / colCount;
+                let curY = y;
+                const rowHeight = 20;
+                doc.setFillColor(102, 126, 234);
+                doc.roundedRect(margin, curY, usableWidth, rowHeight, 3, 3, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(10);
+                for (let i = 0; i < colCount; i++) {
+                    const txtX = margin + i * colWidth + 8;
+                    doc.text(String(headers[i]), txtX, curY + 14);
+                }
+                curY += rowHeight + 2;
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(9);
+                for (let r = 0; r < rows.length; r++) {
+                    if (curY + rowHeight > 750) { doc.addPage(); curY = margin; }
+                    if (r % 2 === 0) { doc.setFillColor(248, 249, 250); doc.roundedRect(margin, curY, usableWidth, rowHeight, 2, 2, 'F'); }
+                    doc.setTextColor(40, 40, 40);
+                    for (let c = 0; c < colCount; c++) {
+                        const txt = rows[r][c] === null || rows[r][c] === undefined ? '' : String(rows[r][c]);
+                        const txtX = margin + c * colWidth + 8;
+                        doc.text(txt, txtX, curY + 14, { maxWidth: colWidth - 16 });
+                    }
+                    curY += rowHeight;
+                }
+
+                // Footer
+                const pageCount = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    doc.setFillColor(240, 240, 240);
+                    doc.rect(0, 792 - 30, pageWidth, 30, 'F');
+                    doc.setTextColor(100, 100, 100);
+                    doc.setFontSize(9);
+                    doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 11);
+                    doc.text(`The Ultimate Business Architecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
+                }
+
+                doc.save(`Inventory_Term_${cycleNumber}.pdf`);
+                showToast('Term report PDF downloaded', 'success');
+            } catch (e) {
+                console.error('Term PDF error:', e);
+                showToast('Failed to generate term PDF', 'error');
+            }
+        }
+
         function adjustStock(productName, amount) {
             if (!state.inventory[productName]) {
                 state.inventory[productName] = { stock: 0, minAlert: 5 };
@@ -6466,6 +6853,8 @@
             // Header
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
+            const logo = getLogoForPdf();
+            if (logo) { try { doc.addImage(logo.dataUrl, logo.format, centerX - 12, y - 4, 24, 24); y += 26; } catch (e) { console.warn('Logo draw error:', e); } }
             doc.text(profile.businessName, centerX, y, { align: 'center' });
             y += 18;
 
@@ -6787,11 +7176,14 @@
             doc.setFillColor(230, 230, 230);
             doc.rect(0, 70, pageWidth, 70, 'F');
 
-            // Company name
+            // Company name + logo
             doc.setTextColor(40, 40, 40);
             doc.setFontSize(26);
             doc.setFont(undefined, 'bold');
-            doc.text(profile.businessName || 'Your Business Name', margin, 45);
+            const logo = getLogoForPdf();
+            const titleX = logo ? (margin + 54) : margin;
+            if (logo) { try { doc.addImage(logo.dataUrl, logo.format, margin, 20, 40, 40); } catch (e) { console.warn('Logo draw error:', e); } }
+            doc.text(profile.businessName || 'Your Business Name', titleX, 45);
 
             // Company details - show all profile info
             doc.setFontSize(10);
@@ -7033,10 +7425,12 @@
             // Get profile data
             const profile = getUserProfileData();
 
-            // Header - Business Name
+            // Header - Logo + Business Name
             doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
             const centerX = 226.77 / 2;
+            const logo = getLogoForPdf();
+            if (logo) { try { doc.addImage(logo.dataUrl, logo.format, centerX - 12, y - 4, 24, 24); y += 26; } catch (e) { console.warn('Logo draw error:', e); } }
             doc.text(profile.businessName || 'Your Business', centerX, y, { align: 'center' });
             y += 20;
 
@@ -7905,7 +8299,10 @@
             doc.setFontSize(24);
             doc.setFont(undefined, 'bold');
             const profile = getUserProfileData();
-            doc.text(profile.businessName, margin, 45);
+            const logo = getLogoForPdf();
+            const titleX = logo ? (margin + 48) : margin;
+            if (logo) { try { doc.addImage(logo.dataUrl, logo.format, margin, 20, 36, 36); } catch (e) { console.warn('Logo draw error:', e); } }
+            doc.text(profile.businessName, titleX, 45);
 
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
@@ -9980,6 +10377,11 @@
 
                     // Load user profile first
                     await loadUserProfile();
+
+                    // Upload logo if selected locally
+                    if (state.userLogoDataUrl) {
+                        try { await uploadLogoToSupabase(state.userLogoDataUrl, state.userLogoMime || 'image/png'); } catch (e) { console.warn('Logo upload after sign-in failed:', e); }
+                    }
 
                     // Check if local data exists
                     const localHasData = state.sales.length > 0 || state.products.length > 0;
