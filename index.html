@@ -3049,6 +3049,39 @@
             return { dataUrl, format };
         }
 
+        // Draw logo with rounded enclosure/border
+        function drawLogo(doc, x, y, size, options = {}) {
+            const logo = getLogoForPdf();
+            if (!logo) return false;
+
+            const {
+                borderRadius = Math.min(8, size / 2),
+                borderColor = [180, 180, 180],
+                borderWidth = 1,
+                backgroundColor = [255, 255, 255],
+                padding = 3
+            } = options;
+
+            try {
+                // Background rounded box
+                doc.setFillColor(...backgroundColor);
+                doc.roundedRect(x, y, size, size, borderRadius, borderRadius, 'F');
+
+                // Border
+                doc.setDrawColor(...borderColor);
+                doc.setLineWidth(borderWidth);
+                doc.roundedRect(x, y, size, size, borderRadius, borderRadius, 'S');
+
+                // Image (contained inside with padding)
+                const innerSize = Math.max(0, size - padding * 2);
+                doc.addImage(logo.dataUrl, logo.format, x + padding, y + padding, innerSize, innerSize);
+                return true;
+            } catch (e) {
+                console.warn('Logo draw error:', e);
+                return false;
+            }
+        }
+
         function saveData() {
             cachedStats = null; // Clear cache when data changes
             try {
@@ -5729,10 +5762,9 @@
                 doc.setFontSize(24);
                 doc.setFont(undefined, 'bold');
                 const profile = (typeof getUserProfileData === 'function') ? getUserProfileData() : (state.userProfile || { businessName: 'TUBA', address: '', phone: '', email: '' });
-                const logo = getLogoForPdf();
-                const titleX = logo ? (margin + 48) : margin;
-                if (logo) { try { doc.addImage(logo.dataUrl, logo.format, margin, 20, 36, 36); } catch (e) { console.warn('Logo draw error:', e); } }
-                doc.text(profile.businessName || 'TUBA', titleX, 45);
+                const drewInvTermHdr = drawLogo(doc, margin, 20, 36, { borderRadius: 18 });
+                const titleXTermHdr = drewInvTermHdr ? (margin + 52) : margin;
+                doc.text(profile.businessName || 'TUBA', titleXTermHdr, 45);
                 doc.setFontSize(10);
                 doc.setFont(undefined, 'normal');
                 doc.text(`${profile.address || ''} | ${profile.phone || ''} | ${profile.email || ''}`, margin, 70);
@@ -6902,8 +6934,8 @@
             // Header
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
-            const logo = getLogoForPdf();
-            if (logo) { try { doc.addImage(logo.dataUrl, logo.format, centerX - 12, y - 4, 24, 24); y += 26; } catch (e) { console.warn('Logo draw error:', e); } }
+            const drewRec = drawLogo(doc, centerX - 12, y - 4, 24, { borderRadius: 12 });
+            if (drewRec) { y += 26; }
             doc.text(profile.businessName, centerX, y, { align: 'center' });
             y += 18;
 
@@ -7229,9 +7261,8 @@
             doc.setTextColor(40, 40, 40);
             doc.setFontSize(26);
             doc.setFont(undefined, 'bold');
-            const logo = getLogoForPdf();
-            const titleX = logo ? (margin + 54) : margin;
-            if (logo) { try { doc.addImage(logo.dataUrl, logo.format, margin, 20, 40, 40); } catch (e) { console.warn('Logo draw error:', e); } }
+            const drewInv = drawLogo(doc, margin, 20, 40, { borderRadius: 20 });
+            const titleX = drewInv ? (margin + 58) : margin;
             doc.text(profile.businessName || 'Your Business Name', titleX, 45);
 
             // Company details - show all profile info
@@ -7478,8 +7509,8 @@
             doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
             const centerX = 226.77 / 2;
-            const logo = getLogoForPdf();
-            if (logo) { try { doc.addImage(logo.dataUrl, logo.format, centerX - 12, y - 4, 24, 24); y += 26; } catch (e) { console.warn('Logo draw error:', e); } }
+            const drewSaleRec = drawLogo(doc, centerX - 12, y - 4, 24, { borderRadius: 12 });
+            if (drewSaleRec) { y += 26; }
             doc.text(profile.businessName || 'Your Business', centerX, y, { align: 'center' });
             y += 20;
 
@@ -8348,9 +8379,8 @@
             doc.setFontSize(24);
             doc.setFont(undefined, 'bold');
             const profile = getUserProfileData();
-            const logo = getLogoForPdf();
-            const titleX = logo ? (margin + 48) : margin;
-            if (logo) { try { doc.addImage(logo.dataUrl, logo.format, margin, 20, 36, 36); } catch (e) { console.warn('Logo draw error:', e); } }
+            const drew = drawLogo(doc, margin, 20, 36, { borderRadius: 18 });
+            const titleX = drew ? (margin + 52) : margin;
             doc.text(profile.businessName, titleX, 45);
 
             doc.setFontSize(10);
@@ -8512,7 +8542,9 @@
             doc.setFont(undefined, 'bold');
 
             const profile = getUserProfileData();
-            doc.text(profile.businessName, margin, 45);
+            const drewDaily = drawLogo(doc, margin, 20, 36, { borderRadius: 18 });
+            const nameX = drewDaily ? (margin + 52) : margin;
+            doc.text(profile.businessName, nameX, 45);
 
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
@@ -9527,10 +9559,10 @@
         console.log('🚀 Loading TUBA enhancements...');
 
         // ============================================
-        // FIX 1: DePeriodinistic ID Generation
+        // FIX 1: Deterministic ID Generation
         // ============================================
 
-        function generateDePeriodinisticID(type, item) {
+        function generateDeterministicID(type, item) {
             let hashBase = '';
 
             switch (type) {
@@ -9581,7 +9613,7 @@
 
         function generateIDSafe(type, item = null) {
             if (item && typeof item === 'object') {
-                return generateDePeriodinisticID(type, item);
+                return generateDeterministicID(type, item);
             }
             return generateID(type);
         }
@@ -9626,7 +9658,7 @@
 
                 if (!uniqueMap.has(contentKey)) {
                     if (!item.id) {
-                        item.id = generateDePeriodinisticID(type, item);
+                        item.id = generateDeterministicID(type, item);
                     }
                     uniqueMap.set(contentKey, item);
                 } else {
