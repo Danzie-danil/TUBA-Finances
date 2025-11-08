@@ -906,23 +906,33 @@
         /* Date input sizing: prevent overflow outside cards */
         input[type="date"] {
             width: 100%;
-            max-width: 220px; /* keep compact across devices */
+            max-width: 220px;
+            /* keep compact across devices */
             box-sizing: border-box;
-            -webkit-appearance: none; /* normalize iOS Safari */
+            -webkit-appearance: none;
+            /* normalize iOS Safari */
             appearance: none;
             height: 36px;
             line-height: 1.2;
-            padding: 6px 28px 6px 10px; /* space for picker icon */
-            border: 2px solid rgba(0,0,0,0.1);
+            padding: 6px 28px 6px 10px;
+            /* space for picker icon */
+            border: 2px solid rgba(0, 0, 0, 0.1);
             border-radius: 8px;
         }
+
         .form-group input[type="date"],
         .filter-row input[type="date"] {
-            flex: 0 1 220px; /* allow shrink/grow but cap width */
-            min-width: 0;    /* avoid flex min-content overflow */
+            flex: 0 1 220px;
+            /* allow shrink/grow but cap width */
+            min-width: 0;
+            /* avoid flex min-content overflow */
         }
+
         /* Ensure date inputs can shrink within filter groups on iOS */
-        .filter-row .form-group { min-width: 0; flex: 0 1 auto; }
+        .filter-row .form-group {
+            min-width: 0;
+            flex: 0 1 auto;
+        }
 
         /* iOS-specific tuning */
         @supports (-webkit-touch-callout: none) {
@@ -931,11 +941,13 @@
                 /* flex-basis mirrors max-width to prevent overflow */
                 /* Use both to handle different flex contexts */
             }
+
             .form-group input[type="date"],
             .filter-row input[type="date"] {
                 flex-basis: clamp(140px, 42vw, 220px);
                 font-size: 14px;
             }
+
             .filter-row input[type="date"]::-webkit-calendar-picker-indicator {
                 right: 6px;
             }
@@ -1180,6 +1192,7 @@
             .filter-row select {
                 width: 100%;
             }
+
             .form-group input[type="date"],
             .filter-row input[type="date"] {
                 max-width: 100%;
@@ -2328,7 +2341,7 @@
                     await supabase.from('notes').insert(notesData);
                 }
 
-                // Sync inventory purchase terms (cycles)
+                // Sync inventory purchase Periods (cycles)
                 if (state.inventoryPurchaseCycles && state.inventoryPurchaseCycles.length > 0) {
                     const cyclesData = state.inventoryPurchaseCycles.map(c => ({
                         user_id: currentUser.id,
@@ -2736,7 +2749,7 @@
                     state.monthlyTarget = parseFloat(settings.monthly_target || 0);
                 }
 
-                // Inventory purchase terms (cycles)
+                // Inventory purchase Periods (cycles)
                 const { data: cloudCycles } = await supabase
                     .from('inventory_purchase_cycles')
                     .select('*')
@@ -2820,12 +2833,12 @@
                 yas: { initial: 0, current: 0 }
             },
             inventoryFilters: {
-                termNumber: '',
+                PeriodNumber: '',
                 supplier: '',
                 dateFrom: '',
                 dateTo: ''
             },
-            searchTerm: '',
+            searchPeriod: '',
             filterDateFrom: '',
             filterDateTo: '',
             filterCategory: '',
@@ -3786,12 +3799,12 @@
             // Filter sales based on search and filters
             let filteredSales = state.sales.slice();
 
-            if (state.searchTerm) {
-                const term = state.searchTerm.toLowerCase();
+            if (state.searchPeriod) {
+                const Period = state.searchPeriod.toLowerCase();
                 filteredSales = filteredSales.filter(s =>
-                    s.productName.toLowerCase().includes(term) ||
-                    s.customer.toLowerCase().includes(term) ||
-                    s.payment.toLowerCase().includes(term)
+                    s.productName.toLowerCase().includes(Period) ||
+                    s.customer.toLowerCase().includes(Period) ||
+                    s.payment.toLowerCase().includes(Period)
                 );
             }
 
@@ -3846,9 +3859,9 @@
                     <select id="saleProduct" onchange="updateSaleTotal()" required>
                         <option value="">-- Select Product --</option>
                         ${state.products
-                            .map((p, i) => ({ p, i }))
-                            .sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)))
-                            .map(({ p, i }) => { const stockText = (p.hasStock === false) ? 'N/A' : ((state.inventory[p.name] || { stock: 0 }).stock); const typeTag = p.hasStock === false ? '[Service]' : '[Product]'; return `<option value="${i}">${p.name} - ${p.category} ${typeTag}${p.hasStock === false ? '' : ` (Stock: ${stockText})`}</option>`; }).join('')}
+                    .map((p, i) => ({ p, i }))
+                    .sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)))
+                    .map(({ p, i }) => { const stockText = (p.hasStock === false) ? 'N/A' : ((state.inventory[p.name] || { stock: 0 }).stock); const typeTag = p.hasStock === false ? '[Service]' : '[Product]'; return `<option value="${i}">${p.name} - ${p.category} ${typeTag}${p.hasStock === false ? '' : ` (Stock: ${stockText})`}</option>`; }).join('')}
                     </select>
                 </div>
                 <div class="form-group">
@@ -3856,9 +3869,9 @@
                     <select id="saleCustomer" onchange="toggleCustomerInput()">
                         <option value="">-- Walk-in --</option>
                         ${state.customers
-                            .map((c, i) => ({ c, i }))
-                            .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
-                            .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
+                    .map((c, i) => ({ c, i }))
+                    .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
+                    .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
                         <option value="new">+ Add New Customer</option>
                     </select>
                 </div>
@@ -3895,7 +3908,7 @@
             <h2>Recent Sales (${filteredSales.length})</h2>
             
             <div class="search-box">
-                <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
+                <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchPeriod(this.value)">
             </div>
 
             <div class="filter-row">
@@ -3912,17 +3925,17 @@
                     <select onchange="updateFilterCustomer(this.value)">
                         <option value="">All Customers</option>
                         ${[...new Set(state.sales.map(s => s.customer))]
-                .filter(c => !!c)
-                .sort((a,b)=>String(a).localeCompare(String(b)))
-                .map(c =>
-                `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
-            ).join('')}
+                    .filter(c => !!c)
+                    .sort((a, b) => String(a).localeCompare(String(b)))
+                    .map(c =>
+                        `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
+                    ).join('')}
                     </select>
                 </div>
                 <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
             </div>
 
-            ${(state.listExpanded.sales || state.searchTerm || state.filterDateFrom || state.filterDateTo || state.filterCustomer) ? `
+            ${(state.listExpanded.sales || state.searchPeriod || state.filterDateFrom || state.filterDateTo || state.filterCustomer) ? `
                 <div class="bulk-actions">
                     <input type="checkbox" id="selectAll_sales" onchange="toggleSelectAll('sales')" class="checkbox-select">
                     <label for="selectAll_sales">Select All</label>
@@ -3935,9 +3948,9 @@
                 </div>
 
                 ${filteredSales.slice().reverse().map((s, idx) => {
-                    const isService = (state.products.find(p => p.name === s.productName)?.hasStock === false);
-                    const typeBadge = isService ? '<span class="badge badge-warning">Service</span>' : '<span class="badge badge-success">Product</span>';
-                    return `
+                        const isService = (state.products.find(p => p.name === s.productName)?.hasStock === false);
+                        const typeBadge = isService ? '<span class="badge badge-warning">Service</span>' : '<span class="badge badge-success">Product</span>';
+                        return `
                     <div class="item">
                         <div style="display: flex; gap: 12px; align-items: start;">
                             <input type="checkbox" class="checkbox-select" 
@@ -3973,8 +3986,8 @@
         }
 
 
-        function updateSearchTerm(value) {
-            state.searchTerm = value;
+        function updateSearchPeriod(value) {
+            state.searchPeriod = value;
             // Don't re-render, just update the list
             renderSalesList();
         }
@@ -3985,12 +3998,12 @@
 
             let filteredSales = state.sales.slice();
 
-            if (state.searchTerm) {
-                const term = state.searchTerm.toLowerCase();
+            if (state.searchPeriod) {
+                const Period = state.searchPeriod.toLowerCase();
                 filteredSales = filteredSales.filter(s =>
-                    s.productName.toLowerCase().includes(term) ||
-                    s.customer.toLowerCase().includes(term) ||
-                    s.payment.toLowerCase().includes(term)
+                    s.productName.toLowerCase().includes(Period) ||
+                    s.customer.toLowerCase().includes(Period) ||
+                    s.payment.toLowerCase().includes(Period)
                 );
             }
 
@@ -4044,7 +4057,7 @@
         }
 
         function clearFilters() {
-            state.searchTerm = '';
+            state.searchPeriod = '';
             state.filterDateFrom = '';
             state.filterDateTo = '';
             state.filterCategory = '';
@@ -4532,15 +4545,15 @@
             `;
         }
 
-        function renderTransactionsList(transactions, searchTerm = '') {
+        function renderTransactionsList(transactions, searchPeriod = '') {
             let filtered = transactions;
 
-            if (searchTerm) {
-                const term = searchTerm.toLowerCase();
+            if (searchPeriod) {
+                const Period = searchPeriod.toLowerCase();
                 filtered = transactions.filter(t =>
-                    (t.customerName && t.customerName.toLowerCase().includes(term)) ||
-                    t.type.toLowerCase().includes(term) ||
-                    t.channel.toLowerCase().includes(term)
+                    (t.customerName && t.customerName.toLowerCase().includes(Period)) ||
+                    t.type.toLowerCase().includes(Period) ||
+                    t.channel.toLowerCase().includes(Period)
                 );
             }
 
@@ -4575,11 +4588,11 @@
     `).join('');
         }
 
-        function searchTransactions(term) {
+        function searchTransactions(Period) {
             const currentChannel = state.activeTransactionChannel || 'mpesa';
             const channelTransactions = (state.transactions || []).filter(t => t.channel === currentChannel);
 
-            document.getElementById('transactionsList').innerHTML = renderTransactionsList(channelTransactions, term);
+            document.getElementById('transactionsList').innerHTML = renderTransactionsList(channelTransactions, Period);
         }
 
         async function editInitialFloat(channel) {
@@ -4696,7 +4709,7 @@
                             <label>Category</label>
                             <select id="productCategory" required>
                                 <option value="">-- Select Category --</option>
-                                ${state.categories.slice().sort((a,b)=>String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join('')}
+                                ${state.categories.slice().sort((a, b) => String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join('')}
                             </select>
                         </div>
                         <div class="form-group">
@@ -4760,13 +4773,13 @@
             }
         }
 
-        function renderProductsList(searchTerm = '') {
+        function renderProductsList(searchPeriod = '') {
             let products = state.products;
-            if (searchTerm) {
-                const term = searchTerm.toLowerCase();
+            if (searchPeriod) {
+                const Period = searchPeriod.toLowerCase();
                 products = products.filter(p =>
-                    p.name.toLowerCase().includes(term) ||
-                    p.category.toLowerCase().includes(term)
+                    p.name.toLowerCase().includes(Period) ||
+                    p.category.toLowerCase().includes(Period)
                 );
             }
 
@@ -4806,8 +4819,8 @@
             }).join('');
         }
 
-        function searchProducts(term) {
-            document.getElementById('productsList').innerHTML = renderProductsList(term);
+        function searchProducts(Period) {
+            document.getElementById('productsList').innerHTML = renderProductsList(Period);
         }
 
         async function addProduct(e) {
@@ -5084,11 +5097,11 @@
 
             let filteredExpenses = state.expenses.slice();
 
-            if (state.searchTerm) {
-                const term = state.searchTerm.toLowerCase();
+            if (state.searchPeriod) {
+                const Period = state.searchPeriod.toLowerCase();
                 filteredExpenses = filteredExpenses.filter(e =>
-                    e.description.toLowerCase().includes(term) ||
-                    e.category.toLowerCase().includes(term)
+                    e.description.toLowerCase().includes(Period) ||
+                    e.category.toLowerCase().includes(Period)
                 );
             }
 
@@ -5167,7 +5180,7 @@
                     <h2>Recent Expenses (${filteredExpenses.length})</h2>
                     
                     <div class="search-box">
-                        <input type="text" placeholder="🔍 Search expenses..." oninput="updateSearchTerm(this.value)">
+                        <input type="text" placeholder="🔍 Search expenses..." oninput="updateSearchPeriod(this.value)">
                     </div>
 
                     <div class="filter-row">
@@ -5176,11 +5189,11 @@
                         <select onchange="updateFilterCategory(this.value)">
                             <option value="">All Categories</option>
                             ${[...new Set(state.expenses.map(e => e.category))]
-                .filter(c => !!c)
-                .sort((a,b)=>String(a).localeCompare(String(b)))
-                .map(c =>
-                `<option value="${c}" ${state.filterCategory === c ? 'selected' : ''}>${c}</option>`
-            ).join('')}
+                    .filter(c => !!c)
+                    .sort((a, b) => String(a).localeCompare(String(b)))
+                    .map(c =>
+                        `<option value="${c}" ${state.filterCategory === c ? 'selected' : ''}>${c}</option>`
+                    ).join('')}
                         </select>
                         <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
                     </div>
@@ -5355,21 +5368,21 @@
             // Filters
             const filter = state.inventoryFilters || {};
             const cycleOptions = cycles.length > 0
-                ? `<option value="">All Terms</option>` + cycles.map(c => `<option value="${c.number}">Term ${c.number} ${c.title ? '– ' + c.title : ''}</option>`).join('')
-                : '<option value="">No terms yet</option>';
+                ? `<option value="">All Periods</option>` + cycles.map(c => `<option value="${c.number}">Period ${c.number} ${c.title ? '– ' + c.title : ''}</option>`).join('')
+                : '<option value="">No Periods yet</option>';
 
             // Filtered purchases
             const filtered = purchases.filter(p => {
-                const matchTerm = !filter.termNumber || String(p.cycleNumber) === String(filter.termNumber);
+                const matchPeriod = !filter.PeriodNumber || String(p.cycleNumber) === String(filter.PeriodNumber);
                 const matchSupplier = !filter.supplier || (p.supplierName || '').toLowerCase().includes(filter.supplier.toLowerCase());
                 const df = filter.dateFrom ? new Date(filter.dateFrom).getTime() : null;
                 const dt = filter.dateTo ? new Date(filter.dateTo).getTime() : null;
                 const ts = p.timestamp || (p.purchaseDate ? new Date(p.purchaseDate).getTime() : 0);
                 const matchDate = (!df || ts >= df) && (!dt || ts <= dt);
-                return matchTerm && matchSupplier && matchDate;
+                return matchPeriod && matchSupplier && matchDate;
             });
 
-            // Group by term
+            // Group by Period
             const groupedHTML = cycles.map(cycle => {
                 const cps = filtered.filter(p => p.cycleNumber === cycle.number);
                 const cycleTotal = cps.reduce((sum, p) => sum + (Number(p.totalCost) || Number(p.buyingPrice) || 0), 0);
@@ -5384,15 +5397,15 @@
                 return `
                     <div class="card">
                         <div class="flex-between">
-                            <h2>Term ${cycle.number} ${cycle.title ? '– ' + cycle.title : ''}</h2>
+                            <h2>Period ${cycle.number} ${cycle.title ? '– ' + cycle.title : ''}</h2>
                             <div class="flex-gap">
                                 <span class="badge">Items: ${cps.length}</span>
                                 <span class="badge">Spent: ${formatNumber(cycleTotal)} Tsh</span>
                                 ${lastedText ? `<span class="badge">${lastedText}</span>` : ''}
-                                <button class="btn-small" onclick="downloadInventoryCyclePDF(${cycle.number})">📥 Term PDF</button>
+                                <button class="btn-small" onclick="downloadInventoryCyclePDF(${cycle.number})">📥 Period PDF</button>
                             </div>
                         </div>
-                        ${cps.length === 0 ? '<p style="color:#666">No purchases in this term</p>' : cps.map(p => `
+                        ${cps.length === 0 ? '<p style="color:#666">No purchases in this Period</p>' : cps.map(p => `
                             <div class="item">
                                 <div class="item-header">
                                     <span class="item-title">${p.itemName} × ${p.quantity || 1}</span>
@@ -5433,8 +5446,8 @@
                     <h3>Filter</h3>
                     <div class="grid-2" style="gap:12px;">
                         <div>
-                            <label>Term</label>
-                            <select id="invFilterTerm" onchange="updateInventoryFilter('termNumber', this.value)">${cycleOptions}</select>
+                            <label>Period</label>
+                            <select id="invFilterPeriod" onchange="updateInventoryFilter('PeriodNumber', this.value)">${cycleOptions}</select>
                         </div>
                         <div>
                             <label>Supplier</label>
@@ -5454,7 +5467,7 @@
             // Embed the existing stock view
             const stock = renderInventory();
 
-            return summary + filters + (groupedHTML || '<p style="text-align:center;color:#666;">No terms yet. Add an inventory purchase to create a new term.</p>') + stock;
+            return summary + filters + (groupedHTML || '<p style="text-align:center;color:#666;">No Periods yet. Add an inventory purchase to create a new Period.</p>') + stock;
         }
 
         function updateInventoryFilter(key, value) {
@@ -5476,9 +5489,9 @@
                     .map(p => `<option value="${p.name}">${p.name}</option>`).join('')
                 : '<option value="">No products found</option>';
             const cycles = state.inventoryPurchaseCycles || [];
-            const nextTermNumber = (cycles?.length || 0) + 1;
-            const defaultTitle = new Date().toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + ' Term';
-            const cycleOptions = cycles.map(c => `<option value="${c.number}">Term ${c.number} ${c.title ? '– ' + c.title : ''}</option>`).join('');
+            const nextPeriodNumber = (cycles?.length || 0) + 1;
+            const defaultTitle = new Date().toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + ' Period';
+            const cycleOptions = cycles.map(c => `<option value="${c.number}">Period ${c.number} ${c.title ? '– ' + c.title : ''}</option>`).join('');
 
             content.innerHTML = `
                 <div class="grid-2" style="gap:12px;">
@@ -5516,7 +5529,7 @@
                     </div>
                     <div>
                         <label>Time</label>
-                        <input id="invTime" type="time" value="${new Date().toISOString().slice(11,16)}">
+                        <input id="invTime" type="time" value="${new Date().toISOString().slice(11, 16)}">
                     </div>
                     <div class="grid-span-2">
                         <label>Notes (optional)</label>
@@ -5525,19 +5538,19 @@
                 </div>
 
                     <div class="card" style="margin-top:12px;">
-                        <h3>Term</h3>
+                        <h3>Period</h3>
                         <div class="flex-gap">
                             <label style="display:flex;align-items:center;gap:8px;">
-                                <input id="invCreateNewTerm" type="checkbox" checked>
-                                Create new term (recommended)
+                                <input id="invCreateNewPeriod" type="checkbox" checked>
+                                Create new Period (recommended)
                             </label>
                             <div>
-                                <label>Existing Term</label>
-                                <select id="invTermSelect"><option value="">—</option>${cycleOptions}</select>
+                                <label>Existing Period</label>
+                                <select id="invPeriodSelect"><option value="">—</option>${cycleOptions}</select>
                             </div>
                             <div>
-                                <label>New Term Title</label>
-                                <input id="invNewTermTitle" type="text" value="${defaultTitle}">
+                                <label>New Period Title</label>
+                                <input id="invNewPeriodTitle" type="text" value="${defaultTitle}">
                             </div>
                         </div>
                     </div>
@@ -5567,10 +5580,10 @@
             if (modal) modal.classList.remove('show');
         }
 
-        function ensureTermCreated(purchaseDate, time, titleHint) {
+        function ensurePeriodCreated(purchaseDate, time, titleHint) {
             state.inventoryPurchaseCycles = state.inventoryPurchaseCycles || [];
             const nextNumber = (state.inventoryPurchaseCycles.length || 0) + 1;
-            const title = titleHint || (new Date(purchaseDate).toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + ' Term');
+            const title = titleHint || (new Date(purchaseDate).toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + ' Period');
             const cycle = {
                 id: generateID('invCycle'),
                 number: nextNumber,
@@ -5592,20 +5605,20 @@
             const supplierPhone = (document.getElementById('invSupplierPhone')?.value || '').trim();
             const supplierAddress = (document.getElementById('invSupplierAddress')?.value || '').trim();
             const purchaseDate = document.getElementById('invDate')?.value || getTodayDateString();
-            const time = document.getElementById('invTime')?.value || new Date().toISOString().slice(11,16);
+            const time = document.getElementById('invTime')?.value || new Date().toISOString().slice(11, 16);
             const notes = (document.getElementById('invNotes')?.value || '').trim();
-            const createNew = !!(document.getElementById('invCreateNewTerm')?.checked);
-            const selectedTerm = document.getElementById('invTermSelect')?.value || '';
-            const newTermTitle = (document.getElementById('invNewTermTitle')?.value || '').trim();
+            const createNew = !!(document.getElementById('invCreateNewPeriod')?.checked);
+            const selectedPeriod = document.getElementById('invPeriodSelect')?.value || '';
+            const newPeriodTitle = (document.getElementById('invNewPeriodTitle')?.value || '').trim();
 
             if (!productName) return showToast('Select a product', 'error');
             if (!quantity || quantity <= 0) return showToast('Enter a valid quantity', 'error');
             if (isNaN(unitCost) || unitCost <= 0) return showToast('Enter unit cost', 'error');
 
-            // Determine term number
-            let cycleNumber = selectedTerm ? parseInt(selectedTerm, 10) : null;
+            // DePeriodine Period number
+            let cycleNumber = selectedPeriod ? parseInt(selectedPeriod, 10) : null;
             if (createNew || !cycleNumber) {
-                cycleNumber = ensureTermCreated(purchaseDate, time, newTermTitle);
+                cycleNumber = ensurePeriodCreated(purchaseDate, time, newPeriodTitle);
             }
 
             const timestamp = Date.now();
@@ -5641,7 +5654,7 @@
                 category: 'Inventory Purchase',
                 amount: record.totalCost,
                 payment: 'cash',
-                comment: `Term ${cycleNumber}`
+                comment: `Period ${cycleNumber}`
             };
             state.expenses.push(expense);
 
@@ -5665,7 +5678,7 @@
             const purchases = state.inventoryPurchases || [];
             const cycles = state.inventoryPurchaseCycles || [];
             if (format === 'csv') {
-                const headers = ['Product','Quantity','UnitCost','TotalCost','Supplier','Phone','Address','Term','Date','Time'];
+                const headers = ['Product', 'Quantity', 'UnitCost', 'TotalCost', 'Supplier', 'Phone', 'Address', 'Period', 'Date', 'Time'];
                 const rows = purchases.map(p => [
                     p.itemName,
                     p.quantity || 0,
@@ -5678,7 +5691,7 @@
                     p.purchaseDate || '',
                     p.time || ''
                 ]);
-                const csv = [headers.join(','), ...rows.map(r => r.map(v => String(v).replace(/\n/g,' ').replace(/,/g,';')).join(','))].join('\n');
+                const csv = [headers.join(','), ...rows.map(r => r.map(v => String(v).replace(/\n/g, ' ').replace(/,/g, ';')).join(','))].join('\n');
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -5783,7 +5796,7 @@
                 if (cycles.length === 0) {
                     doc.setFontSize(12);
                     doc.setFont(undefined, 'normal');
-                    doc.text('No terms found.', margin, y);
+                    doc.text('No Periods found.', margin, y);
                 } else {
                     cycles.forEach(cycle => {
                         const cps = purchases.filter(p => p.cycleNumber === cycle.number);
@@ -5792,7 +5805,7 @@
                         doc.setFontSize(14);
                         doc.setFont(undefined, 'bold');
                         doc.setTextColor(0, 0, 0);
-                        doc.text(`Term ${cycle.number} ${cycle.title ? '– ' + cycle.title : ''}`, margin, y);
+                        doc.text(`Period ${cycle.number} ${cycle.title ? '– ' + cycle.title : ''}`, margin, y);
                         doc.setFontSize(10);
                         doc.setFont(undefined, 'normal');
                         doc.setTextColor(100, 100, 100);
@@ -5874,7 +5887,7 @@
                 doc.setTextColor(0, 0, 0);
                 doc.setFontSize(18);
                 doc.setFont(undefined, 'bold');
-                doc.text(`Inventory Term ${cycleNumber} ${cycle?.title ? '– ' + cycle.title : ''}`, margin, y);
+                doc.text(`Inventory Period ${cycleNumber} ${cycle?.title ? '– ' + cycle.title : ''}`, margin, y);
                 doc.setFontSize(10);
                 doc.setFont(undefined, 'normal');
                 doc.setTextColor(100, 100, 100);
@@ -5934,11 +5947,11 @@
                     doc.text(`The Ultimate Business Architecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
                 }
 
-                doc.save(`Inventory_Term_${cycleNumber}.pdf`);
-                showToast('Term report PDF downloaded', 'success');
+                doc.save(`Inventory_Period_${cycleNumber}.pdf`);
+                showToast('Period report PDF downloaded', 'success');
             } catch (e) {
-                console.error('Term PDF error:', e);
-                showToast('Failed to generate term PDF', 'error');
+                console.error('Period PDF error:', e);
+                showToast('Failed to generate Period PDF', 'error');
             }
         }
 
@@ -6050,14 +6063,14 @@
             `;
         }
 
-        function renderCustomersList(searchTerm = '') {
+        function renderCustomersList(searchPeriod = '') {
             let customers = state.customers;
-            if (searchTerm) {
-                const term = searchTerm.toLowerCase();
+            if (searchPeriod) {
+                const Period = searchPeriod.toLowerCase();
                 customers = customers.filter(c =>
-                    c.name.toLowerCase().includes(term) ||
-                    (c.email && c.email.toLowerCase().includes(term)) ||
-                    (c.phone && c.phone.includes(term))
+                    c.name.toLowerCase().includes(Period) ||
+                    (c.email && c.email.toLowerCase().includes(Period)) ||
+                    (c.phone && c.phone.includes(Period))
                 );
             }
 
@@ -6097,8 +6110,8 @@
             }).join('');
         }
 
-        function searchCustomers(term) {
-            document.getElementById('customersList').innerHTML = renderCustomersList(term);
+        function searchCustomers(Period) {
+            document.getElementById('customersList').innerHTML = renderCustomersList(Period);
         }
 
         function viewCustomerHistory(i) {
@@ -6214,9 +6227,9 @@
                     <select id="invoiceCustomer" onchange="toggleInvoiceCustomerInput()" required>
                         <option value="">-- Select Customer --</option>
                         ${state.customers
-                            .map((c, i) => ({ c, i }))
-                            .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
-                            .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
+                        .map((c, i) => ({ c, i }))
+                        .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
+                        .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
                         <option value="new">+ Add New Customer</option>
                     </select>
                 </div>
@@ -6239,8 +6252,8 @@
                     <input type="date" id="invoiceDueDate" required>
                 </div>
                 <div class="form-group">
-                    <label>Payment Terms</label>
-                    <input type="text" id="invoiceTerms" placeholder="Due within 7 days" value="Due within 7 days">
+                    <label>Payment Periods</label>
+                    <input type="text" id="invoicePeriods" placeholder="Due within 7 days" value="Due within 7 days">
                 </div>
                 <div class="form-group">
     <label>Items/Services</label>
@@ -6279,9 +6292,9 @@
         <select id="receiptCustomer" onchange="updateReceiptFromCustomer()" required>
             <option value="">-- Select Customer --</option>
             ${state.customers
-                .map((c, i) => ({ c, i }))
-                .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
-                .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
+                    .map((c, i) => ({ c, i }))
+                    .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
+                    .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
             <option value="manual">✏️ Enter Manually</option>
         </select>
     </div>
@@ -6349,8 +6362,8 @@
             </div>
             
             ${state.invoices.filter(i => i.status !== 'Paid').map((inv, origIdx) => {
-                const actualIndex = state.invoices.findIndex(i => i === inv);
-                return `
+                        const actualIndex = state.invoices.findIndex(i => i === inv);
+                        return `
                 <div class="item">
                     <div style="display: flex; gap: 12px; align-items: start;">
                         <input type="checkbox" class="checkbox-select" 
@@ -6377,7 +6390,7 @@
                     </div>
                 </div>
             `;
-            }).join('')}
+                    }).join('')}
         ` : '<p style="text-align: center; color: #666;">No unpaid invoices</p>'}
     </div>
 
@@ -6398,8 +6411,8 @@
             </div>
             
             ${state.invoices.filter(i => i.status === 'Paid').map((inv, origIdx) => {
-                const actualIndex = state.invoices.findIndex(i => i === inv);
-                return `
+                        const actualIndex = state.invoices.findIndex(i => i === inv);
+                        return `
                 <div class="item">
                     <div style="display: flex; gap: 12px; align-items: start;">
                         <input type="checkbox" class="checkbox-select" 
@@ -6423,7 +6436,7 @@
                     </div>
                 </div>
             `;
-            }).join('')}
+                    }).join('')}
         ` : '<p style="text-align: center; color: #666;">No paid invoices</p>'}
     </div>
 
@@ -7174,7 +7187,7 @@
                 time: now.toLocaleTimeString(),
                 timestamp: now.getTime(),
                 dueDate: document.getElementById('invoiceDueDate').value,
-                terms: document.getElementById('invoiceTerms')?.value.trim() || 'Due within 7 days',
+                Periods: document.getElementById('invoicePeriods')?.value.trim() || 'Due within 7 days',
                 items: items,
                 subtotal: subtotal,
                 taxRate: taxRate * 100,
@@ -7288,19 +7301,19 @@
                 doc.text(inv.customerAddress, margin + 15, billY);
             }
 
-            // Payment Terms section
+            // Payment Periods section
             doc.setFillColor(248, 248, 248);
             doc.roundedRect(margin + (usableWidth / 2) + 10, y, (usableWidth / 2) - 10, 80, 5, 5, 'F');
 
             doc.setFontSize(10);
             doc.setFont(undefined, 'bold');
             doc.setTextColor(107, 114, 128);
-            doc.text('PAYMENT TERMS', margin + (usableWidth / 2) + 25, y + 20);
+            doc.text('PAYMENT PeriodS', margin + (usableWidth / 2) + 25, y + 20);
 
             doc.setTextColor(0, 0, 0);
             doc.setFont(undefined, 'normal');
             doc.setFontSize(10);
-            doc.text(inv.terms || 'Due within 7 days', margin + (usableWidth / 2) + 25, y + 40);
+            doc.text(inv.Periods || 'Due within 7 days', margin + (usableWidth / 2) + 25, y + 40);
 
             doc.setFont(undefined, 'bold');
             doc.text('Payment Method', margin + (usableWidth / 2) + 25, y + 60);
@@ -7616,9 +7629,9 @@
                             <select id="unpaidCustomer">
                                 <option value="">-- Select Customer --</option>
                                 ${state.customers
-                                    .map((c, i) => ({ c, i }))
-                                    .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
-                                    .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
+                    .map((c, i) => ({ c, i }))
+                    .sort((a, b) => String(a.c.name).localeCompare(String(b.c.name)))
+                    .map(({ c, i }) => `<option value="${i}">${c.name}</option>`).join('')}
                             </select>
                         </div>
                         <div class="form-group">
@@ -7840,14 +7853,14 @@
             `;
         }
 
-        function renderNotesList(searchTerm = '') {
+        function renderNotesList(searchPeriod = '') {
             let notes = state.notes.slice().reverse();
 
-            if (searchTerm) {
-                const term = searchTerm.toLowerCase();
+            if (searchPeriod) {
+                const Period = searchPeriod.toLowerCase();
                 notes = notes.filter(n =>
-                    n.content.toLowerCase().includes(term) ||
-                    (n.title && n.title.toLowerCase().includes(term))
+                    n.content.toLowerCase().includes(Period) ||
+                    (n.title && n.title.toLowerCase().includes(Period))
                 );
             }
 
@@ -7930,8 +7943,8 @@
             if (syncEnabled) syncInBackground();
         }
 
-        function searchNotes(term) {
-            document.getElementById('notesList').innerHTML = renderNotesList(term);
+        function searchNotes(Period) {
+            document.getElementById('notesList').innerHTML = renderNotesList(Period);
         }
 
         async function addNote(e) {
@@ -9140,12 +9153,12 @@
             // Filter sales based on search and filters
             let filteredSales = state.sales.slice();
 
-            if (state.searchTerm) {
-                const term = state.searchTerm.toLowerCase();
+            if (state.searchPeriod) {
+                const Period = state.searchPeriod.toLowerCase();
                 filteredSales = filteredSales.filter(s =>
-                    s.productName.toLowerCase().includes(term) ||
-                    s.customer.toLowerCase().includes(term) ||
-                    s.payment.toLowerCase().includes(term)
+                    s.productName.toLowerCase().includes(Period) ||
+                    s.customer.toLowerCase().includes(Period) ||
+                    s.payment.toLowerCase().includes(Period)
                 );
             }
 
@@ -9200,9 +9213,9 @@
                     <select id="saleProduct" onchange="handleProductSelection()" required>
                         <option value="">-- Select Product --</option>
                         ${state.products
-                            .map((p, i) => ({ p, i }))
-                            .sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)))
-                            .map(({ p, i }) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || { stock: 0 }).stock})</option>`).join('')}
+                    .map((p, i) => ({ p, i }))
+                    .sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)))
+                    .map(({ p, i }) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || { stock: 0 }).stock})</option>`).join('')}
                         <option value="new" style="background: #e3f2fd; font-weight: 600;">+ Add New Product</option>
                     </select>
                 </div>
@@ -9216,7 +9229,7 @@
                         <label>Category</label>
                         <select id="newProductCategory" onchange="handleCategorySelection()">
                             <option value="">-- Select Category --</option>
-                            ${state.categories.slice().sort((a,b)=>String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join('')}
+                            ${state.categories.slice().sort((a, b) => String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join('')}
                             <option value="new" style="background: #fff3e0; font-weight: 600;">+ Add New Category</option>
                         </select>
                     </div>
@@ -9289,7 +9302,7 @@
             <h2>Recent Sales (${filteredSales.length})</h2>
             
             <div class="search-box">
-                <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchTerm(this.value)">
+                <input type="text" placeholder="🔍 Search sales..." oninput="updateSearchPeriod(this.value)">
             </div>
 
             <div class="filter-row">
@@ -9306,14 +9319,14 @@
                     <select onchange="updateFilterCustomer(this.value)">
                         <option value="">All Customers</option>
                         ${[...new Set(state.sales.map(s => s.customer))].map(c =>
-                `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
-            ).join('')}
+                        `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
+                    ).join('')}
                     </select>
                 </div>
                 <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
             </div>
 
-            ${(state.listExpanded.sales || state.searchTerm || state.filterDateFrom || state.filterDateTo || state.filterCustomer) ? `
+            ${(state.listExpanded.sales || state.searchPeriod || state.filterDateFrom || state.filterDateTo || state.filterCustomer) ? `
                 <div class="bulk-actions">
                     <input type="checkbox" id="selectAll_sales" onchange="toggleSelectAll('sales')" class="checkbox-select">
                     <label for="selectAll_sales">Select All</label>
@@ -9514,10 +9527,10 @@
         console.log('🚀 Loading TUBA enhancements...');
 
         // ============================================
-        // FIX 1: Deterministic ID Generation
+        // FIX 1: DePeriodinistic ID Generation
         // ============================================
 
-        function generateDeterministicID(type, item) {
+        function generateDePeriodinisticID(type, item) {
             let hashBase = '';
 
             switch (type) {
@@ -9568,7 +9581,7 @@
 
         function generateIDSafe(type, item = null) {
             if (item && typeof item === 'object') {
-                return generateDeterministicID(type, item);
+                return generateDePeriodinisticID(type, item);
             }
             return generateID(type);
         }
@@ -9613,7 +9626,7 @@
 
                 if (!uniqueMap.has(contentKey)) {
                     if (!item.id) {
-                        item.id = generateDeterministicID(type, item);
+                        item.id = generateDePeriodinisticID(type, item);
                     }
                     uniqueMap.set(contentKey, item);
                 } else {
