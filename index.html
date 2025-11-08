@@ -908,11 +908,37 @@
             width: 100%;
             max-width: 220px; /* keep compact across devices */
             box-sizing: border-box;
+            -webkit-appearance: none; /* normalize iOS Safari */
+            appearance: none;
+            height: 36px;
+            line-height: 1.2;
+            padding: 6px 28px 6px 10px; /* space for picker icon */
+            border: 2px solid rgba(0,0,0,0.1);
+            border-radius: 8px;
         }
         .form-group input[type="date"],
         .filter-row input[type="date"] {
             flex: 0 1 220px; /* allow shrink/grow but cap width */
             min-width: 0;    /* avoid flex min-content overflow */
+        }
+        /* Ensure date inputs can shrink within filter groups on iOS */
+        .filter-row .form-group { min-width: 0; flex: 0 1 auto; }
+
+        /* iOS-specific tuning */
+        @supports (-webkit-touch-callout: none) {
+            input[type="date"] {
+                max-width: clamp(140px, 42vw, 220px);
+                /* flex-basis mirrors max-width to prevent overflow */
+                /* Use both to handle different flex contexts */
+            }
+            .form-group input[type="date"],
+            .filter-row input[type="date"] {
+                flex-basis: clamp(140px, 42vw, 220px);
+                font-size: 14px;
+            }
+            .filter-row input[type="date"]::-webkit-calendar-picker-indicator {
+                right: 6px;
+            }
         }
 
         .alert-box {
