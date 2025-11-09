@@ -77,6 +77,13 @@
             padding-top: max(16px, env(safe-area-inset-top));
             padding-left: max(16px, env(safe-area-inset-left));
             padding-right: max(16px, env(safe-area-inset-right));
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            /* above banners */
+            background: #ffffff;
+            /* prevent content showing through when stuck */
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
         }
 
         .bottom-nav {
@@ -8596,7 +8603,9 @@
                 }
             });
 
-            const entries = Object.entries(categoryStats).sort((a, b) => b[1].profit - a[1].profit);
+            const entries = Object.entries(categoryStats)
+                .sort((a, b) => b[1].profit - a[1].profit)
+                .slice(0, 2);
 
             if (entries.length === 0) {
                 return '<p style="text-align: center; color: #666;">No category data yet</p>';
@@ -8626,7 +8635,9 @@
                 productStats[s.productName].revenue += s.totalPrice;
             });
 
-            const entries = Object.entries(productStats).sort((a, b) => b[1].profit - a[1].profit).slice(0, 10);
+            const entries = Object.entries(productStats)
+                .sort((a, b) => b[1].profit - a[1].profit)
+                .slice(0, 2);
 
             if (entries.length === 0) {
                 return '<p style="text-align: center; color: #666;">No product data yet</p>';
@@ -8654,7 +8665,9 @@
                 return '<p style="text-align: center; color: #666;">No payment data yet</p>';
             }
 
-            const entries = Object.entries(paymentTotals).sort((a, b) => b[1] - a[1]);
+            const entries = Object.entries(paymentTotals)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 2);
             return entries.map(([method, total]) => `
                 <div class="item">
                     <div style="display: flex; justify-content: space-between;">
@@ -8705,9 +8718,10 @@
                 return '<p style="text-align: center; color: #666;">No transaction data yet</p>';
             }
 
-            const entries = Object.entries(transactionTotals).filter(([channel, amounts]) =>
-                amounts.deposit > 0 || amounts.withdrawal > 0
-            );
+            const entries = Object.entries(transactionTotals)
+                .filter(([channel, amounts]) => amounts.deposit > 0 || amounts.withdrawal > 0)
+                .sort((a, b) => (b[1].deposit + b[1].withdrawal) - (a[1].deposit + a[1].withdrawal))
+                .slice(0, 2);
 
             return entries.map(([channel, amounts]) => `
                 <div class="item">
@@ -11124,6 +11138,13 @@
                         const offlineBannerEl = document.getElementById('offlineBanner');
                         const updateOfflineBanner = () => {
                             if (!offlineBannerEl) return;
+                            // Keep banner just below sticky header
+                            const headerEl = document.querySelector('.header');
+                            if (headerEl) {
+                                offlineBannerEl.style.top = headerEl.offsetHeight + 'px';
+                                offlineBannerEl.style.position = 'sticky';
+                                offlineBannerEl.style.zIndex = '150';
+                            }
                             if (navigator.onLine) {
                                 offlineBannerEl.style.display = 'none';
                                 offlineBannerEl.textContent = '';
@@ -11141,6 +11162,12 @@
                         const authBannerEl = document.getElementById('authBanner');
                         window.updateAuthBanner = () => {
                             if (!authBannerEl) return;
+                            const headerEl = document.querySelector('.header');
+                            if (headerEl) {
+                                authBannerEl.style.top = headerEl.offsetHeight + 'px';
+                                authBannerEl.style.position = 'sticky';
+                                authBannerEl.style.zIndex = '140';
+                            }
                             if (!navigator.onLine) {
                                 authBannerEl.style.display = 'none';
                                 authBannerEl.textContent = '';
@@ -11182,6 +11209,11 @@
                             } catch (e) { /* no-op */ }
                         });
                         window.addEventListener('offline', () => {
+                            updateOfflineBanner();
+                            window.updateAuthBanner && window.updateAuthBanner();
+                        });
+                        // Recompute banner offsets on resize
+                        window.addEventListener('resize', () => {
                             updateOfflineBanner();
                             window.updateAuthBanner && window.updateAuthBanner();
                         });
