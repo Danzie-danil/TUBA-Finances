@@ -114,11 +114,154 @@
             z-index: 50;
         }
 
+        /* FAB (Floating Action Button) and radial tabs */
+        .fab-container {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 8px;
+            /* above bottom nav */
+            z-index: 1000;
+        }
+
+        .fab {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+            background: linear-gradient(145deg, #7b1fa2, #4a148c);
+        }
+
+        .fab:active {
+            transform: scale(0.98);
+        }
+
+        /* FAB hint: subtle pulsing ring to indicate tap */
+        .fab.hint::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(123, 31, 162, 0.5);
+            animation: fab-pulse 1.8s ease-out infinite;
+        }
+
+        @keyframes fab-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(123, 31, 162, 0.45);
+            }
+
+            70% {
+                box-shadow: 0 0 0 14px rgba(123, 31, 162, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(123, 31, 162, 0);
+            }
+        }
+
+        .fab-menu {
+            position: absolute;
+            left: 50%;
+            bottom: 28px;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            pointer-events: none;
+            /* enable items only when open */
+        }
+
+        .fab-item {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            border: none;
+            color: #fff;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+            background: linear-gradient(145deg, #1976d2, #0d47a1);
+            transform: translate(0, 0) scale(0.6);
+            opacity: 0;
+            transition: transform 0.35s cubic-bezier(.2, .8, .2, 1), opacity 0.25s ease-out;
+            overflow: visible;
+        }
+
+        .fab-icon {
+            pointer-events: none;
+            color: #fff;
+        }
+
+        .fab-label {
+            position: absolute;
+            top: 52px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            font-weight: 600;
+            color: #222;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2px 6px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            white-space: nowrap;
+            max-width: 96px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            z-index: 2;
+        }
+
+        .fab-item:hover {
+            filter: brightness(1.05);
+        }
+
+        .fab-container.open .fab-menu {
+            pointer-events: auto;
+        }
+
+        .fab-container.open .fab-item {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        @keyframes fab-spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .fab-container.open .fab {
+            animation: fab-spin 0.6s ease-out;
+        }
+
         /* Splash screen styles */
         .privacy-blur {
             filter: blur(8px);
             -webkit-filter: blur(8px);
             transition: filter 0.3s ease;
+        }
+
+        /* Hide legacy bottom nav in favor of FAB menu */
+        .bottom-nav {
+            display: none;
         }
 
         .privacy-toggle-btn {
@@ -1601,7 +1744,12 @@
         </div>
 
         <div class="content" id="app"></div>
-        <div class="bottom-nav" id="bottomNav"></div>
+        <div class="bottom-nav" id="bottomNav" style="display:none;"></div>
+        <!-- Floating Action Button & radial tab menu -->
+        <div id="fabContainer" class="fab-container" aria-label="Open tab menu">
+            <button id="fabButton" class="fab" title="Quick Tabs">☰</button>
+            <div id="fabMenu" class="fab-menu" aria-hidden="true"></div>
+        </div>
     </div>
 
     <div class="modal" id="noteModal">
@@ -3373,6 +3521,121 @@
                 state.privacyBlurred = true;
             }
             render();
+        }
+
+        // FAB: build radial menu from tabs and handle open/close/positioning
+        function initFabMenu() {
+            const container = document.getElementById('fabContainer');
+            const button = document.getElementById('fabButton');
+            const menu = document.getElementById('fabMenu');
+            if (!container || !button || !menu) return;
+
+            // Build items once
+            if (!menu.dataset.built) {
+                try {
+                    menu.innerHTML = (typeof tabs !== 'undefined' ? tabs : []).map(t => `
+                        <button class="fab-item" data-tab="${t.id}" title="${t.label}">
+                            <span class="fab-icon">${t.icon}</span>
+                            <span class="fab-label">${t.label}</span>
+                        </button>
+                    `).join('');
+                    menu.dataset.built = '1';
+                } catch (e) { /* no-op */ }
+            }
+
+            const items = Array.from(menu.querySelectorAll('.fab-item'));
+
+            function positionItems() {
+                const spacing = 56; // compact spacing with room for labels
+                const rowOffsetY = -84; // lift row above FAB so labels are visible
+                const count = items.length;
+                if (count === 0 || typeof tabs === 'undefined') return;
+
+                const expIndex = tabs.findIndex(t => t.id === 'expenses');
+                const stockIndex = tabs.findIndex(t => t.id === 'inventory');
+                const leftIDs = tabs.slice(0, Math.max(0, expIndex)).map(t => t.id);
+                const rightIDs = tabs.slice(Math.max(stockIndex + 1, 0)).map(t => t.id);
+
+                // Order nearest to FAB first
+                const leftOrder = leftIDs.slice().reverse();
+                const rightOrder = rightIDs.slice();
+
+                items.forEach((el) => {
+                    const tabId = el.getAttribute('data-tab');
+                    let x = 0;
+                    let y = rowOffsetY;
+                    if (leftOrder.includes(tabId)) {
+                        const idxL = leftOrder.indexOf(tabId);
+                        x = -((idxL + 2) * spacing); // push left side farther from FAB
+                        el.style.display = 'block';
+                    } else if (rightOrder.includes(tabId)) {
+                        const idxR = rightOrder.indexOf(tabId);
+                        x = ((idxR + 1) * spacing);
+                        el.style.display = 'block';
+                    } else {
+                        // Hide tabs not in left or right groups (e.g., expenses, inventory)
+                        el.style.display = 'none';
+                        return;
+                    }
+                    el.style.transform = `translate(${x}px, ${y}px) scale(1)`;
+                    el.style.opacity = '1';
+                    el.style.transitionDelay = '0.01s';
+                });
+            }
+
+            function resetPositions() {
+                items.forEach(el => {
+                    el.style.transform = 'translate(0,0) scale(0.6)';
+                    el.style.opacity = '0';
+                });
+            }
+
+            function toggleFab(open) {
+                const isOpen = container.classList.contains('open');
+                const next = (open === undefined) ? !isOpen : open;
+                if (next) {
+                    container.classList.add('open');
+                    positionItems();
+                    menu.setAttribute('aria-hidden', 'false');
+                } else {
+                    container.classList.remove('open');
+                    resetPositions();
+                    menu.setAttribute('aria-hidden', 'true');
+                }
+            }
+
+            // Open/close
+            button.onclick = () => {
+                // clear hint on first open
+                try {
+                    if (button.classList.contains('hint')) {
+                        button.classList.remove('hint');
+                        localStorage.setItem('fabHintSeen', '1');
+                    }
+                } catch (e) { }
+                toggleFab();
+            };
+            // Click on item navigates and closes
+            items.forEach(el => {
+                el.onclick = (e) => {
+                    const tabId = el.getAttribute('data-tab');
+                    try { switchTab(tabId); } catch (err) { }
+                    toggleFab(false);
+                };
+            });
+            // Close on outside click
+            document.addEventListener('click', (e) => {
+                const isInside = container.contains(e.target);
+                if (!isInside) toggleFab(false);
+            });
+
+            // Initialize positions closed
+            toggleFab(false);
+            // Show hint if not seen yet
+            try {
+                const seen = localStorage.getItem('fabHintSeen') === '1';
+                if (!seen) button.classList.add('hint');
+            } catch (e) { }
         }
 
         function showToast(message, type = "info", actionText = null, actionHandler = null, durationMs = 3000, onClickHandler = null) {
@@ -11048,6 +11311,8 @@
                                 }
                             });
                         });
+                        // Initialize Floating Action Button menu
+                        try { initFabMenu(); } catch (e) { }
                     } catch (error) {
                         console.log('SW registration failed: ', error);
                     }
