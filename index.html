@@ -2220,10 +2220,12 @@
                 try {
                     if (localHasData) {
                         // Smart merge - combine unique items by ID
+                        showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                         await smartMergeData();
                         showToast('Local and cloud data merged successfully', 'success');
                     } else {
                         // No local data, just pull from cloud
+                        showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                         await pullDataFromSupabase();
                         showToast('Cloud data loaded', 'success');
                     }
@@ -2245,6 +2247,7 @@
         async function smartMergeData() {
             try {
                 updateSyncIndicator('syncing');
+                showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                 console.log('🔄 Starting smart merge...');
 
                 // Save local data BEFORE pulling from cloud
@@ -2255,7 +2258,8 @@
                     customers: [...(state.customers || [])],
                     transactions: [...(state.transactions || [])],
                     unpaidEntries: [...(state.unpaidEntries || [])],
-                    notes: [...(state.notes || [])]
+                    notes: [...(state.notes || [])],
+                    categories: [...(state.categories || [])]
                 };
 
                 console.log('📱 Local data counts:', {
@@ -2332,6 +2336,8 @@
                 state.transactions = mergeByID(localData.transactions, cloudData.transactions, 'transactions');
                 state.unpaidEntries = mergeByID(localData.unpaidEntries, cloudData.unpaidEntries, 'unpaid');
                 state.notes = mergeByID(localData.notes, cloudData.notes, 'notes');
+                // Categories: merge by name (set uniqueness)
+                state.categories = Array.from(new Set([...(localData.categories || []), ...((cloudData.categories) || [])]));
 
                 // Final pass: content-based deduplication per type
                 state.sales = deduplicateByContent(state.sales, 'sales');
@@ -2382,7 +2388,8 @@
                     { data: customers },
                     { data: transactions },
                     { data: unpaidEntries },
-                    { data: notes }
+                    { data: notes },
+                    { data: categories }
                 ] = await Promise.all([
                     supabase.from('products').select('*').eq('user_id', currentUser.id),
                     supabase.from('sales').select('*').eq('user_id', currentUser.id),
@@ -2390,7 +2397,8 @@
                     supabase.from('customers').select('*').eq('user_id', currentUser.id),
                     supabase.from('transactions').select('*').eq('user_id', currentUser.id),
                     supabase.from('unpaid_entries').select('*').eq('user_id', currentUser.id),
-                    supabase.from('notes').select('*').eq('user_id', currentUser.id)
+                    supabase.from('notes').select('*').eq('user_id', currentUser.id),
+                    supabase.from('categories').select('*').eq('user_id', currentUser.id)
                 ]);
 
                 return {
@@ -2400,13 +2408,14 @@
                     customers: customers || [],
                     transactions: transactions || [],
                     unpaidEntries: unpaidEntries || [],
-                    notes: notes || []
+                    notes: notes || [],
+                    categories: (categories || []).map(c => c.name).filter(Boolean)
                 };
             } catch (error) {
                 console.error('Error fetching cloud data:', error);
                 return {
                     sales: [], products: [], expenses: [], customers: [],
-                    transactions: [], unpaidEntries: [], notes: []
+                    transactions: [], unpaidEntries: [], notes: [], categories: []
                 };
             }
         }
@@ -2785,34 +2794,65 @@
             if (!syncEnabled || !currentUser) return;
 
             try {
-                // SAFEGUARD: Check if we have local data that should be preserved
+                showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                 const hasLocalData = state.products.length > 0 || state.sales.length > 0 ||
                     state.expenses.length > 0 || state.customers.length > 0;
 
-                // Quick check: count total records in cloud
-                if (hasLocalData) {
-                    const { count: cloudCount } = await supabase
-                        .from('products')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('user_id', currentUser.id);
+                console.log('📥 Pulling data from cloud (parallel)...');
 
-                    if (cloudCount === 0) {
-                        console.log('⚠️ Cloud data is empty, preserving local data');
-                        console.log('💡 Use "Push to Cloud" if you want to upload your local data');
-                        return; // Don't overwrite local data with empty cloud data
-                    }
+                const [
+                    { data: products },
+                    { data: sales },
+                    { data: expenses },
+                    { data: customers },
+                    { data: invoices },
+                    { data: receipts },
+                    { data: inventory },
+                    { data: notes },
+                    { data: transactions },
+                    { data: unpaidEntries },
+                    { data: floats },
+                    { data: settings, error: settingsErr },
+                    { data: cloudCycles, error: cyclesErr },
+                    { data: cloudPurchases, error: purchasesPullErr },
+                    { data: categories }
+                ] = await Promise.all([
+                    supabase.from('products').select('name,category,cost,price,has_stock').eq('user_id', currentUser.id),
+                    supabase.from('sales').select('date,time,timestamp,product_name,customer,quantity,cost_per_unit,price_per_unit,total_cost,total_price,payment').eq('user_id', currentUser.id).order('timestamp', { ascending: false }),
+                    supabase.from('expenses').select('date,time,timestamp,description,category,amount,payment,comment').eq('user_id', currentUser.id),
+                    supabase.from('customers').select('name,email,phone,address,total_purchases').eq('user_id', currentUser.id),
+                    supabase.from('invoices').select('number,customer,date,due_date,items,amount,status').eq('user_id', currentUser.id),
+                    supabase.from('receipts').select('number,customer,customer_email,date,time,timestamp,description,amount,payment_method').eq('user_id', currentUser.id),
+                    supabase.from('inventory').select('product_name,stock,min_alert').eq('user_id', currentUser.id),
+                    supabase.from('notes').select('title,content,date,time,timestamp').eq('user_id', currentUser.id),
+                    supabase.from('transactions').select('channel,customer_name,type,amount,date,time,timestamp').eq('user_id', currentUser.id),
+                    supabase.from('unpaid_entries').select('name,type,amount,date,time,timestamp,paid').eq('user_id', currentUser.id),
+                    supabase.from('transaction_floats').select('channel,initial_float').eq('user_id', currentUser.id),
+                    supabase.from('settings').select('daily_target,monthly_target').eq('user_id', currentUser.id).single(),
+                    supabase.from('inventory_purchase_periods').select('period_number,title,start_date,end_date,notes').eq('user_id', currentUser.id),
+                    supabase.from('inventory_purchases').select('period_number,item_name,quantity,unit_cost,total_cost,purchase_date,supplier_name,supplier_phone,supplier_address,notes,timestamp').eq('user_id', currentUser.id),
+                    supabase.from('categories').select('name').eq('user_id', currentUser.id)
+                ]);
+
+                const totalRecords = (
+                    (products?.length || 0) + (sales?.length || 0) + (expenses?.length || 0) +
+                    (customers?.length || 0) + (invoices?.length || 0) + (receipts?.length || 0) +
+                    (inventory?.length || 0) + (notes?.length || 0) + (transactions?.length || 0) +
+                    (unpaidEntries?.length || 0) + (cloudCycles?.length || 0) + (cloudPurchases?.length || 0) +
+                    (categories?.length || 0)
+                );
+
+                if (hasLocalData && totalRecords === 0) {
+                    console.log('⚠️ Cloud data is empty, preserving local data');
+                    console.log('💡 Use "Push to Cloud" if you want to upload your local data');
+                    return;
                 }
 
-                console.log('📥 Pulling data from cloud...');
+                // Replace local cache only when cloud has data
+                localStorage.removeItem('financeManagerData');
 
-                // Products
-                const { data: products } = await supabase
-                    .from('products')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
                 if (products && products.length > 0) {
-                    const cloudProducts = products.map(p => ({
-                        // Use stable ID derived from name to avoid duplicate IDs between offline and cloud
+                    state.products = products.map(p => ({
                         id: `P-${(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
                         name: p.name,
                         category: p.category,
@@ -2820,16 +2860,8 @@
                         price: parseFloat(p.price),
                         hasStock: (p.has_stock === false) ? false : true
                     }));
-                    // Merge with any existing local products and deduplicate by content
-                    state.products = deduplicateByContent([...state.products, ...cloudProducts], 'products');
                 }
 
-                // Sales
-                const { data: sales } = await supabase
-                    .from('sales')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .order('timestamp', { ascending: false });
                 if (sales && sales.length > 0) {
                     state.sales = sales.map(s => ({
                         id: `S-${s.timestamp}`,
@@ -2848,24 +2880,10 @@
                     }));
                 }
 
-                // Categories
-                const { data: categories } = await supabase
-                    .from('categories')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
                 if (categories && categories.length > 0) {
-                    const cloudCategories = categories.map(c => c.name).filter(Boolean);
-                    // Merge cloud + local category names uniquely
-                    const mergedCats = Array.from(new Set([...(state.categories || []), ...cloudCategories]));
-                    state.categories = mergedCats;
+                    state.categories = categories.map(c => c.name);
                 }
 
-                // Expenses
-                const { data: expenses } = await supabase
-                    .from('expenses')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Expenses
                 if (expenses && expenses.length > 0) state.expenses = expenses.map(e => ({
                     id: `E-${e.timestamp}`,
                     date: e.date,
@@ -2878,14 +2896,8 @@
                     comment: e.comment
                 }));
 
-                // Customers
-                const { data: customers } = await supabase
-                    .from('customers')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Customers
                 if (customers && customers.length > 0) state.customers = customers.map(c => ({
-                    id: `C-${c.name.replace(/\s+/g, '_')}_${Date.now()}`,
+                    id: `C-${(c.name || '').replace(/\s+/g, '_')}_${Date.now()}`,
                     name: c.name,
                     email: c.email || '',
                     phone: c.phone || '',
@@ -2893,12 +2905,6 @@
                     totalPurchases: parseFloat(c.total_purchases || 0)
                 }));
 
-                // Invoices
-                const { data: invoices } = await supabase
-                    .from('invoices')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Invoices
                 if (invoices && invoices.length > 0) state.invoices = invoices.map(i => ({
                     id: `INV-${i.number}`,
                     number: i.number,
@@ -2910,11 +2916,6 @@
                     status: i.status
                 }));
 
-                // Receipts
-                const { data: receipts } = await supabase
-                    .from('receipts')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
                 if (receipts && receipts.length > 0) state.receipts = receipts.map(r => ({
                     id: `RCPT-${r.timestamp}`,
                     number: r.number,
@@ -2928,16 +2929,8 @@
                     paymentMethod: r.payment_method
                 }));
 
-                // Inventory
-                const { data: inventory } = await supabase
-                    .from('inventory')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
                 if (inventory && inventory.length > 0) {
-                    // Preserve existing inventory if not in cloud
-                    if (!state.inventory) {
-                        state.inventory = {};
-                    }
+                    if (!state.inventory) state.inventory = {};
                     inventory.forEach(item => {
                         state.inventory[item.product_name] = {
                             stock: parseInt(item.stock) || 0,
@@ -2946,13 +2939,6 @@
                     });
                 }
 
-                // Don't reset inventory if cloud has no data - keep local data
-                // Notes
-                const { data: notes } = await supabase
-                    .from('notes')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Notes
                 if (notes && notes.length > 0) state.notes = notes.map(n => ({
                     id: `N-${n.timestamp}`,
                     title: n.title || '',
@@ -2962,12 +2948,6 @@
                     timestamp: n.timestamp
                 }));
 
-                // Transactions
-                const { data: transactions } = await supabase
-                    .from('transactions')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Transactions
                 if (transactions && transactions.length > 0) state.transactions = transactions.map(t => ({
                     id: `T-${t.timestamp}`,
                     channel: t.channel,
@@ -2979,12 +2959,6 @@
                     timestamp: t.timestamp
                 }));
 
-                // Unpaid entries
-                const { data: unpaidEntries } = await supabase
-                    .from('unpaid_entries')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Unpaid entries
                 if (unpaidEntries && unpaidEntries.length > 0) state.unpaidEntries = unpaidEntries.map(u => ({
                     id: `U-${u.timestamp}`,
                     name: u.name,
@@ -2996,11 +2970,6 @@
                     paid: u.paid
                 }));
 
-                // Transaction floats
-                const { data: floats } = await supabase
-                    .from('transaction_floats')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
                 if (floats && floats.length > 0) {
                     floats.forEach(f => {
                         if (state.transactionFloats[f.channel]) {
@@ -3009,23 +2978,12 @@
                     });
                 }
 
-                // Settings
-                const { data: settings } = await supabase
-                    .from('settings')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .single();
-                if (settings) {
+                if (settings && !settingsErr) {
                     state.dailyTarget = parseFloat(settings.daily_target || 0);
                     state.monthlyTarget = parseFloat(settings.monthly_target || 0);
                 }
 
-                // Inventory purchase Periods (cycles)
-                const { data: cloudCycles, error: cyclesErr } = await supabase
-                    .from('inventory_purchase_periods')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (cyclesErr) console.warn('Pull periods error:', cyclesErr.message || cyclesErr);
+                if (cyclesErr) console.warn('Pull periods error:', cyclesErr?.message || cyclesErr);
                 if (cloudCycles && cloudCycles.length > 0) {
                     state.inventoryPurchaseCycles = cloudCycles.map(c => ({
                         id: generateID('invCycle'),
@@ -3037,12 +2995,7 @@
                     }));
                 }
 
-                // Inventory purchases
-                const { data: cloudPurchases, error: purchasesPullErr } = await supabase
-                    .from('inventory_purchases')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (purchasesPullErr) console.warn('Pull purchases error:', purchasesPullErr.message || purchasesPullErr);
+                if (purchasesPullErr) console.warn('Pull purchases error:', purchasesPullErr?.message || purchasesPullErr);
                 if (cloudPurchases && cloudPurchases.length > 0) {
                     state.inventoryPurchases = cloudPurchases.map(p => ({
                         id: generateID('invPurchase'),
@@ -3062,9 +3015,7 @@
 
                 calculateFloatBalances();
                 saveData();
-                setTimeout(() => {
-                    render();
-                }, 100);
+                setTimeout(() => { render(); }, 100);
             } catch (error) {
                 console.error('Pull error:', error);
             }
@@ -4144,6 +4095,7 @@
             }
 
             updateSyncIndicator('syncing');
+            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
 
             try {
                 console.log('⬇️ Pulling data from cloud...');
@@ -4174,6 +4126,7 @@
             }
 
             updateSyncIndicator('syncing');
+            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
 
             try {
                 console.log('⬆️ Pushing data to cloud...');
@@ -10154,6 +10107,7 @@
         async function smartMergeDataFixed() {
             try {
                 updateSyncIndicator('syncing');
+                showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                 console.log('🔄 Starting smart merge with duplicate prevention...');
 
                 const localData = {
@@ -10958,9 +10912,11 @@
 
                     try {
                         if (localHasData) {
+                            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                             await smartMergeData();
                             showToast('Local and cloud data merged successfully', 'success');
                         } else {
+                            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                             await pullDataFromSupabase();
                             showToast('Cloud data loaded', 'success');
                         }
