@@ -3751,6 +3751,10 @@
                 🧹 Clean Cloud Duplicates
             </button>
             
+            <button onclick="signOut()" class="btn-danger" style="margin-bottom: 12px;">
+                Sign Out
+            </button>
+            
             <div class="card" style="margin-top: 12px;">
                 <h3>🖼️ Business Logo</h3>
                 <p style="color:#666;font-size:13px;margin-bottom:8px;">Upload your logo (PNG/JPEG). It appears on all PDFs before your business name.</p>
@@ -3766,10 +3770,6 @@
             </div>
             
             <!-- Removed in-app dashboard refresh button -->
-
-            <button onclick="signOut()" class="btn-danger">
-                Sign Out
-            </button>
 
             <div class="alert-info">
                 <strong>Sync Options:</strong><br>
@@ -3910,12 +3910,36 @@
                 document.getElementById('signupForm').style.display = 'none';
                 document.getElementById('loginTab').classList.add('active');
                 document.getElementById('signupTab').classList.remove('active');
+                // Attempt auto submit if autofill has already populated fields
+                try { autoSubmitLoginIfAutofilled(); } catch (e) { /* no-op */ }
             } else {
                 document.getElementById('loginForm').style.display = 'none';
                 document.getElementById('signupForm').style.display = 'block';
                 document.getElementById('loginTab').classList.remove('active');
                 document.getElementById('signupTab').classList.add('active');
             }
+        }
+
+        // Detect autofill and auto submit sign in
+        function autoSubmitLoginIfAutofilled() {
+            const emailEl = document.getElementById('loginEmail');
+            const passEl = document.getElementById('loginPassword');
+            const btn = document.querySelector('#loginForm button[onclick="handleSignIn()"]');
+            if (!emailEl || !passEl || !btn) return;
+
+            let attempts = 0;
+            const maxAttempts = 15; // ~3 seconds
+            const timer = setInterval(() => {
+                attempts++;
+                const email = (emailEl.value || '').trim();
+                const pwd = (passEl.value || '').trim();
+                if (email && pwd) {
+                    clearInterval(timer);
+                    try { handleSignIn(); } catch (e) { /* no-op */ }
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(timer);
+                }
+            }, 200);
         }
         async function pullFromCloud() {
             if (!syncEnabled || !currentUser) {
@@ -10433,6 +10457,10 @@
         window.render = function () {
             originalRender();
             updateSideNavAuthButton();
+            // Auto-submit login if autofill populated credentials
+            if (state.activeTab === 'account' && !currentUser) {
+                try { autoSubmitLoginIfAutofilled(); } catch (e) { /* no-op */ }
+            }
         };
 
         // Override toggleSideNav to update button when opened
