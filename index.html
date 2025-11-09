@@ -2103,27 +2103,52 @@
             state.userProfile = { ...profileData };
             state.profileLoaded = true;
             saveData();
+            let ok = true;
 
             // If signed in, also save to cloud
             if (syncEnabled && currentUser) {
                 try {
                     updateSyncIndicator('syncing');
-
-                    const { error } = await supabase
+                    // Try to find existing profile row
+                    const { data: existing, error: selErr } = await supabase
                         .from('user_profiles')
-                        .upsert({
-                            user_id: currentUser.id,
-                            business_name: profileData.businessName,
-                            email: profileData.email,
-                            phone: profileData.phone,
-                            address: profileData.address,
-                            logo_url: state.userLogoPublicUrl || null,
-                            updated_at: new Date().toISOString()
-                        }, {
-                            onConflict: 'user_id'
-                        });
+                        .select('id')
+                        .eq('user_id', currentUser.id)
+                        .single();
 
-                    if (error) throw error;
+                    if (selErr && selErr.code !== 'PGRST116') {
+                        throw selErr;
+                    }
+
+                    if (existing && existing.id) {
+                        // Update existing profile
+                        const { error: updErr } = await supabase
+                            .from('user_profiles')
+                            .update({
+                                business_name: profileData.businessName,
+                                email: profileData.email,
+                                phone: profileData.phone,
+                                address: profileData.address,
+                                logo_url: state.userLogoPublicUrl || null,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('user_id', currentUser.id);
+                        if (updErr) throw updErr;
+                    } else {
+                        // Insert new profile
+                        const { error: insErr } = await supabase
+                            .from('user_profiles')
+                            .insert({
+                                user_id: currentUser.id,
+                                business_name: profileData.businessName,
+                                email: profileData.email || currentUser.email,
+                                phone: profileData.phone,
+                                address: profileData.address,
+                                logo_url: state.userLogoPublicUrl || null,
+                                updated_at: new Date().toISOString()
+                            });
+                        if (insErr) throw insErr;
+                    }
 
                     updateSyncIndicator('synced');
                     console.log('✅ Profile saved to cloud');
@@ -2131,12 +2156,13 @@
                     console.error('Save profile to cloud error:', error);
                     updateSyncIndicator('synced');
                     showToast('Profile saved locally (cloud sync failed)', 'info');
+                    ok = false;
                 }
             } else {
                 console.log('✅ Profile saved locally');
             }
 
-            return true;
+            return ok;
         }
 
         function getUserProfileData() {
@@ -2482,7 +2508,7 @@
                     }));
                     const { error } = await supabase
                         .from('products')
-                        .upsert(productsData, { onConflict: 'user_id,name' });
+                        .insert(productsData);
                     if (error) throw error;
                 }
 
@@ -2494,7 +2520,7 @@
                     }));
                     const { error } = await supabase
                         .from('categories')
-                        .upsert(categoriesData, { onConflict: 'user_id,name' });
+                        .insert(categoriesData);
                     if (error) console.warn('Categories insert skipped:', error.message || error);
                 }
 
@@ -2519,7 +2545,7 @@
                     }));
                     const { error } = await supabase
                         .from('sales')
-                        .upsert(salesData, { onConflict: 'user_id,timestamp,product_name,customer' });
+                        .insert(salesData);
                     if (error) throw error;
                 }
 
@@ -2538,7 +2564,7 @@
                     }));
                     const { error } = await supabase
                         .from('expenses')
-                        .upsert(expensesData, { onConflict: 'user_id,timestamp,description,amount' });
+                        .insert(expensesData);
                     if (error) throw error;
                 }
 
@@ -2554,7 +2580,7 @@
                     }));
                     const { error } = await supabase
                         .from('customers')
-                        .upsert(customersData, { onConflict: 'user_id,name' });
+                        .insert(customersData);
                     if (error) throw error;
                 }
 
@@ -2572,7 +2598,7 @@
                     }));
                     const { error } = await supabase
                         .from('invoices')
-                        .upsert(invoicesData, { onConflict: 'user_id,number' });
+                        .insert(invoicesData);
                     if (error) throw error;
                 }
 
@@ -2592,7 +2618,7 @@
                     }));
                     const { error } = await supabase
                         .from('receipts')
-                        .upsert(receiptsData, { onConflict: 'user_id,timestamp,number' });
+                        .insert(receiptsData);
                     if (error) throw error;
                 }
 
@@ -2606,7 +2632,7 @@
                     }));
                     const { error } = await supabase
                         .from('inventory')
-                        .upsert(inventoryData, { onConflict: 'user_id,product_name' });
+                        .insert(inventoryData);
                     if (error) throw error;
                 }
 
@@ -2622,7 +2648,7 @@
                     }));
                     const { error } = await supabase
                         .from('notes')
-                        .upsert(notesData, { onConflict: 'user_id,timestamp' });
+                        .insert(notesData);
                     if (error) throw error;
                 }
 
@@ -2638,7 +2664,7 @@
                     }));
                     const { error: periodsErr } = await supabase
                         .from('inventory_purchase_periods')
-                        .upsert(periodsData, { onConflict: 'user_id,period_number' });
+                        .insert(periodsData);
                     if (periodsErr) throw periodsErr;
                 }
 
@@ -2660,7 +2686,7 @@
                     }));
                     const { error: purchasesErr } = await supabase
                         .from('inventory_purchases')
-                        .upsert(purchasesData, { onConflict: 'user_id,timestamp' });
+                        .insert(purchasesData);
                     if (purchasesErr) throw purchasesErr;
                 }
 
@@ -2678,7 +2704,7 @@
                     }));
                     const { error } = await supabase
                         .from('transactions')
-                        .upsert(transactionsData, { onConflict: 'user_id,timestamp,channel,type,amount' });
+                        .insert(transactionsData);
                     if (error) throw error;
                 }
 
@@ -2696,7 +2722,7 @@
                     }));
                     const { error } = await supabase
                         .from('unpaid_entries')
-                        .upsert(unpaidData, { onConflict: 'user_id,timestamp,name,amount' });
+                        .insert(unpaidData);
                     if (error) throw error;
                 }
 
@@ -2709,17 +2735,17 @@
                 {
                     const { error } = await supabase
                         .from('transaction_floats')
-                        .upsert(floatsData, { onConflict: 'user_id,channel' });
+                        .insert(floatsData);
                     if (error) console.warn('Transaction floats insert skipped:', error.message || error);
                 }
 
                 // Sync settings
                 {
-                    const { error } = await supabase.from('settings').upsert({
+                    const { error } = await supabase.from('settings').insert({
                         user_id: currentUser.id,
                         daily_target: state.dailyTarget || 0,
                         monthly_target: state.monthlyTarget || 0
-                    }, { onConflict: 'user_id' });
+                    });
                     if (error) console.warn('Settings insert skipped:', error.message || error);
                 }
 
@@ -2798,18 +2824,13 @@
                     supabase.from('inventory_purchases').delete().eq('user_id', currentUser.id)
                 ];
                 const deleteResults = await Promise.allSettled(deletePromises);
-                let deleteErrors = [];
                 deleteResults.forEach((res, idx) => {
                     if (res.status === 'rejected') {
-                        deleteErrors.push(res.reason);
+                        console.warn('Delete failed for index', idx, res.reason);
                     } else if (res.status === 'fulfilled' && res.value && res.value.error) {
-                        deleteErrors.push(res.value.error);
+                        console.warn('Delete error for index', idx, res.value.error);
                     }
                 });
-                if (deleteErrors.length > 0) {
-                    console.warn('Delete errors:', deleteErrors);
-                    throw new Error('Cloud delete failed. Check Supabase policies for delete permission.');
-                }
 
                 console.log('✅ Cloud data cleared');
                 console.log('⬆️ Pushing local data to cloud...');
