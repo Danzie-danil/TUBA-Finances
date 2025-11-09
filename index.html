@@ -3173,6 +3173,7 @@
         let cachedStats = null;
         let lastStatsUpdate = 0;
         let isSyncing = false;
+        let pendingSyncTimer = null; // debounce immediate background sync after saves
         let idCounters = {              // ADD THIS ENTIRE OBJECT
             sales: 0,
             products: 0,
@@ -3441,6 +3442,13 @@
             cachedStats = null; // Clear cache when data changes
             try {
                 localStorage.setItem('financeManagerData', JSON.stringify(state));
+                // Immediately schedule a background sync after any user data change
+                if (syncEnabled && currentUser) {
+                    try { if (pendingSyncTimer) clearTimeout(pendingSyncTimer); } catch (e) { /* no-op */ }
+                    pendingSyncTimer = setTimeout(() => {
+                        try { window.syncInBackground && window.syncInBackground(); } catch (e) { console.warn('Background sync trigger failed:', e); }
+                    }, 500); // small debounce to coalesce rapid saves
+                }
             } catch (e) {
                 console.error('Error saving data:', e);
                 showToast('Error saving data!', 'error');
