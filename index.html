@@ -1211,7 +1211,8 @@
             background: linear-gradient(145deg, #2e7d32, #1b5e20);
             color: white;
             display: none;
-            white-space: nowrap;
+            white-space: normal;
+            /* allow two-line label */
         }
 
         .sync-indicator.show {
@@ -1221,6 +1222,10 @@
         .sync-indicator.syncing {
             background: linear-gradient(145deg, #1976d2, #0d47a1);
             animation: pulse 1s infinite;
+        }
+
+        .sync-indicator.clickable {
+            cursor: pointer;
         }
 
         @keyframes pulse {
@@ -1954,13 +1959,20 @@
             if (!indicator) return;
 
             if (status === 'synced' && syncEnabled) {
-                indicator.textContent = '☁️ Synced';
-                indicator.className = 'sync-indicator show';
+                indicator.innerHTML = '☁️ Synced<br><span style="font-size:9px;opacity:0.9;">Click to 🔄</span>';
+                indicator.className = 'sync-indicator show clickable';
+                indicator.setAttribute('title', 'Push all data to cloud');
+                indicator.onclick = function () {
+                    try { pushToCloud(); } catch (e) { /* no-op */ }
+                };
             } else if (status === 'syncing') {
                 indicator.textContent = '🔄 Syncing...';
                 indicator.className = 'sync-indicator show syncing';
+                indicator.removeAttribute('title');
+                indicator.onclick = null;
             } else {
                 indicator.className = 'sync-indicator';
+                indicator.onclick = null;
             }
         }
 
