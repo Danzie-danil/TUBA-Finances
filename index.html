@@ -116,6 +116,11 @@
             z-index: 50;
         }
 
+        /* Blink animation for loading toasts */
+        .toast-loading {
+            animation: pulse 1.2s infinite;
+        }
+
         /* FAB (Floating Action Button) and radial tabs */
         .fab-container {
             position: fixed;
@@ -2247,7 +2252,7 @@
         async function smartMergeData() {
             try {
                 updateSyncIndicator('syncing');
-                showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
+                showLoadingToast();
                 console.log('🔄 Starting smart merge...');
 
                 // Save local data BEFORE pulling from cloud
@@ -2364,11 +2369,13 @@
                 // Push merged data back to cloud (clear and push to avoid server-side duplicates)
                 await clearAndPushAllData();
                 updateSyncIndicator('synced');
+                hideLoadingToast();
 
                 console.log('✅ Smart merge completed successfully');
             } catch (error) {
                 console.error('Smart merge error:', error);
                 updateSyncIndicator('synced');
+                hideLoadingToast();
                 throw error;
             }
         }
@@ -2845,6 +2852,7 @@
                 if (hasLocalData && totalRecords === 0) {
                     console.log('⚠️ Cloud data is empty, preserving local data');
                     console.log('💡 Use "Push to Cloud" if you want to upload your local data');
+                    hideLoadingToast();
                     return;
                 }
 
@@ -3502,6 +3510,35 @@
             setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, Math.max(1000, durationMs || 3000));
         }
 
+        // Persistent loading toast with blink animation
+        function showLoadingToast(message = 'Loading Your Data, Please wait...') {
+            try {
+                if (window.__loadingToast) {
+                    const span = window.__loadingToast.querySelector('span');
+                    if (span) span.textContent = message;
+                    return;
+                }
+                const t = document.createElement('div');
+                t.className = 'toast toast-info toast-loading';
+                const span = document.createElement('span');
+                span.textContent = message;
+                t.appendChild(span);
+                document.body.appendChild(t);
+                requestAnimationFrame(() => t.classList.add('show'));
+                window.__loadingToast = t;
+            } catch (e) { /* no-op */ }
+        }
+
+        function hideLoadingToast() {
+            try {
+                const t = window.__loadingToast;
+                if (!t) return;
+                t.classList.remove('show');
+                setTimeout(() => { try { t.remove(); } catch (e) { } }, 200);
+                window.__loadingToast = null;
+            } catch (e) { /* no-op */ }
+        }
+
         function showConfirm(text, onYes) {
             if (confirm(text)) {
                 onYes();
@@ -4095,7 +4132,7 @@
             }
 
             updateSyncIndicator('syncing');
-            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
+            showLoadingToast();
 
             try {
                 console.log('⬇️ Pulling data from cloud...');
@@ -4106,12 +4143,14 @@
                 // Pull everything from cloud
                 await pullDataFromSupabase();
 
+                hideLoadingToast();
                 updateSyncIndicator('synced');
                 showToast('Data pulled from cloud successfully!', 'success');
                 render();
             } catch (error) {
                 console.error('Pull error:', error);
                 showToast('Pull failed: ' + error.message, 'error');
+                hideLoadingToast();
                 updateSyncIndicator('synced');
             }
         }
@@ -4126,16 +4165,18 @@
             }
 
             updateSyncIndicator('syncing');
-            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
+            showLoadingToast();
 
             try {
                 console.log('⬆️ Pushing data to cloud...');
                 await clearAndPushAllData();
+                hideLoadingToast();
                 updateSyncIndicator('synced');
                 showToast('Data pushed to cloud successfully!', 'success');
             } catch (error) {
                 console.error('Push error:', error);
                 showToast('Push failed: ' + error.message, 'error');
+                hideLoadingToast();
                 updateSyncIndicator('synced');
             }
         }
@@ -10107,7 +10148,7 @@
         async function smartMergeDataFixed() {
             try {
                 updateSyncIndicator('syncing');
-                showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
+                showLoadingToast();
                 console.log('🔄 Starting smart merge with duplicate prevention...');
 
                 const localData = {
@@ -10280,11 +10321,13 @@
                 await clearAndPushAllData();
 
                 updateSyncIndicator('synced');
+                hideLoadingToast();
                 console.log('✅ Smart merge completed successfully');
 
             } catch (error) {
                 console.error('Smart merge error:', error);
                 updateSyncIndicator('synced');
+                hideLoadingToast();
                 throw error;
             }
         }
@@ -10912,17 +10955,20 @@
 
                     try {
                         if (localHasData) {
-                            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
+                            showLoadingToast();
                             await smartMergeData();
+                            hideLoadingToast();
                             showToast('Local and cloud data merged successfully', 'success');
                         } else {
-                            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
+                            showLoadingToast();
                             await pullDataFromSupabase();
+                            hideLoadingToast();
                             showToast('Cloud data loaded', 'success');
                         }
                     } catch (syncError) {
                         console.error('Sync error after sign in:', syncError);
                         showToast('Signed in but sync failed. Try manual sync.', 'error');
+                        hideLoadingToast();
                     }
 
                     return data;
