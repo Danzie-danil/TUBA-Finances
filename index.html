@@ -2949,7 +2949,27 @@
         }
 
         async function pullDataFromSupabase() {
-            if (!syncEnabled || !currentUser) return;
+            // Ensure we have a valid session/user even if flags are out of sync
+            if (!currentUser || !syncEnabled) {
+                try {
+                    const { data: { session }, error } = await supabase.auth.getSession();
+                    if (error) {
+                        console.error('Session check error:', error);
+                        showToast('Not signed in', 'error');
+                        return false;
+                    }
+                    if (!session) {
+                        showToast('Not signed in', 'error');
+                        return false;
+                    }
+                    currentUser = session.user;
+                    syncEnabled = true;
+                } catch (e) {
+                    console.error('Session recovery failed:', e);
+                    showToast('Not signed in', 'error');
+                    return false;
+                }
+            }
 
             try {
                 showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
@@ -3018,7 +3038,9 @@
                 // This avoids false negatives when RLS or filters return empty sets
 
                 // Replace local cache only when cloud has data
-                localStorage.removeItem('financeManagerData');
+                if (totalRecords > 0) {
+                    try { localStorage.removeItem('financeManagerData'); } catch (e) { /* no-op */ }
+                }
 
                 if (products && products.length > 0) {
                     state.products = products.map(p => ({
@@ -4299,7 +4321,7 @@
                 return showToast('Not signed in', 'error');
             }
 
-            if (!confirm('This will replace ALL local data with cloud data. Continue?')) {
+            if (!confirm('Load your cloud data into the app now?')) {
                 return;
             }
 
@@ -4309,8 +4331,7 @@
             try {
                 console.log('⬇️ Pulling data from cloud...');
 
-                // Clear local storage first
-                localStorage.removeItem('financeManagerData');
+                // Do not clear local storage preemptively; rely on pull to hydrate state
 
                 // Pull everything from cloud
                 await pullDataFromSupabase();
@@ -4319,12 +4340,17 @@
                 updateSyncIndicator('synced');
                 showToast('Data pulled from cloud successfully!', 'success');
                 render();
+                // Persist and re-render UI after pull
+                try { saveData(); } catch (e) { console.warn('Failed to save after pull:', e); }
+                try { render(); } catch (e) { /* no-op */ }
             } catch (error) {
                 console.error('Pull error:', error);
                 showToast('Pull failed: ' + error.message, 'error');
                 hideLoadingToast();
                 updateSyncIndicator('synced');
+                return false;
             }
+            return true;
         }
 
         async function pushToCloud() {
