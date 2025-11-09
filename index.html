@@ -2374,14 +2374,14 @@
                 // Categories: merge by name (set uniqueness)
                 state.categories = Array.from(new Set([...(localData.categories || []), ...((cloudData.categories) || [])]));
 
-                // Final pass: content-based deduplication per type
-                state.sales = deduplicateByContent(state.sales, 'sales');
-                state.products = deduplicateByContent(state.products, 'products');
-                state.expenses = deduplicateByContent(state.expenses, 'expenses');
-                state.customers = deduplicateByContent(state.customers, 'customers');
-                state.transactions = deduplicateByContent(state.transactions, 'transactions');
-                state.unpaidEntries = deduplicateByContent(state.unpaidEntries, 'unpaid');
-                state.notes = deduplicateByContent(state.notes, 'notes');
+                // Final pass: ID-first deduplication to preserve distinct entries
+                state.sales = deduplicateByID(state.sales, 'sales');
+                state.products = deduplicateByID(state.products, 'products');
+                state.expenses = deduplicateByID(state.expenses, 'expenses');
+                state.customers = deduplicateByID(state.customers, 'customers');
+                state.transactions = deduplicateByID(state.transactions, 'transactions');
+                state.unpaidEntries = deduplicateByID(state.unpaidEntries, 'unpaid');
+                state.notes = deduplicateByID(state.notes, 'notes');
 
                 console.log('🔀 Merged data counts:', {
                     sales: state.sales.length,
@@ -2995,21 +2995,21 @@
                     { data: cloudPurchases, error: purchasesPullErr },
                     { data: categories, error: categoriesErr }
                 ] = await Promise.all([
-                    supabase.from('products').select('name,category,cost,price,has_stock').eq('user_id', currentUser.id),
-                    supabase.from('sales').select('date,time,timestamp,product_name,customer,quantity,cost_per_unit,price_per_unit,total_cost,total_price,payment').eq('user_id', currentUser.id).order('timestamp', { ascending: false }),
-                    supabase.from('expenses').select('date,time,timestamp,description,category,amount,payment,comment').eq('user_id', currentUser.id),
-                    supabase.from('customers').select('name,email,phone,address,total_purchases').eq('user_id', currentUser.id),
-                    supabase.from('invoices').select('number,customer,date,due_date,items,amount,status').eq('user_id', currentUser.id),
-                    supabase.from('receipts').select('number,customer,customer_email,date,time,timestamp,description,amount,payment_method').eq('user_id', currentUser.id),
-                    supabase.from('inventory').select('product_name,stock,min_alert').eq('user_id', currentUser.id),
-                    supabase.from('notes').select('title,content,date,time,timestamp').eq('user_id', currentUser.id),
-                    supabase.from('transactions').select('channel,customer_name,type,amount,date,time,timestamp').eq('user_id', currentUser.id),
-                    supabase.from('unpaid_entries').select('name,type,amount,date,time,timestamp,paid').eq('user_id', currentUser.id),
-                    supabase.from('transaction_floats').select('channel,initial_float').eq('user_id', currentUser.id),
-                    supabase.from('settings').select('daily_target,monthly_target').eq('user_id', currentUser.id).single(),
-                    supabase.from('inventory_purchase_periods').select('period_number,title,start_date,end_date,notes').eq('user_id', currentUser.id),
-                    supabase.from('inventory_purchases').select('period_number,item_name,quantity,unit_cost,total_cost,purchase_date,supplier_name,supplier_phone,supplier_address,notes,timestamp').eq('user_id', currentUser.id),
-                    supabase.from('categories').select('name').eq('user_id', currentUser.id)
+                    supabase.from('products').select('id,name,category,cost,price,has_stock').eq('user_id', currentUser.id),
+                    supabase.from('sales').select('id,date,time,timestamp,product_name,customer,quantity,cost_per_unit,price_per_unit,total_cost,total_price,payment').eq('user_id', currentUser.id).order('timestamp', { ascending: false }),
+                    supabase.from('expenses').select('id,date,time,timestamp,description,category,amount,payment,comment').eq('user_id', currentUser.id),
+                    supabase.from('customers').select('id,name,email,phone,address,total_purchases').eq('user_id', currentUser.id),
+                    supabase.from('invoices').select('id,number,customer,date,due_date,items,amount,status').eq('user_id', currentUser.id),
+                    supabase.from('receipts').select('id,number,customer,customer_email,date,time,timestamp,description,amount,payment_method').eq('user_id', currentUser.id),
+                    supabase.from('inventory').select('id,product_name,stock,min_alert').eq('user_id', currentUser.id),
+                    supabase.from('notes').select('id,title,content,date,time,timestamp').eq('user_id', currentUser.id),
+                    supabase.from('transactions').select('id,channel,customer_name,type,amount,date,time,timestamp').eq('user_id', currentUser.id),
+                    supabase.from('unpaid_entries').select('id,name,type,amount,date,time,timestamp,paid').eq('user_id', currentUser.id),
+                    supabase.from('transaction_floats').select('id,channel,initial_float').eq('user_id', currentUser.id),
+                    supabase.from('settings').select('id,daily_target,monthly_target').eq('user_id', currentUser.id).single(),
+                    supabase.from('inventory_purchase_periods').select('id,period_number,title,start_date,end_date,notes').eq('user_id', currentUser.id),
+                    supabase.from('inventory_purchases').select('id,period_number,item_name,quantity,unit_cost,total_cost,purchase_date,supplier_name,supplier_phone,supplier_address,notes,timestamp').eq('user_id', currentUser.id),
+                    supabase.from('categories').select('id,name').eq('user_id', currentUser.id)
                 ]);
 
                 // Log per-table errors for diagnostics
@@ -3044,7 +3044,7 @@
 
                 if (products && products.length > 0) {
                     state.products = products.map(p => ({
-                        id: `P-${(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+                        id: p.id ? `P-${p.id}` : `P-${(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
                         name: p.name,
                         category: p.category,
                         cost: parseFloat(p.cost),
@@ -3055,7 +3055,7 @@
 
                 if (sales && sales.length > 0) {
                     state.sales = sales.map(s => ({
-                        id: `S-${s.timestamp}`,
+                        id: s.id ? `S-${s.id}` : `S-${s.timestamp}`,
                         date: s.date,
                         time: s.time,
                         timestamp: s.timestamp,
@@ -3074,11 +3074,12 @@
                 }
 
                 if (categories && categories.length > 0) {
+                    // Keep categories as names array in state (IDs are used only in cloud)
                     state.categories = categories.map(c => c.name);
                 }
 
                 if (expenses && expenses.length > 0) state.expenses = expenses.map(e => ({
-                    id: `E-${e.timestamp}`,
+                    id: e.id ? `E-${e.id}` : `E-${e.timestamp}`,
                     date: e.date,
                     time: e.time,
                     timestamp: e.timestamp,
@@ -3090,7 +3091,7 @@
                 }));
 
                 if (customers && customers.length > 0) state.customers = customers.map(c => ({
-                    id: `C-${(c.name || '').replace(/\s+/g, '_')}_${Date.now()}`,
+                    id: c.id ? `C-${c.id}` : `C-${(c.name || '').replace(/\s+/g, '_')}_${Date.now()}`,
                     name: c.name,
                     email: c.email || '',
                     phone: c.phone || '',
@@ -3099,7 +3100,7 @@
                 }));
 
                 if (invoices && invoices.length > 0) state.invoices = invoices.map(i => ({
-                    id: `INV-${i.number}`,
+                    id: i.id ? `INV-${i.id}` : `INV-${i.number}`,
                     number: i.number,
                     customer: i.customer,
                     date: i.date,
@@ -3110,7 +3111,7 @@
                 }));
 
                 if (receipts && receipts.length > 0) state.receipts = receipts.map(r => ({
-                    id: `RCPT-${r.timestamp}`,
+                    id: r.id ? `RCPT-${r.id}` : `RCPT-${r.timestamp}`,
                     number: r.number,
                     customer: r.customer,
                     customerEmail: r.customer_email || '',
@@ -3133,7 +3134,7 @@
                 }
 
                 if (notes && notes.length > 0) state.notes = notes.map(n => ({
-                    id: `N-${n.timestamp}`,
+                    id: n.id ? `N-${n.id}` : `N-${n.timestamp}`,
                     title: n.title || '',
                     content: n.content,
                     date: n.date,
@@ -3142,7 +3143,7 @@
                 }));
 
                 if (transactions && transactions.length > 0) state.transactions = transactions.map(t => ({
-                    id: `T-${t.timestamp}`,
+                    id: t.id ? `T-${t.id}` : `T-${t.timestamp}`,
                     channel: t.channel,
                     customerName: t.customer_name,
                     type: t.type,
@@ -3153,7 +3154,7 @@
                 }));
 
                 if (unpaidEntries && unpaidEntries.length > 0) state.unpaidEntries = unpaidEntries.map(u => ({
-                    id: `U-${u.timestamp}`,
+                    id: u.id ? `U-${u.id}` : `U-${u.timestamp}`,
                     name: u.name,
                     type: u.type,
                     amount: parseFloat(u.amount),
@@ -10301,25 +10302,25 @@
 
                 switch (type) {
                     case 'sales':
-                        contentKey = `${item.productName}|${item.customer}|${item.date}|${item.time}|${item.quantity}|${item.totalPrice}`;
+                        contentKey = `${item.productName}|${item.customer}|${item.date}|${item.time}|${item.quantity}|${item.totalPrice}|${item.timestamp || ''}`;
                         break;
                     case 'products':
                         contentKey = `${item.name}|${item.category}`;
                         break;
                     case 'expenses':
-                        contentKey = `${item.description}|${item.date}|${item.time}|${item.amount}`;
+                        contentKey = `${item.description}|${item.date}|${item.time}|${item.amount}|${item.timestamp || ''}`;
                         break;
                     case 'customers':
                         contentKey = `${item.name}|${item.email || ''}|${item.phone || ''}`;
                         break;
                     case 'transactions':
-                        contentKey = `${item.channel}|${item.date}|${item.time}|${item.amount}|${item.type}`;
+                        contentKey = `${item.channel}|${item.date}|${item.time}|${item.amount}|${item.type}|${item.timestamp || ''}`;
                         break;
                     case 'unpaid':
-                        contentKey = `${item.name}|${item.type}|${item.date}|${item.amount}`;
+                        contentKey = `${item.name}|${item.type}|${item.date}|${item.amount}|${item.timestamp || ''}`;
                         break;
                     case 'notes':
-                        contentKey = `${item.content}|${item.date}|${item.time}`;
+                        contentKey = `${item.content}|${item.date}|${item.time}|${item.timestamp || ''}`;
                         break;
                     default:
                         contentKey = JSON.stringify(item);
@@ -10339,6 +10340,27 @@
             });
 
             return Array.from(uniqueMap.values());
+        }
+
+        // ID-first deduplication: prefer unique IDs, use deterministic fallback
+        function deduplicateByID(items, type) {
+            if (!Array.isArray(items) || items.length === 0) return items;
+            const uniqueById = new Map();
+            for (const item of items) {
+                let id = item.id;
+                if (!id) {
+                    id = generateDeterministicID(type, item);
+                    item.id = id;
+                }
+                if (!uniqueById.has(id)) {
+                    uniqueById.set(id, item);
+                } else {
+                    // Merge same-id entries (keep original id)
+                    const existing = uniqueById.get(id);
+                    uniqueById.set(id, { ...existing, ...item, id: existing.id });
+                }
+            }
+            return Array.from(uniqueById.values());
         }
 
         // ============================================
@@ -10380,6 +10402,7 @@
                         .eq('user_id', currentUser.id);
                     if (products) {
                         cloudData.products = products.map(p => ({
+                            id: p.id ? `P-${p.id}` : undefined,
                             name: p.name,
                             category: p.category,
                             cost: parseFloat(p.cost),
@@ -10395,6 +10418,7 @@
                         .order('timestamp', { ascending: false });
                     if (sales) {
                         cloudData.sales = sales.map(s => ({
+                            id: s.id ? `S-${s.id}` : undefined,
                             date: s.date,
                             time: s.time,
                             timestamp: s.timestamp,
@@ -10418,6 +10442,7 @@
                         .eq('user_id', currentUser.id);
                     if (expenses) {
                         cloudData.expenses = expenses.map(e => ({
+                            id: e.id ? `E-${e.id}` : undefined,
                             date: e.date,
                             time: e.time,
                             timestamp: e.timestamp,
@@ -10435,6 +10460,7 @@
                         .eq('user_id', currentUser.id);
                     if (customers) {
                         cloudData.customers = customers.map(c => ({
+                            id: c.id ? `C-${c.id}` : undefined,
                             name: c.name,
                             email: c.email || '',
                             phone: c.phone || '',
@@ -10449,6 +10475,7 @@
                         .eq('user_id', currentUser.id);
                     if (transactions) {
                         cloudData.transactions = transactions.map(t => ({
+                            id: t.id ? `T-${t.id}` : undefined,
                             channel: t.channel,
                             customerName: t.customer_name,
                             type: t.type,
@@ -10465,6 +10492,7 @@
                         .eq('user_id', currentUser.id);
                     if (unpaidEntries) {
                         cloudData.unpaidEntries = unpaidEntries.map(u => ({
+                            id: u.id ? `U-${u.id}` : undefined,
                             name: u.name,
                             type: u.type,
                             amount: parseFloat(u.amount),
@@ -10481,6 +10509,7 @@
                         .eq('user_id', currentUser.id);
                     if (notes) {
                         cloudData.notes = notes.map(n => ({
+                            id: n.id ? `N-${n.id}` : undefined,
                             title: n.title || '',
                             content: n.content,
                             date: n.date,
@@ -10581,13 +10610,13 @@
                 notes: state.notes.length
             };
 
-            state.sales = deduplicateByContent(state.sales, 'sales');
-            state.products = deduplicateByContent(state.products, 'products');
-            state.expenses = deduplicateByContent(state.expenses, 'expenses');
-            state.customers = deduplicateByContent(state.customers, 'customers');
-            state.transactions = deduplicateByContent(state.transactions, 'transactions');
-            state.unpaidEntries = deduplicateByContent(state.unpaidEntries, 'unpaid');
-            state.notes = deduplicateByContent(state.notes, 'notes');
+            state.sales = deduplicateByID(state.sales, 'sales');
+            state.products = deduplicateByID(state.products, 'products');
+            state.expenses = deduplicateByID(state.expenses, 'expenses');
+            state.customers = deduplicateByID(state.customers, 'customers');
+            state.transactions = deduplicateByID(state.transactions, 'transactions');
+            state.unpaidEntries = deduplicateByID(state.unpaidEntries, 'unpaid');
+            state.notes = deduplicateByID(state.notes, 'notes');
 
             const afterCounts = {
                 sales: state.sales.length,
@@ -10645,60 +10674,60 @@
                 notes: 0
             };
 
-            // Check sales
+            // Check sales by ID
             const salesMap = new Map();
             state.sales.forEach(s => {
-                const key = `${s.productName}|${s.customer}|${s.date}|${s.time}`;
-                if (salesMap.has(key)) duplicateCounts.sales++;
-                salesMap.set(key, true);
+                const id = s.id || generateDeterministicID('sales', s);
+                if (salesMap.has(id)) duplicateCounts.sales++;
+                salesMap.set(id, true);
             });
 
-            // Check products
+            // Check products by ID
             const productsMap = new Map();
             state.products.forEach(p => {
-                const key = `${p.name}|${p.category}`;
-                if (productsMap.has(key)) duplicateCounts.products++;
-                productsMap.set(key, true);
+                const id = p.id || generateDeterministicID('products', p);
+                if (productsMap.has(id)) duplicateCounts.products++;
+                productsMap.set(id, true);
             });
 
-            // Check expenses
+            // Check expenses by ID
             const expensesMap = new Map();
             state.expenses.forEach(e => {
-                const key = `${e.description}|${e.date}|${e.time}`;
-                if (expensesMap.has(key)) duplicateCounts.expenses++;
-                expensesMap.set(key, true);
+                const id = e.id || generateDeterministicID('expenses', e);
+                if (expensesMap.has(id)) duplicateCounts.expenses++;
+                expensesMap.set(id, true);
             });
 
-            // Check customers
+            // Check customers by ID
             const customersMap = new Map();
             state.customers.forEach(c => {
-                const key = `${c.name}|${c.email || ''}`;
-                if (customersMap.has(key)) duplicateCounts.customers++;
-                customersMap.set(key, true);
+                const id = c.id || generateDeterministicID('customers', c);
+                if (customersMap.has(id)) duplicateCounts.customers++;
+                customersMap.set(id, true);
             });
 
-            // Check transactions
+            // Check transactions by ID
             const transactionsMap = new Map();
             state.transactions.forEach(t => {
-                const key = `${t.channel}|${t.date}|${t.time}|${t.amount}`;
-                if (transactionsMap.has(key)) duplicateCounts.transactions++;
-                transactionsMap.set(key, true);
+                const id = t.id || generateDeterministicID('transactions', t);
+                if (transactionsMap.has(id)) duplicateCounts.transactions++;
+                transactionsMap.set(id, true);
             });
 
-            // Check unpaid
+            // Check unpaid by ID
             const unpaidMap = new Map();
             state.unpaidEntries.forEach(u => {
-                const key = `${u.name}|${u.type}|${u.date}`;
-                if (unpaidMap.has(key)) duplicateCounts.unpaidEntries++;
-                unpaidMap.set(key, true);
+                const id = u.id || generateDeterministicID('unpaid', u);
+                if (unpaidMap.has(id)) duplicateCounts.unpaidEntries++;
+                unpaidMap.set(id, true);
             });
 
-            // Check notes
+            // Check notes by ID
             const notesMap = new Map();
             state.notes.forEach(n => {
-                const key = `${n.content}|${n.date}|${n.time}`;
-                if (notesMap.has(key)) duplicateCounts.notes++;
-                notesMap.set(key, true);
+                const id = n.id || generateDeterministicID('notes', n);
+                if (notesMap.has(id)) duplicateCounts.notes++;
+                notesMap.set(id, true);
             });
 
             const totalDuplicates = Object.values(duplicateCounts).reduce((a, b) => a + b, 0);
