@@ -11170,8 +11170,10 @@
                             } else {
                                 authBannerEl.innerHTML = "You’re not signed in — tap to sign in and sync.";
                                 authBannerEl.style.display = 'block';
-                                authBannerEl.onclick = () => {
+                                authBannerEl.onclick = async () => {
                                     try {
+                                        // Force a fresh sign-in page: sign out in background, then navigate
+                                        try { await signOut(); } catch (e) { /* no-op */ }
                                         switchTab('account');
                                         setTimeout(() => {
                                             try { switchAuthTab('login'); } catch (e) { }
@@ -11200,6 +11202,12 @@
                             } catch (e) { /* no-op */ }
                         });
                         window.addEventListener('offline', () => {
+                            // Clear local auth so UI doesn't appear signed in while offline
+                            try {
+                                currentUser = null;
+                                syncEnabled = false;
+                                updateSyncIndicator('offline');
+                            } catch (e) { /* no-op */ }
                             updateOfflineBanner();
                             window.updateAuthBanner && window.updateAuthBanner();
                         });
