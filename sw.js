@@ -184,36 +184,25 @@ self.addEventListener('notificationclick', event => {
 // Helper function for offline data sync
 async function syncOfflineData() {
   try {
-    // Get offline data from IndexedDB or localStorage
-    const offlineData = await getOfflineData();
-
-    if (offlineData && offlineData.length > 0) {
-      // Sync data with server when online
-      for (const data of offlineData) {
-        await syncDataToServer(data);
-      }
-
-      // Clear offline data after successful sync
-      await clearOfflineData();
-      console.log('[SW] Offline data synced successfully');
+    console.log('[SW] Starting offline data sync...');
+    
+    // Service workers can't access localStorage directly, so we need to
+    // communicate with the main app to trigger sync
+    const clients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+    
+    if (clients.length > 0) {
+      // Send message to main app to trigger sync
+      clients.forEach(client => {
+        client.postMessage({
+          type: 'SYNC_REQUEST',
+          source: 'service-worker'
+        });
+      });
+      console.log('[SW] Sync request sent to main app');
+    } else {
+      console.warn('[SW] No clients available for sync');
     }
   } catch (error) {
     console.error('[SW] Failed to sync offline data:', error);
   }
-}
-
-// Placeholder functions for offline data management
-async function getOfflineData() {
-  // Implementation would depend on your data storage strategy
-  return [];
-}
-
-async function syncDataToServer(data) {
-  // Implementation for syncing data to server
-  return Promise.resolve();
-}
-
-async function clearOfflineData() {
-  // Implementation for clearing offline data
-  return Promise.resolve();
 }

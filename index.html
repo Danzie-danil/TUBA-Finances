@@ -1954,14 +1954,11 @@
         async function maybeAutoPullCloudData() {
             if (!syncEnabled || !currentUser) return;
             if (autoCloudPullDone) return;
-
-            const hasLocal = hasAnyLocalData();
-            if (!hasLocal) {
-                try {
-                    await pullDataFromSupabase();
-                } finally {
-                    autoCloudPullDone = true;
-                }
+            try {
+                // Always pull once after login; merging prevents overwrites
+                await pullDataFromSupabase();
+            } finally {
+                autoCloudPullDone = true;
             }
         }
 
@@ -2377,20 +2374,11 @@
         async function fetchCloudDataDirect() {
             if (!syncEnabled || !currentUser) return {
                 sales: [], products: [], expenses: [], customers: [],
-                transactions: [], unpaidEntries: [], notes: []
+                transactions: [], unpaidEntries: [], notes: [], categories: []
             };
 
             try {
-                const [
-                    { data: products },
-                    { data: sales },
-                    { data: expenses },
-                    { data: customers },
-                    { data: transactions },
-                    { data: unpaidEntries },
-                    { data: notes },
-                    { data: categories }
-                ] = await Promise.all([
+                const results = await Promise.allSettled([
                     supabase.from('products').select('*').eq('user_id', currentUser.id),
                     supabase.from('sales').select('*').eq('user_id', currentUser.id),
                     supabase.from('expenses').select('*').eq('user_id', currentUser.id),
@@ -2401,15 +2389,35 @@
                     supabase.from('categories').select('*').eq('user_id', currentUser.id)
                 ]);
 
+                // Extract data from results, handling both fulfilled and rejected promises
+                const getData = (result, index) => {
+                    if (result.status === 'fulfilled' && result.value && !result.value.error) {
+                        return result.value.data || [];
+                    } else {
+                        const error = result.status === 'rejected' ? result.reason : result.value?.error;
+                        console.warn(`Failed to fetch data for index ${index}:`, error);
+                        return [];
+                    }
+                };
+
+                const products = getData(results[0], 0);
+                const sales = getData(results[1], 1);
+                const expenses = getData(results[2], 2);
+                const customers = getData(results[3], 3);
+                const transactions = getData(results[4], 4);
+                const unpaidEntries = getData(results[5], 5);
+                const notes = getData(results[6], 6);
+                const categories = getData(results[7], 7);
+
                 return {
-                    sales: sales || [],
-                    products: products || [],
-                    expenses: expenses || [],
-                    customers: customers || [],
-                    transactions: transactions || [],
-                    unpaidEntries: unpaidEntries || [],
-                    notes: notes || [],
-                    categories: (categories || []).map(c => c.name).filter(Boolean)
+                    sales: Array.isArray(sales) ? sales : [],
+                    products: Array.isArray(products) ? products : [],
+                    expenses: Array.isArray(expenses) ? expenses : [],
+                    customers: Array.isArray(customers) ? customers : [],
+                    transactions: Array.isArray(transactions) ? transactions : [],
+                    unpaidEntries: Array.isArray(unpaidEntries) ? unpaidEntries : [],
+                    notes: Array.isArray(notes) ? notes : [],
+                    categories: Array.isArray(categories) ? (categories.map(c => c?.name).filter(Boolean)) : []
                 };
             } catch (error) {
                 console.error('Error fetching cloud data:', error);
@@ -2714,12 +2722,19 @@
                     // Pull from cloud if local is empty
                     console.log('⬇️ Local data is empty, pulling from cloud...');
                     await pullDataFromSupabase();
+                    // pullDataFromSupabase already saves data, but ensure it's saved
+                    saveData();
                 } else {
                     // Push local data to cloud
                     console.log('⬆️ Pushing local data to cloud...');
                     await clearAndPushAllData();
+                    // clearAndPushAllData now saves data, but ensure it's saved
+                    saveData();
                 }
 
+                // Ensure float balances are calculated
+                calculateFloatBalances();
+                
                 updateSyncIndicator('synced');
                 showToast('Data synced successfully!', 'success');
                 console.log('✅ Sync complete');
@@ -2727,7 +2742,16 @@
             } catch (error) {
                 console.error('❌ Sync error:', error);
                 updateSyncIndicator('synced');
-                showToast('Sync failed: ' + error.message, 'error');
+                const errorMessage = error?.message || error?.error_description || error?.details || 'Unknown error';
+                showToast('Sync failed: ' + errorMessage, 'error');
+                
+                // Try to save data even if sync failed
+                try {
+                    saveData();
+                    calculateFloatBalances();
+                } catch (saveErr) {
+                    console.error('Failed to save data after sync error:', saveErr);
+                }
             } finally {
                 isSyncing = false;
             }
@@ -3275,25 +3299,53 @@
                     }
                 }
 
+                // Ensure data is saved locally after successful sync
+                saveData();
+                calculateFloatBalances();
+                
                 updateSyncIndicator('synced');
                 console.log('✅ Cloud merge complete');
             } catch (error) {
                 errorContext('Cloud merge', error);
                 updateSyncIndicator('synced');
+                // Still save data even if sync partially failed
+                try {
+                    saveData();
+                } catch (saveErr) {
+                    console.error('Failed to save data after sync error:', saveErr);
+                }
                 throw error;
             }
         }
 
         async function syncInBackground() {
             if (!syncEnabled || !currentUser) return;
+            
+            // Prevent multiple background syncs from running simultaneously
+            if (isSyncing) {
+                console.log('[Background] Sync already in progress, skipping...');
+                return;
+            }
 
+            isSyncing = true;
             try {
                 // Silent background sync - no loading indicators
                 await clearAndPushAllData();
+                // Ensure data is persisted
+                saveData();
+                calculateFloatBalances();
                 console.log('✅ Background sync complete');
             } catch (error) {
                 console.error('❌ Background sync error:', error);
                 // Don't show error toast for background operations
+                // But still try to save data
+                try {
+                    saveData();
+                } catch (saveErr) {
+                    console.error('Failed to save after background sync error:', saveErr);
+                }
+            } finally {
+                isSyncing = false;
             }
         }
 
@@ -3302,31 +3354,45 @@
 
             try {
                 showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
-                // SAFEGUARD: Check if we have local data that should be preserved
-                const hasLocalData = state.products.length > 0 || state.sales.length > 0 ||
-                    state.expenses.length > 0 || state.customers.length > 0;
-
-                // Quick check: count total records in cloud
-                if (hasLocalData) {
-                    const { count: cloudCount } = await supabase
-                        .from('products')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('user_id', currentUser.id);
-
-                    if (cloudCount === 0) {
-                        console.log('⚠️ Cloud data is empty, preserving local data');
-                        console.log('💡 Use "Push to Cloud" if you want to upload your local data');
-                        return; // Don't overwrite local data with empty cloud data
-                    }
-                }
+                // Always pull from cloud and merge locally; dedup prevents overwrites
 
                 console.log('📥 Pulling data from cloud...');
+                
+                // Ensure state arrays exist before merging
+                if (!state.sales) state.sales = [];
+                if (!state.products) state.products = [];
+                if (!state.expenses) state.expenses = [];
+                if (!state.customers) state.customers = [];
+                if (!state.transactions) state.transactions = [];
+                if (!state.unpaidEntries) state.unpaidEntries = [];
+                if (!state.notes) state.notes = [];
+                if (!state.categories) state.categories = [];
+
+                // Helper: select by user_id if available; fallback to selecting all
+                const selectByUserOrAll = async (table, columns = '*', orderBy = null) => {
+                    try {
+                        let query = supabase.from(table).select(columns).eq('user_id', currentUser.id);
+                        if (orderBy) query = query.order(orderBy.column, orderBy.options || {});
+                        const res = await query;
+                        if (res.error) {
+                            console.warn(`Select ${table} with user filter failed; falling back to all:`, res.error.message || res.error);
+                            let q2 = supabase.from(table).select(columns);
+                            if (orderBy) q2 = q2.order(orderBy.column, orderBy.options || {});
+                            const res2 = await q2;
+                            return res2.data || [];
+                        }
+                        return res.data || [];
+                    } catch (e) {
+                        console.warn(`Select ${table} fallback error:`, e);
+                        let q2 = supabase.from(table).select(columns);
+                        if (orderBy) q2 = q2.order(orderBy.column, orderBy.options || {});
+                        const res2 = await q2;
+                        return res2.data || [];
+                    }
+                };
 
                 // Products
-                const { data: products } = await supabase
-                    .from('products')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const products = await selectByUserOrAll('products');
                 if (products && products.length > 0) {
                     const cloudProducts = products.map(p => ({
                         // Use stable ID derived from name to avoid duplicate IDs between offline and cloud
@@ -3342,11 +3408,7 @@
                 }
 
                 // Sales (merge + dedup)
-                const { data: sales } = await supabase
-                    .from('sales')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .order('timestamp', { ascending: false });
+                const sales = await selectByUserOrAll('sales', '*', { column: 'timestamp', options: { ascending: false } });
                 if (sales && sales.length > 0) {
                     const cloudSales = sales.map(s => ({
                         date: s.date,
@@ -3366,10 +3428,7 @@
                 }
 
                 // Categories
-                const { data: categories } = await supabase
-                    .from('categories')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const categories = await selectByUserOrAll('categories');
                 if (categories && categories.length > 0) {
                     const cloudCategories = categories.map(c => c.name).filter(Boolean);
                     // Merge cloud + local category names uniquely
@@ -3378,10 +3437,7 @@
                 }
 
                 // Expenses (merge + dedup)
-                const { data: expenses } = await supabase
-                    .from('expenses')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const expenses = await selectByUserOrAll('expenses');
                 if (expenses && expenses.length > 0) {
                     const cloudExpenses = expenses.map(e => ({
                         date: e.date,
@@ -3397,10 +3453,7 @@
                 }
 
                 // Customers (merge + dedup)
-                const { data: customers } = await supabase
-                    .from('customers')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const customers = await selectByUserOrAll('customers');
                 if (customers && customers.length > 0) {
                     const cloudCustomers = customers.map(c => ({
                         name: c.name,
@@ -3413,10 +3466,7 @@
                 }
 
                 // Invoices (merge)
-                const { data: invoices } = await supabase
-                    .from('invoices')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const invoices = await selectByUserOrAll('invoices');
                 if (invoices && invoices.length > 0) {
                     const cloudInvoices = invoices.map(i => ({
                         number: i.number,
@@ -3434,10 +3484,7 @@
                 }
 
                 // Receipts (merge)
-                const { data: receipts } = await supabase
-                    .from('receipts')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const receipts = await selectByUserOrAll('receipts');
                 if (receipts && receipts.length > 0) {
                     const cloudReceipts = receipts.map(r => ({
                         number: r.number,
@@ -3456,10 +3503,7 @@
                 }
 
                 // Inventory
-                const { data: inventory } = await supabase
-                    .from('inventory')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const inventory = await selectByUserOrAll('inventory');
                 if (inventory && inventory.length > 0) {
                     // Preserve existing inventory if not in cloud
                     if (!state.inventory) {
@@ -3475,10 +3519,7 @@
 
                 // Don't reset inventory if cloud has no data - keep local data
                 // Notes (merge + dedup)
-                const { data: notes } = await supabase
-                    .from('notes')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const notes = await selectByUserOrAll('notes');
                 if (notes && notes.length > 0) {
                     const cloudNotes = notes.map(n => ({
                         title: n.title || '',
@@ -3491,10 +3532,7 @@
                 }
 
                 // Transactions (merge + dedup)
-                const { data: transactions } = await supabase
-                    .from('transactions')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const transactions = await selectByUserOrAll('transactions');
                 if (transactions && transactions.length > 0) {
                     const cloudTransactions = transactions.map(t => ({
                         channel: t.channel,
@@ -3509,10 +3547,7 @@
                 }
 
                 // Unpaid entries (merge + dedup)
-                const { data: unpaidEntries } = await supabase
-                    .from('unpaid_entries')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const unpaidEntries = await selectByUserOrAll('unpaid_entries');
                 if (unpaidEntries && unpaidEntries.length > 0) {
                     const cloudUnpaid = unpaidEntries.map(u => ({
                         name: u.name,
@@ -3527,10 +3562,7 @@
                 }
 
                 // Transaction floats
-                const { data: floats } = await supabase
-                    .from('transaction_floats')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
+                const floats = await selectByUserOrAll('transaction_floats');
                 if (floats && floats.length > 0) {
                     floats.forEach(f => {
                         if (state.transactionFloats[f.channel]) {
@@ -3597,7 +3629,16 @@
                 }, 100);
             } catch (error) {
                 console.error('Pull error:', error);
-                showToast('Cloud pull failed: ' + (error?.message || 'Unknown error'), 'error');
+                const errorMessage = error?.message || error?.error_description || error?.details || 'Unknown error';
+                showToast('Cloud pull failed: ' + errorMessage, 'error');
+                
+                // Try to save any data that was successfully pulled, even if there was an error
+                try {
+                    calculateFloatBalances();
+                    saveData();
+                } catch (saveErr) {
+                    console.error('Failed to save data after pull error:', saveErr);
+                }
             }
         }
         async function pushToSupabase(table, data) {
@@ -11672,6 +11713,22 @@
                         const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
                         console.log('SW registered: ', registration);
 
+                        // Listen for messages from service worker (sync requests)
+                        navigator.serviceWorker.addEventListener('message', async (event) => {
+                            if (event.data && event.data.type === 'SYNC_REQUEST' && event.data.source === 'service-worker') {
+                                console.log('[App] Received sync request from service worker');
+                                // Only sync if user is signed in and online
+                                if (syncEnabled && currentUser && navigator.onLine) {
+                                    try {
+                                        // Use background sync to avoid blocking UI
+                                        await syncInBackground();
+                                    } catch (error) {
+                                        console.error('[App] Background sync failed:', error);
+                                    }
+                                }
+                            }
+                        });
+
                         // Offline banner show/hide without overlaying text areas
                         const offlineBannerEl = document.getElementById('offlineBanner');
                         const updateOfflineBanner = () => {
@@ -11724,6 +11781,13 @@
                             updateOfflineBanner();
                             window.updateAuthBanner && window.updateAuthBanner();
                             try {
+                                // Auto-sync when coming back online if user is signed in
+                                if (syncEnabled && currentUser) {
+                                    console.log('[App] Online - triggering background sync');
+                                    syncInBackground().catch(err => {
+                                        console.error('[App] Auto-sync on online failed:', err);
+                                    });
+                                }
                                 if (navigator.serviceWorker && navigator.serviceWorker.ready) {
                                     navigator.serviceWorker.ready.then(reg => {
                                         if (reg.sync && typeof reg.sync.register === 'function') {
