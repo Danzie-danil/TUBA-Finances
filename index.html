@@ -77,15 +77,6 @@
             padding-top: max(16px, env(safe-area-inset-top));
             padding-left: max(16px, env(safe-area-inset-left));
             padding-right: max(16px, env(safe-area-inset-right));
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 200;
-            /* above banners */
-            background: #ffffff;
-            /* prevent content showing through when stuck */
-            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
         }
 
         .bottom-nav {
@@ -8722,7 +8713,8 @@
 
             const entries = Object.entries(transactionTotals)
                 .filter(([channel, amounts]) => amounts.deposit > 0 || amounts.withdrawal > 0)
-                .sort((a, b) => (b[1].deposit + b[1].withdrawal) - (a[1].deposit + a[1].withdrawal))
+                .map(([channel, amounts]) => ([channel, amounts, (amounts.deposit + amounts.withdrawal)]))
+                .sort((a, b) => b[2] - a[2])
                 .slice(0, 2);
 
             return entries.map(([channel, amounts]) => `
@@ -11122,19 +11114,6 @@
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', async () => {
                     try {
-                        // Ensure content is offset below fixed header
-                        try {
-                            const headerEl = document.querySelector('.header');
-                            const appContainer = document.querySelector('.app-container');
-                            const applyOffsets = () => {
-                                if (headerEl && appContainer) {
-                                    appContainer.style.paddingTop = headerEl.offsetHeight + 'px';
-                                }
-                            };
-                            applyOffsets();
-                            window.addEventListener('resize', applyOffsets);
-                        } catch (e) { }
-
                         // Initialize Capacitor plugins if available
                         if (window.Capacitor) {
                             const { CapacitorApp } = await import('@capacitor/app');
@@ -11211,11 +11190,6 @@
                             } catch (e) { /* no-op */ }
                         });
                         window.addEventListener('offline', () => {
-                            updateOfflineBanner();
-                            window.updateAuthBanner && window.updateAuthBanner();
-                        });
-                        // Recompute banner offsets on resize
-                        window.addEventListener('resize', () => {
                             updateOfflineBanner();
                             window.updateAuthBanner && window.updateAuthBanner();
                         });
