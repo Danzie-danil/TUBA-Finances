@@ -2909,7 +2909,8 @@
                 }
                 if ((state.backupReminder.count || 0) < 3) {
                     setTimeout(() => {
-                        showToast('Tip: save a local backup (Dashboard → 📥 Backup All Data).', 'info');
+                        // Click anywhere on toast to save/export immediately
+                        showToast('Consider Local Backup', 'info', null, null, 3000, () => exportData('Saved', 2000));
                     }, 600);
                     state.backupReminder.count = (state.backupReminder.count || 0) + 1;
                     saveData();
@@ -3241,13 +3242,25 @@
             render();
         }
 
-        function showToast(message, type = "info") {
+        function showToast(message, type = "info", actionText = null, actionHandler = null, durationMs = 3000, onClickHandler = null) {
             const t = document.createElement('div');
             t.className = 'toast toast-' + type;
-            t.textContent = message;
+            const span = document.createElement('span');
+            span.textContent = message;
+            t.appendChild(span);
+            if (actionText && typeof actionHandler === 'function') {
+                const btn = document.createElement('button');
+                btn.textContent = actionText;
+                btn.style.cssText = 'margin-left:8px; padding:4px 8px; font-size:10px; border-radius:8px; border:none; background:#fff; color:#000; cursor:pointer;';
+                btn.onclick = (e) => { e.stopPropagation(); try { actionHandler(); } finally { t.classList.remove('show'); setTimeout(() => t.remove(), 150); } };
+                t.appendChild(btn);
+            }
+            if (typeof onClickHandler === 'function') {
+                t.onclick = () => { try { onClickHandler(); } finally { t.classList.remove('show'); setTimeout(() => t.remove(), 150); } };
+            }
             document.body.appendChild(t);
             requestAnimationFrame(() => t.classList.add('show'));
-            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, Math.max(1000, durationMs || 3000));
         }
 
         function showConfirm(text, onYes) {
@@ -8823,7 +8836,7 @@
             }
         }
 
-        function exportData() {
+        function exportData(customMessage = null, customDurationMs = null) {
             const data = {
                 products: state.products,
                 sales: state.sales,
@@ -8851,7 +8864,7 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            showToast('Data exported successfully!', 'success');
+            showToast(customMessage || 'Data exported successfully!', 'success', null, null, customDurationMs || 3000);
         }
 
         function importData() {
@@ -9295,7 +9308,13 @@
                         ${state.products
                     .map((p, i) => ({ p, i }))
                     .sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)))
-                    .map(({ p, i }) => `<option value="${i}">${p.name} - ${p.category} (Stock: ${(state.inventory[p.name] || { stock: 0 }).stock})</option>`).join('')}
+                    .map(({ p, i }) => {
+                        const stockVal = (state.inventory[p.name] || { stock: 0 }).stock;
+                        const label = (p.hasStock === false)
+                            ? `${p.name} - ${p.category}`
+                            : `${p.name} - ${p.category} (Stock: ${stockVal})`;
+                        return `<option value="${i}">${label}</option>`;
+                    }).join('')}
                         <option value="new" style="background: #e3f2fd; font-weight: 600;">+ Add New Product</option>
                     </select>
                 </div>
