@@ -2065,9 +2065,9 @@
                 try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { /* no-op */ }
 
                 // Upload logo if selected locally
-                if (state.userLogoDataUrl) {
-                    try { await uploadLogoToSupabase(state.userLogoDataUrl, state.userLogoMime || 'image/png'); } catch (e) { console.warn('Logo upload after sign-in failed:', e); }
-                }
+                // if (state.userLogoDataUrl) {
+                //     try { await uploadLogoToSupabase(state.userLogoDataUrl, state.userLogoMime || 'image/png'); } catch (e) { console.warn('Logo upload after sign-in failed:', e); }
+                // }
 
                 // Check if local data exists
                 const localHasData = state.sales.length > 0 || state.products.length > 0;
@@ -3104,30 +3104,30 @@
         }
 
         // Logo helpers
-        function triggerLogoUpload() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/png,image/jpeg';
-            input.onchange = async (e) => {
-                const file = e.target.files && e.target.files[0];
-                if (!file) return;
-                try {
-                    const resized = await resizeImageFile(file, 256);
-                    state.userLogoDataUrl = resized.dataUrl;
-                    state.userLogoMime = resized.mime;
-                    saveData();
-                    render();
-                    if (syncEnabled && currentUser) {
-                        await uploadLogoToSupabase(resized.dataUrl, resized.mime);
-                    }
-                    showToast('Logo saved', 'success');
-                } catch (err) {
-                    console.error('Logo upload error:', err);
-                    showToast('Failed to process logo', 'error');
-                }
-            };
-            input.click();
-        }
+        // function triggerLogoUpload() {
+        //     const input = document.createElement('input');
+        //     input.type = 'file';
+        //     input.accept = 'image/png,image/jpeg';
+        //     input.onchange = async (e) => {
+        //         const file = e.target.files && e.target.files[0];
+        //         if (!file) return;
+        //         try {
+        //             const resized = await resizeImageFile(file, 256);
+        //             state.userLogoDataUrl = resized.dataUrl;
+        //             state.userLogoMime = resized.mime;
+        //             saveData();
+        //             render();
+        //             if (syncEnabled && currentUser) {
+        //                 await uploadLogoToSupabase(resized.dataUrl, resized.mime);
+        //             }
+        //             showToast('Logo saved', 'success');
+        //         } catch (err) {
+        //             console.error('Logo upload error:', err);
+        //             showToast('Failed to process logo', 'error');
+        //         }
+        //     };
+        //     input.click();
+        // }
 
         async function resizeImageFile(file, size = 256) {
             const img = document.createElement('img');
@@ -3160,30 +3160,30 @@
             return { dataUrl: outDataUrl, mime };
         }
 
-        async function uploadLogoToSupabase(dataUrl, mime = 'image/png') {
-            try {
-                if (!supabase || !currentUser) return;
-                const blob = await (await fetch(dataUrl)).blob();
-                const ext = mime === 'image/png' ? 'png' : 'jpg';
-                const path = `${currentUser.id}/logo.${ext}`;
-                const { error: upErr } = await supabase.storage.from('logos').upload(path, blob, { upsert: true, contentType: mime });
-                if (upErr) { console.error('Supabase storage upload error:', upErr); return; }
-                const { data: pub } = supabase.storage.from('logos').getPublicUrl(path);
-                if (pub && pub.publicUrl) {
-                    state.userLogoPublicUrl = pub.publicUrl;
-                    saveData();
-                    // Persist into profile for portability (create if missing)
-                    try {
-                        const { error: upsertErr } = await supabase
-                            .from('user_profiles')
-                            .upsert({ user_id: currentUser.id, logo_url: state.userLogoPublicUrl }, { onConflict: 'user_id' });
-                        if (upsertErr) console.warn('Failed to upsert logo_url to profile:', upsertErr);
-                    } catch (e) { console.warn('Failed to save logo_url to profile:', e); }
-                }
-            } catch (e) {
-                console.error('Upload logo error:', e);
-            }
-        }
+        // async function uploadLogoToSupabase(dataUrl, mime = 'image/png') {
+        //     try {
+        //         if (!supabase || !currentUser) return;
+        //         const blob = await (await fetch(dataUrl)).blob();
+        //         const ext = mime === 'image/png' ? 'png' : 'jpg';
+        //         const path = `${currentUser.id}/logo.${ext}`;
+        //         const { error: upErr } = await supabase.storage.from('logos').upload(path, blob, { upsert: true, contentType: mime });
+        //         if (upErr) { console.error('Supabase storage upload error:', upErr); return; }
+        //         const { data: pub } = supabase.storage.from('logos').getPublicUrl(path);
+        //         if (pub && pub.publicUrl) {
+        //             state.userLogoPublicUrl = pub.publicUrl;
+        //             saveData();
+        //             // Persist into profile for portability (create if missing)
+        //             try {
+        //                 const { error: upsertErr } = await supabase
+        //                     .from('user_profiles')
+        //                     .upsert({ user_id: currentUser.id, logo_url: state.userLogoPublicUrl }, { onConflict: 'user_id' });
+        //                 if (upsertErr) console.warn('Failed to upsert logo_url to profile:', upsertErr);
+        //             } catch (e) { console.warn('Failed to save logo_url to profile:', e); }
+        //         }
+        //     } catch (e) {
+        //         console.error('Upload logo error:', e);
+        //     }
+        // }
 
         function getLogoForPdf() {
             const dataUrl = state.userLogoDataUrl || '';
@@ -3694,6 +3694,7 @@
                     <button onclick="handleSignUp()">Create Account</button>
                 </div>
 
+                <!--
                 <div class="card" style="margin-top: 12px;">
                     <h3>🖼️ Business Logo</h3>
                     <p style="color:#666;font-size:13px;margin-bottom:8px;">Upload your logo (PNG/JPEG). It appears on all PDFs before your business name.</p>
@@ -3707,6 +3708,7 @@
                     </div>
                     <small style="display:block;color:#888;margin-top:6px;">Recommended size: 256×256 px (auto-resized).</small>
                 </div>
+                -->
 
                 <div class="alert-info">
                     <strong>Benefits of Cloud Sync:</strong>
@@ -3755,6 +3757,7 @@
                 Sign Out
             </button>
             
+            <!--
             <div class="card" style="margin-top: 12px;">
                 <h3>🖼️ Business Logo</h3>
                 <p style="color:#666;font-size:13px;margin-bottom:8px;">Upload your logo (PNG/JPEG). It appears on all PDFs before your business name.</p>
@@ -3768,6 +3771,7 @@
                 </div>
                 <small style="display:block;color:#888;margin-top:6px;">Recommended size: 256×256 px (auto-resized).</small>
             </div>
+            -->
             
             <!-- Removed in-app dashboard refresh button -->
 
@@ -3927,8 +3931,20 @@
             const btn = document.querySelector('#loginForm button[onclick="handleSignIn()"]');
             if (!emailEl || !passEl || !btn) return;
 
+            // On iOS Safari, rely on autofill animation/visibility triggers and avoid polling
+            try {
+                if (typeof isIOSSafari === 'function' && isIOSSafari()) {
+                    const email = (emailEl.value || '').trim();
+                    const pwd = (passEl.value || '').trim();
+                    if (email && pwd) {
+                        try { handleSignIn(); } catch (e) { /* no-op */ }
+                    }
+                    return; // Skip polling on iOS Safari
+                }
+            } catch (e) { /* no-op */ }
+
             let attempts = 0;
-            const maxAttempts = 15; // ~3 seconds
+            const maxAttempts = 10; // ~1 second
             const timer = setInterval(() => {
                 attempts++;
                 const email = (emailEl.value || '').trim();
@@ -3941,6 +3957,28 @@
                 }
             }, 200);
         }
+
+        // iOS Face ID autofill detection via CSS animationstart (Safari only)
+        function isIOSSafari() {
+            const ua = navigator.userAgent || navigator.vendor || window.opera;
+            const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+            return isIOS && isSafari;
+        }
+        if (isIOSSafari()) {
+            document.addEventListener('animationstart', function (e) {
+                if (e.animationName === 'autofillDetection') {
+                    try { autoSubmitLoginIfAutofilled(); } catch (err) { }
+                }
+            }, true);
+        }
+
+        // Also trigger detection on visibility change and when inputs receive focus
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible' && state.activeTab === 'account' && !currentUser) {
+                try { autoSubmitLoginIfAutofilled(); } catch (e) { }
+            }
+        });
         async function pullFromCloud() {
             if (!syncEnabled || !currentUser) {
                 return showToast('Not signed in', 'error');
@@ -10739,6 +10777,9 @@
                     // Hydrate profile and logo
                     await loadUserProfile();
                     try { await ensureLogoReady(); } catch (e) { /* no-op */ }
+                    // if (state.userLogoDataUrl) {
+                    //     try { await uploadLogoToSupabase(state.userLogoDataUrl, state.userLogoMime || 'image/png'); } catch (e) { console.warn('Logo upload after sign-in failed:', e); }
+                    // }
                     try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { /* no-op */ }
 
                     // Load user profile first
@@ -11076,3 +11117,13 @@
 </body>
 
 </html>
+/* iOS autofill detection helper */
+@keyframes autofillDetection {
+from { opacity: 1; }
+to { opacity: 1; }
+}
+input:-webkit-autofill {
+animation-name: autofillDetection;
+animation-duration: 0.01s;
+animation-iteration-count: 1;
+}
