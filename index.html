@@ -1483,7 +1483,7 @@
             </div>
             <div class="side-nav-item" onclick="navigateToTab('inventory')">
                 <span class="side-nav-icon">📦</span>
-                <span>Inventory</span>
+                <span>Stock</span>
             </div>
             <div class="side-nav-item" onclick="navigateToTab('inventoryPurchases')">
                 <span class="side-nav-icon">📦</span>
@@ -2871,7 +2871,9 @@
             userLogoPublicUrl: '',
             profileEditMode: false,
             profileLoaded: false,
-            privacyBlurred: true  // ADD THIS LINE
+            privacyBlurred: true,  // ADD THIS LINE
+            // Daily backup reminder tracking
+            backupReminder: { date: '', count: 0 }
         };
 
         let chartInstance = null;
@@ -2896,6 +2898,23 @@
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`; // Returns: 2025-01-15
+        }
+
+        // Show a backup reminder up to 3 times per day
+        function maybeShowBackupReminder() {
+            try {
+                const today = getTodayDateString();
+                if (!state.backupReminder || state.backupReminder.date !== today) {
+                    state.backupReminder = { date: today, count: 0 };
+                }
+                if ((state.backupReminder.count || 0) < 3) {
+                    setTimeout(() => {
+                        showToast('Tip: save a local backup (Dashboard → 📥 Backup All Data).', 'info');
+                    }, 600);
+                    state.backupReminder.count = (state.backupReminder.count || 0) + 1;
+                    saveData();
+                }
+            } catch (e) { /* no-op */ }
         }
 
         // ID Generation Functions
@@ -3336,6 +3355,7 @@
                         <button class="btn-danger btn-small" onclick="switchTab('expenses')">💸 Add Expense</button>
                         <button class="btn-small" onclick="switchTab('products')">🛒 Manage Products/Services</button>
                         <button class="btn-small" onclick="switchTab('transactions')">💳 Transactions</button>
+                        <button class="btn-small" onclick="switchTab('inventoryPurchases')">📦 Inventory</button>
                         <button class="btn-small" onclick="switchTab('invoices')" style="background: linear-gradient(145deg, #1976d2, #0d47a1); color: white;">📄 Invoices</button>
                         <button class="btn-small" onclick="switchTab('notes')" style="background: linear-gradient(145deg, #e65100, #bf360c); color: white;">📝 Notes</button>
                         <button class="btn-small" onclick="switchTab('analytics')" style="background: linear-gradient(145deg, #7b1fa2, #4a148c); color: white;">📈 Analytics</button>
@@ -4485,6 +4505,9 @@
             saveData();
             render();
             showToast("Sale recorded successfully!", "success");
+
+            // Friendly reminder to save a local backup (max 3 per day)
+            maybeShowBackupReminder();
 
             // Sync in background
             if (syncEnabled) syncInBackground();
@@ -10223,6 +10246,7 @@
                         <button class="btn-danger btn-small" onclick="switchTab('expenses')">💸 Add Expense</button>
                         <button class="btn-small" onclick="switchTab('products')">🛒 Manage Products/Services</button>
                         <button class="btn-small" onclick="switchTab('transactions')">💳 Transactions</button>
+                        <button class="btn-small" onclick="switchTab('inventoryPurchases')">📦 Inventory</button>
                         <button class="btn-small" onclick="switchTab('invoices')" style="background: linear-gradient(145deg, #1976d2, #0d47a1); color: white;">📄 Invoices</button>
                         <button class="btn-small" onclick="switchTab('notes')" style="background: linear-gradient(145deg, #e65100, #bf360c); color: white;">📝 Notes</button>
                         <button class="btn-small" onclick="switchTab('analytics')" style="background: linear-gradient(145deg, #7b1fa2, #4a148c); color: white;">📈 Analytics</button>
