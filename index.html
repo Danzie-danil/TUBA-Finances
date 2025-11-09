@@ -2263,6 +2263,8 @@
                         await pullDataFromSupabase();
                         showToast('Cloud data loaded', 'success');
                     }
+                    // Force full hydration from cloud to include tables not covered by merge
+                    await pullDataFromSupabase();
                 } catch (syncError) {
                     console.error('Sync error after sign in:', syncError);
                     showToast('Signed in but sync failed. Try manual sync.', 'error');
@@ -2869,21 +2871,21 @@
                 console.log('📥 Pulling data from cloud (parallel)...');
 
                 const [
-                    { data: products },
-                    { data: sales },
-                    { data: expenses },
-                    { data: customers },
-                    { data: invoices },
-                    { data: receipts },
-                    { data: inventory },
-                    { data: notes },
-                    { data: transactions },
-                    { data: unpaidEntries },
-                    { data: floats },
+                    { data: products, error: productsErr },
+                    { data: sales, error: salesErr },
+                    { data: expenses, error: expensesErr },
+                    { data: customers, error: customersErr },
+                    { data: invoices, error: invoicesErr },
+                    { data: receipts, error: receiptsErr },
+                    { data: inventory, error: inventoryErr },
+                    { data: notes, error: notesErr },
+                    { data: transactions, error: transactionsErr },
+                    { data: unpaidEntries, error: unpaidErr },
+                    { data: floats, error: floatsErr },
                     { data: settings, error: settingsErr },
                     { data: cloudCycles, error: cyclesErr },
                     { data: cloudPurchases, error: purchasesPullErr },
-                    { data: categories }
+                    { data: categories, error: categoriesErr }
                 ] = await Promise.all([
                     supabase.from('products').select('name,category,cost,price,has_stock').eq('user_id', currentUser.id),
                     supabase.from('sales').select('date,time,timestamp,product_name,customer,quantity,cost_per_unit,price_per_unit,total_cost,total_price,payment').eq('user_id', currentUser.id).order('timestamp', { ascending: false }),
@@ -2902,6 +2904,20 @@
                     supabase.from('categories').select('name').eq('user_id', currentUser.id)
                 ]);
 
+                // Log per-table errors for diagnostics
+                if (productsErr) console.warn('Products pull error:', productsErr.message || productsErr);
+                if (salesErr) console.warn('Sales pull error:', salesErr.message || salesErr);
+                if (expensesErr) console.warn('Expenses pull error:', expensesErr.message || expensesErr);
+                if (customersErr) console.warn('Customers pull error:', customersErr.message || customersErr);
+                if (invoicesErr) console.warn('Invoices pull error:', invoicesErr.message || invoicesErr);
+                if (receiptsErr) console.warn('Receipts pull error:', receiptsErr.message || receiptsErr);
+                if (inventoryErr) console.warn('Inventory pull error:', inventoryErr.message || inventoryErr);
+                if (notesErr) console.warn('Notes pull error:', notesErr.message || notesErr);
+                if (transactionsErr) console.warn('Transactions pull error:', transactionsErr.message || transactionsErr);
+                if (unpaidErr) console.warn('Unpaid pull error:', unpaidErr.message || unpaidErr);
+                if (floatsErr) console.warn('Floats pull error:', floatsErr.message || floatsErr);
+                if (categoriesErr) console.warn('Categories pull error:', categoriesErr.message || categoriesErr);
+
                 const totalRecords = (
                     (products?.length || 0) + (sales?.length || 0) + (expenses?.length || 0) +
                     (customers?.length || 0) + (invoices?.length || 0) + (receipts?.length || 0) +
@@ -2910,12 +2926,8 @@
                     (categories?.length || 0)
                 );
 
-                if (hasLocalData && totalRecords === 0) {
-                    console.log('⚠️ Cloud data is empty, preserving local data');
-                    console.log('💡 Use "Push to Cloud" if you want to upload your local data');
-                    hideLoadingToast();
-                    return;
-                }
+                // Always proceed to hydrate state from cloud (even if local exists)
+                // This avoids false negatives when RLS or filters return empty sets
 
                 // Replace local cache only when cloud has data
                 localStorage.removeItem('financeManagerData');
