@@ -1848,6 +1848,7 @@
         }
         let currentUser = null;
         let syncEnabled = false;
+        let syncLock = false; // Prevent concurrent sync operations
         let autoCloudPullDone = false;
 
         // Your existing code continues below...
@@ -2203,7 +2204,7 @@
 
             updateSyncIndicator('syncing');
             try {
-                await clearAndPushAllData();
+                await smartSyncToCloud();
                 updateSyncIndicator('synced');
                 showToast('Data pushed to cloud successfully!', 'success');
             } catch (error) {
@@ -2396,8 +2397,8 @@
                 // Save merged data locally
                 saveData();
 
-                // Push merged data back to cloud (clear and push to avoid server-side duplicates)
-                await clearAndPushAllData();
+                // Push merged data back to cloud using incremental upsert
+                await smartSyncToCloud();
                 updateSyncIndicator('synced');
                 hideLoadingToast();
 
@@ -2871,9 +2872,9 @@
                     console.log('⬇️ Local data is empty, pulling from cloud...');
                     await pullDataFromSupabase();
                 } else {
-                    // Push local data to cloud
+                    // Push local data to cloud (incremental)
                     console.log('⬆️ Pushing local data to cloud...');
-                    await clearAndPushAllData();
+                    await smartSyncToCloud();
                 }
 
                 updateSyncIndicator('synced');
@@ -2889,50 +2890,119 @@
             }
         }
 
-        async function clearAndPushAllData() {
-            if (!syncEnabled || !currentUser) return;
+        // Safer incremental sync that upserts only new/modified records
+        function addTimestamp(record) {
+            const now = new Date().toISOString();
+            if (!record.created_at) record.created_at = now;
+            record.last_modified = now;
+            return record;
+        }
+
+        async function smartSyncToCloud() {
+            if (!syncEnabled || !currentUser || syncLock) return;
+
+            syncLock = true;
+            updateSyncIndicator('syncing');
 
             try {
-                console.log('🗑️ Clearing cloud data...');
+                console.log('⬆️ Smart sync to cloud...');
+                const userId = currentUser.id;
 
-                // Delete with resilience — continue on failures
-                const deletePromises = [
-                    supabase.from('products').delete().eq('user_id', currentUser.id),
-                    supabase.from('sales').delete().eq('user_id', currentUser.id),
-                    supabase.from('categories').delete().eq('user_id', currentUser.id),
-                    supabase.from('expenses').delete().eq('user_id', currentUser.id),
-                    supabase.from('customers').delete().eq('user_id', currentUser.id),
-                    supabase.from('invoices').delete().eq('user_id', currentUser.id),
-                    supabase.from('receipts').delete().eq('user_id', currentUser.id),
-                    supabase.from('inventory').delete().eq('user_id', currentUser.id),
-                    supabase.from('notes').delete().eq('user_id', currentUser.id),
-                    supabase.from('transactions').delete().eq('user_id', currentUser.id),
-                    supabase.from('unpaid_entries').delete().eq('user_id', currentUser.id),
-                    supabase.from('transaction_floats').delete().eq('user_id', currentUser.id),
-                    supabase.from('settings').delete().eq('user_id', currentUser.id),
-                    supabase.from('inventory_purchase_periods').delete().eq('user_id', currentUser.id),
-                    supabase.from('inventory_purchases').delete().eq('user_id', currentUser.id)
+                const tables = [
+                    { name: 'products', localKey: 'products', idField: 'id' },
+                    { name: 'sales', localKey: 'sales', idField: 'id' },
+                    { name: 'expenses', localKey: 'expenses', idField: 'id' },
+                    { name: 'customers', localKey: 'customers', idField: 'id' },
+                    { name: 'invoices', localKey: 'invoices', idField: 'id' },
+                    { name: 'receipts', localKey: 'receipts', idField: 'id' },
+                    { name: 'inventory', localKey: 'inventory', idField: 'id' },
+                    { name: 'notes', localKey: 'notes', idField: 'id' },
+                    { name: 'transactions', localKey: 'transactions', idField: 'id' },
+                    { name: 'unpaid_entries', localKey: 'unpaidEntries', idField: 'id' },
+                    { name: 'categories', localKey: 'categories', idField: 'id' }
                 ];
-                const deleteResults = await Promise.allSettled(deletePromises);
-                deleteResults.forEach((res, idx) => {
-                    if (res.status === 'rejected') {
-                        console.warn('Delete failed for index', idx, res.reason);
-                    } else if (res.status === 'fulfilled' && res.value && res.value.error) {
-                        console.warn('Delete error for index', idx, res.value.error);
+
+                for (const table of tables) {
+                    const localData = Array.isArray(state[table.localKey]) ? state[table.localKey] : [];
+                    if (localData.length === 0) continue;
+
+                    const { data: cloudData, error: fetchError } = await supabase
+                        .from(table.name)
+                        .select('*')
+                        .eq('user_id', userId);
+
+                    if (fetchError) {
+                        console.error(`Error fetching ${table.name}:`, fetchError);
+                        continue;
                     }
-                });
 
-                console.log('✅ Cloud data cleared');
-                console.log('⬆️ Pushing local data to cloud...');
+                    const cloudItems = cloudData || [];
+                    const itemsToUpsert = [];
 
-                // Now push all local data
-                await pushAllDataToSupabase();
+                    for (const localItem of localData) {
+                        const localId = localItem[table.idField];
+                        if (!localId) continue; // skip items without IDs
+                        const cloudItem = cloudItems.find(c => c[table.idField] === localId);
 
-                console.log('✅ Local data pushed to cloud');
+                        if (!cloudItem) {
+                            itemsToUpsert.push({ ...addTimestamp({ ...localItem }), user_id: userId });
+                        } else {
+                            const localTime = new Date(localItem.last_modified || localItem.timestamp || 0);
+                            const cloudTime = new Date(cloudItem.last_modified || cloudItem.timestamp || 0);
+                            if (localTime > cloudTime) {
+                                itemsToUpsert.push({ ...addTimestamp({ ...localItem }), user_id: userId });
+                            }
+                        }
+                    }
+
+                    if (itemsToUpsert.length > 0) {
+                        console.log(`Upserting ${itemsToUpsert.length} items to ${table.name}`);
+                        for (let i = 0; i < itemsToUpsert.length; i += 100) {
+                            const batch = itemsToUpsert.slice(i, i + 100);
+                            const { error: upsertError } = await supabase
+                                .from(table.name)
+                                .upsert(batch, { onConflict: table.idField });
+                            if (upsertError) {
+                                console.error(`Error upserting to ${table.name}:`, upsertError);
+                            }
+                        }
+                    }
+                }
+
+                console.log('✅ Smart sync to cloud completed');
+                updateSyncIndicator('synced');
+                showToast('Data synced successfully', 'success');
             } catch (error) {
-                console.error('Clear and push error:', error);
-                throw error;
+                console.error('Smart sync error:', error);
+                updateSyncIndicator('error');
+                showToast('Sync failed: ' + error.message, 'error');
+            } finally {
+                syncLock = false;
             }
+        }
+
+        // Merge helper: keeps newer record by last_modified/timestamp and preserves uniques
+        function smartMergeRecords(localArray = [], cloudArray = [], idField = 'id') {
+            const merged = new Map();
+
+            cloudArray.forEach(item => {
+                merged.set(item[idField], item);
+            });
+
+            localArray.forEach(localItem => {
+                const key = localItem[idField];
+                if (!key) return;
+                const cloudItem = merged.get(key);
+                if (!cloudItem) {
+                    merged.set(key, localItem);
+                } else {
+                    const lt = new Date(localItem.last_modified || localItem.timestamp || 0);
+                    const ct = new Date(cloudItem.last_modified || cloudItem.timestamp || 0);
+                    if (lt > ct) merged.set(key, localItem);
+                }
+            });
+
+            return Array.from(merged.values());
         }
 
         async function syncInBackground() {
@@ -2940,7 +3010,7 @@
 
             try {
                 // Silent background sync - no loading indicators
-                await clearAndPushAllData();
+                await smartSyncToCloud();
                 console.log('✅ Background sync complete');
             } catch (error) {
                 console.error('❌ Background sync error:', error);
@@ -3043,22 +3113,26 @@
                 }
 
                 if (products && products.length > 0) {
-                    state.products = products.map(p => ({
+                    const cloudProducts = products.map(p => ({
                         id: p.id ? `P-${p.id}` : `P-${(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
                         name: p.name,
                         category: p.category,
                         cost: parseFloat(p.cost),
                         price: parseFloat(p.price),
-                        hasStock: (p.has_stock === false) ? false : true
+                        hasStock: (p.has_stock === false) ? false : true,
+                        last_modified: p.last_modified,
+                        timestamp: p.timestamp
                     }));
+                    state.products = smartMergeRecords(state.products, cloudProducts, 'id');
                 }
 
                 if (sales && sales.length > 0) {
-                    state.sales = sales.map(s => ({
+                    const cloudSales = sales.map(s => ({
                         id: s.id ? `S-${s.id}` : `S-${s.timestamp}`,
                         date: s.date,
                         time: s.time,
                         timestamp: s.timestamp,
+                        last_modified: s.last_modified,
                         productName: s.product_name,
                         customer: s.customer,
                         quantity: s.quantity,
@@ -3071,6 +3145,7 @@
                             : +(parseFloat(s.total_price || 0) - parseFloat(s.total_cost || 0)).toFixed(2),
                         payment: s.payment
                     }));
+                    state.sales = smartMergeRecords(state.sales, cloudSales, 'id');
                 }
 
                 if (categories && categories.length > 0) {
@@ -3078,50 +3153,68 @@
                     state.categories = categories.map(c => c.name);
                 }
 
-                if (expenses && expenses.length > 0) state.expenses = expenses.map(e => ({
-                    id: e.id ? `E-${e.id}` : `E-${e.timestamp}`,
-                    date: e.date,
-                    time: e.time,
-                    timestamp: e.timestamp,
-                    description: e.description,
-                    category: e.category,
-                    amount: parseFloat(e.amount),
-                    payment: e.payment,
-                    comment: e.comment
-                }));
+                if (expenses && expenses.length > 0) {
+                    const cloudExpenses = expenses.map(e => ({
+                        id: e.id ? `E-${e.id}` : `E-${e.timestamp}`,
+                        date: e.date,
+                        time: e.time,
+                        timestamp: e.timestamp,
+                        last_modified: e.last_modified,
+                        description: e.description,
+                        category: e.category,
+                        amount: parseFloat(e.amount),
+                        payment: e.payment,
+                        comment: e.comment
+                    }));
+                    state.expenses = smartMergeRecords(state.expenses, cloudExpenses, 'id');
+                }
 
-                if (customers && customers.length > 0) state.customers = customers.map(c => ({
-                    id: c.id ? `C-${c.id}` : `C-${(c.name || '').replace(/\s+/g, '_')}_${Date.now()}`,
-                    name: c.name,
-                    email: c.email || '',
-                    phone: c.phone || '',
-                    address: c.address || '',
-                    totalPurchases: parseFloat(c.total_purchases || 0)
-                }));
+                if (customers && customers.length > 0) {
+                    const cloudCustomers = customers.map(c => ({
+                        id: c.id ? `C-${c.id}` : `C-${(c.name || '').replace(/\s+/g, '_')}_${Date.now()}`,
+                        name: c.name,
+                        email: c.email || '',
+                        phone: c.phone || '',
+                        address: c.address || '',
+                        totalPurchases: parseFloat(c.total_purchases || 0),
+                        last_modified: c.last_modified,
+                        timestamp: c.timestamp
+                    }));
+                    state.customers = smartMergeRecords(state.customers, cloudCustomers, 'id');
+                }
 
-                if (invoices && invoices.length > 0) state.invoices = invoices.map(i => ({
-                    id: i.id ? `INV-${i.id}` : `INV-${i.number}`,
-                    number: i.number,
-                    customer: i.customer,
-                    date: i.date,
-                    dueDate: i.due_date,
-                    items: i.items,
-                    amount: parseFloat(i.amount),
-                    status: i.status
-                }));
+                if (invoices && invoices.length > 0) {
+                    const cloudInvoices = invoices.map(i => ({
+                        id: i.id ? `INV-${i.id}` : `INV-${i.number}`,
+                        number: i.number,
+                        customer: i.customer,
+                        date: i.date,
+                        dueDate: i.due_date,
+                        items: i.items,
+                        amount: parseFloat(i.amount),
+                        status: i.status,
+                        last_modified: i.last_modified,
+                        timestamp: i.timestamp
+                    }));
+                    state.invoices = smartMergeRecords(state.invoices, cloudInvoices, 'id');
+                }
 
-                if (receipts && receipts.length > 0) state.receipts = receipts.map(r => ({
-                    id: r.id ? `RCPT-${r.id}` : `RCPT-${r.timestamp}`,
-                    number: r.number,
-                    customer: r.customer,
-                    customerEmail: r.customer_email || '',
-                    date: r.date,
-                    time: r.time,
-                    timestamp: r.timestamp,
-                    description: r.description,
-                    amount: parseFloat(r.amount),
-                    paymentMethod: r.payment_method
-                }));
+                if (receipts && receipts.length > 0) {
+                    const cloudReceipts = receipts.map(r => ({
+                        id: r.id ? `RCPT-${r.id}` : `RCPT-${r.timestamp}`,
+                        number: r.number,
+                        customer: r.customer,
+                        customerEmail: r.customer_email || '',
+                        date: r.date,
+                        time: r.time,
+                        timestamp: r.timestamp,
+                        last_modified: r.last_modified,
+                        description: r.description,
+                        amount: parseFloat(r.amount),
+                        paymentMethod: r.payment_method
+                    }));
+                    state.receipts = smartMergeRecords(state.receipts, cloudReceipts, 'id');
+                }
 
                 if (inventory && inventory.length > 0) {
                     if (!state.inventory) state.inventory = {};
@@ -3133,36 +3226,48 @@
                     });
                 }
 
-                if (notes && notes.length > 0) state.notes = notes.map(n => ({
-                    id: n.id ? `N-${n.id}` : `N-${n.timestamp}`,
-                    title: n.title || '',
-                    content: n.content,
-                    date: n.date,
-                    time: n.time,
-                    timestamp: n.timestamp
-                }));
+                if (notes && notes.length > 0) {
+                    const cloudNotes = notes.map(n => ({
+                        id: n.id ? `N-${n.id}` : `N-${n.timestamp}`,
+                        title: n.title || '',
+                        content: n.content,
+                        date: n.date,
+                        time: n.time,
+                        timestamp: n.timestamp,
+                        last_modified: n.last_modified
+                    }));
+                    state.notes = smartMergeRecords(state.notes, cloudNotes, 'id');
+                }
 
-                if (transactions && transactions.length > 0) state.transactions = transactions.map(t => ({
-                    id: t.id ? `T-${t.id}` : `T-${t.timestamp}`,
-                    channel: t.channel,
-                    customerName: t.customer_name,
-                    type: t.type,
-                    amount: parseFloat(t.amount),
-                    date: t.date,
-                    time: t.time,
-                    timestamp: t.timestamp
-                }));
+                if (transactions && transactions.length > 0) {
+                    const cloudTransactions = transactions.map(t => ({
+                        id: t.id ? `T-${t.id}` : `T-${t.timestamp}`,
+                        channel: t.channel,
+                        customerName: t.customer_name,
+                        type: t.type,
+                        amount: parseFloat(t.amount),
+                        date: t.date,
+                        time: t.time,
+                        timestamp: t.timestamp,
+                        last_modified: t.last_modified
+                    }));
+                    state.transactions = smartMergeRecords(state.transactions, cloudTransactions, 'id');
+                }
 
-                if (unpaidEntries && unpaidEntries.length > 0) state.unpaidEntries = unpaidEntries.map(u => ({
-                    id: u.id ? `U-${u.id}` : `U-${u.timestamp}`,
-                    name: u.name,
-                    type: u.type,
-                    amount: parseFloat(u.amount),
-                    date: u.date,
-                    time: u.time,
-                    timestamp: u.timestamp,
-                    paid: u.paid
-                }));
+                if (unpaidEntries && unpaidEntries.length > 0) {
+                    const cloudUnpaid = unpaidEntries.map(u => ({
+                        id: u.id ? `U-${u.id}` : `U-${u.timestamp}`,
+                        name: u.name,
+                        type: u.type,
+                        amount: parseFloat(u.amount),
+                        date: u.date,
+                        time: u.time,
+                        timestamp: u.timestamp,
+                        last_modified: u.last_modified,
+                        paid: u.paid
+                    }));
+                    state.unpaidEntries = smartMergeRecords(state.unpaidEntries, cloudUnpaid, 'id');
+                }
 
                 if (floats && floats.length > 0) {
                     floats.forEach(f => {
@@ -4359,7 +4464,7 @@
                 return showToast('Not signed in', 'error');
             }
 
-            if (!confirm('This will replace ALL cloud data with local data. Continue?')) {
+            if (!confirm('Sync your local changes to the cloud?')) {
                 return;
             }
 
@@ -4368,7 +4473,7 @@
 
             try {
                 console.log('⬆️ Pushing data to cloud...');
-                await clearAndPushAllData();
+                await smartSyncToCloud();
                 hideLoadingToast();
                 updateSyncIndicator('synced');
                 showToast('Data pushed to cloud successfully!', 'success');
@@ -9785,6 +9890,18 @@
             saveData();
         }, 15000);
 
+        // Auto-sync every 2 minutes when signed in
+        setInterval(async () => {
+            try {
+                if (syncEnabled && currentUser && !syncLock && navigator.onLine) {
+                    await pullDataFromSupabase();
+                    await smartSyncToCloud();
+                }
+            } catch (e) {
+                console.log('Background sync skipped:', e?.message || e);
+            }
+        }, 120000);
+
         // PWA Manifest (find this section and replace it)
         const manifestData = {
             "name": "TUBA - The Ultimate Business Architecture",
@@ -10549,7 +10666,7 @@
                 saveData();
 
                 console.log('⬆️  Pushing merged data to cloud...');
-                await clearAndPushAllData();
+                await smartSyncToCloud();
 
                 updateSyncIndicator('synced');
                 hideLoadingToast();
@@ -10570,7 +10687,7 @@
         // FIX 4: Sync Lock
         // ============================================
 
-        let syncLock = false;
+        syncLock = false;
 
         async function syncInBackgroundSafe() {
             if (!syncEnabled || !currentUser) return;
@@ -10581,8 +10698,9 @@
 
             syncLock = true;
             try {
-                // Background sync should NOT clear cloud — push incremental data only
-                await pushAllDataToSupabase();
+                // Background sync: pull latest then upsert local changes
+                await pullDataFromSupabase();
+                await smartSyncToCloud();
                 console.log('✅ Background sync complete');
             } catch (error) {
                 console.error('❌ Background sync error:', error);
@@ -10646,7 +10764,7 @@
             saveData();
 
             if (syncEnabled && currentUser) {
-                await clearAndPushAllData();
+                await smartSyncToCloud();
             }
 
             render();
@@ -11505,10 +11623,13 @@
                 });
 
                 // Handle app state changes
-                document.addEventListener('visibilitychange', function () {
-                    if (document.visibilityState === 'visible') {
-                        // App became visible - could refresh data here
-                        console.log('App became visible');
+                document.addEventListener('visibilitychange', async function () {
+                    if (document.visibilityState === 'visible' && syncEnabled && currentUser) {
+                        try {
+                            await pullDataFromSupabase();
+                        } catch (e) {
+                            console.log('Visibility sync failed:', e);
+                        }
                     }
                 });
             });
