@@ -116,11 +116,6 @@
             z-index: 50;
         }
 
-        /* Blink animation for loading toasts */
-        .toast-loading {
-            animation: pulse 1.2s infinite;
-        }
-
         /* FAB (Floating Action Button) and radial tabs */
         .fab-container {
             position: fixed;
@@ -1736,9 +1731,6 @@
             <div
                 style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); display: flex; gap: 8px;">
                 <button
-                    style="width: 40px; height: 40px; background: linear-gradient(145deg, #607d8b, #455a64); color: white; border: none; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(69, 90, 100, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.2);"
-                    onclick="refreshApp()" title="Click here to refresh" aria-label="Click here to refresh">🔄</button>
-                <button
                     style="width: 40px; height: 40px; background: linear-gradient(145deg, #2e7d32, #1b5e20); color: white; border: none; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(46, 125, 50, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.2);"
                     onclick="exportData()">💾</button>
                 <button
@@ -1848,7 +1840,6 @@
         }
         let currentUser = null;
         let syncEnabled = false;
-        let syncLock = false; // Prevent concurrent sync operations
         let autoCloudPullDone = false;
 
         // Your existing code continues below...
@@ -1883,7 +1874,7 @@
                         currentUser = session.user;
                         syncEnabled = true;
                         updateSyncIndicator('synced');
-                        // No auto-pull on auth state change; pulling is triggered explicitly in signIn()
+                        await maybeAutoPullCloudData();
                     } else if (event === 'SIGNED_OUT') {
                         currentUser = null;
                         syncEnabled = false;
@@ -1893,7 +1884,7 @@
                         console.log('✅ Token refreshed');
                         currentUser = session.user;
                         syncEnabled = true;
-                        // No auto-pull on token refresh; keep session active only
+                        await maybeAutoPullCloudData();
                     }
                 });
 
@@ -1920,13 +1911,14 @@
                     // Load user profile
                     await loadUserProfile();
 
-                    // Do NOT auto-pull on restore; user will pull after explicit sign-in
+                    // Auto-pull cloud data when local data is empty
+                    await maybeAutoPullCloudData();
 
                     // REMOVED: Automatic data pull on refresh that was clearing local data
                     // Users can manually sync using the sync button if needed
                     // await pullDataFromSupabase();
 
-                    console.log('✅ Session restored successfully (no auto-pull)');
+                    console.log('✅ Session restored successfully (local data preserved)');
                     return true;
                 }
 
@@ -2103,52 +2095,27 @@
             state.userProfile = { ...profileData };
             state.profileLoaded = true;
             saveData();
-            let ok = true;
 
             // If signed in, also save to cloud
             if (syncEnabled && currentUser) {
                 try {
                     updateSyncIndicator('syncing');
-                    // Try to find existing profile row
-                    const { data: existing, error: selErr } = await supabase
+
+                    const { error } = await supabase
                         .from('user_profiles')
-                        .select('id')
-                        .eq('user_id', currentUser.id)
-                        .single();
+                        .upsert({
+                            user_id: currentUser.id,
+                            business_name: profileData.businessName,
+                            email: profileData.email,
+                            phone: profileData.phone,
+                            address: profileData.address,
+                            logo_url: state.userLogoPublicUrl || null,
+                            updated_at: new Date().toISOString()
+                        }, {
+                            onConflict: 'user_id'
+                        });
 
-                    if (selErr && selErr.code !== 'PGRST116') {
-                        throw selErr;
-                    }
-
-                    if (existing && existing.id) {
-                        // Update existing profile
-                        const { error: updErr } = await supabase
-                            .from('user_profiles')
-                            .update({
-                                business_name: profileData.businessName,
-                                email: profileData.email,
-                                phone: profileData.phone,
-                                address: profileData.address,
-                                logo_url: state.userLogoPublicUrl || null,
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('user_id', currentUser.id);
-                        if (updErr) throw updErr;
-                    } else {
-                        // Insert new profile
-                        const { error: insErr } = await supabase
-                            .from('user_profiles')
-                            .insert({
-                                user_id: currentUser.id,
-                                business_name: profileData.businessName,
-                                email: profileData.email || currentUser.email,
-                                phone: profileData.phone,
-                                address: profileData.address,
-                                logo_url: state.userLogoPublicUrl || null,
-                                updated_at: new Date().toISOString()
-                            });
-                        if (insErr) throw insErr;
-                    }
+                    if (error) throw error;
 
                     updateSyncIndicator('synced');
                     console.log('✅ Profile saved to cloud');
@@ -2156,13 +2123,12 @@
                     console.error('Save profile to cloud error:', error);
                     updateSyncIndicator('synced');
                     showToast('Profile saved locally (cloud sync failed)', 'info');
-                    ok = false;
                 }
             } else {
                 console.log('✅ Profile saved locally');
             }
 
-            return ok;
+            return true;
         }
 
         function getUserProfileData() {
@@ -2204,7 +2170,7 @@
 
             updateSyncIndicator('syncing');
             try {
-                await smartSyncToCloud();
+                await clearAndPushAllData();
                 updateSyncIndicator('synced');
                 showToast('Data pushed to cloud successfully!', 'success');
             } catch (error) {
@@ -2263,8 +2229,6 @@
                         await pullDataFromSupabase();
                         showToast('Cloud data loaded', 'success');
                     }
-                    // Force full hydration from cloud to include tables not covered by merge
-                    await pullDataFromSupabase();
                 } catch (syncError) {
                     console.error('Sync error after sign in:', syncError);
                     showToast('Signed in but sync failed. Try manual sync.', 'error');
@@ -2283,7 +2247,7 @@
         async function smartMergeData() {
             try {
                 updateSyncIndicator('syncing');
-                showLoadingToast();
+                showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                 console.log('🔄 Starting smart merge...');
 
                 // Save local data BEFORE pulling from cloud
@@ -2375,14 +2339,14 @@
                 // Categories: merge by name (set uniqueness)
                 state.categories = Array.from(new Set([...(localData.categories || []), ...((cloudData.categories) || [])]));
 
-                // Final pass: ID-first deduplication to preserve distinct entries
-                state.sales = deduplicateByID(state.sales, 'sales');
-                state.products = deduplicateByID(state.products, 'products');
-                state.expenses = deduplicateByID(state.expenses, 'expenses');
-                state.customers = deduplicateByID(state.customers, 'customers');
-                state.transactions = deduplicateByID(state.transactions, 'transactions');
-                state.unpaidEntries = deduplicateByID(state.unpaidEntries, 'unpaid');
-                state.notes = deduplicateByID(state.notes, 'notes');
+                // Final pass: content-based deduplication per type
+                state.sales = deduplicateByContent(state.sales, 'sales');
+                state.products = deduplicateByContent(state.products, 'products');
+                state.expenses = deduplicateByContent(state.expenses, 'expenses');
+                state.customers = deduplicateByContent(state.customers, 'customers');
+                state.transactions = deduplicateByContent(state.transactions, 'transactions');
+                state.unpaidEntries = deduplicateByContent(state.unpaidEntries, 'unpaid');
+                state.notes = deduplicateByContent(state.notes, 'notes');
 
                 console.log('🔀 Merged data counts:', {
                     sales: state.sales.length,
@@ -2397,16 +2361,14 @@
                 // Save merged data locally
                 saveData();
 
-                // Push merged data back to cloud using incremental upsert
-                await smartSyncToCloud();
+                // Push merged data back to cloud (clear and push to avoid server-side duplicates)
+                await clearAndPushAllData();
                 updateSyncIndicator('synced');
-                hideLoadingToast();
 
                 console.log('✅ Smart merge completed successfully');
             } catch (error) {
                 console.error('Smart merge error:', error);
                 updateSyncIndicator('synced');
-                hideLoadingToast();
                 throw error;
             }
         }
@@ -2469,7 +2431,7 @@
             return 'unknown';
         }
 
-        async function signOut(silent = false) {
+        async function signOut() {
             try {
                 // Set these first in case signOut fails
                 currentUser = null;
@@ -2482,12 +2444,12 @@
                     // Still consider it signed out locally
                 }
 
-                if (!silent) showToast('Signed out successfully', 'info');
+                showToast('Signed out successfully', 'info');
                 try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { /* no-op */ }
                 render();
             } catch (error) {
                 console.error('Sign out error:', error);
-                if (!silent) showToast('Signed out (with errors)', 'info');
+                showToast('Signed out (with errors)', 'info');
                 try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { /* no-op */ }
                 render();
             }
@@ -2498,195 +2460,113 @@
             updateSyncIndicator('syncing');
 
             try {
-                // Build cloud content-key sets to avoid duplicate inserts
-                const [
-                    { data: cloudProducts },
-                    { data: cloudSales },
-                    { data: cloudExpenses },
-                    { data: cloudCustomers },
-                    { data: cloudInvoices },
-                    { data: cloudReceipts },
-                    { data: cloudInventory },
-                    { data: cloudNotes },
-                    { data: cloudTransactions },
-                    { data: cloudUnpaid },
-                    { data: cloudFloats },
-                    { data: cloudSettings },
-                    { data: cloudPeriods },
-                    { data: cloudPurchases },
-                    { data: cloudCategories }
-                ] = await Promise.all([
-                    supabase.from('products').select('name,category').eq('user_id', currentUser.id),
-                    supabase.from('sales').select('date,time,timestamp,product_name,customer,quantity,total_price').eq('user_id', currentUser.id),
-                    supabase.from('expenses').select('date,time,timestamp,description,amount').eq('user_id', currentUser.id),
-                    supabase.from('customers').select('name,email,phone').eq('user_id', currentUser.id),
-                    supabase.from('invoices').select('number,customer,date,amount,status').eq('user_id', currentUser.id),
-                    supabase.from('receipts').select('number,customer,date,time,amount,payment_method,timestamp').eq('user_id', currentUser.id),
-                    supabase.from('inventory').select('product_name').eq('user_id', currentUser.id),
-                    supabase.from('notes').select('title,content,date,time,timestamp').eq('user_id', currentUser.id),
-                    supabase.from('transactions').select('channel,type,amount,date,time').eq('user_id', currentUser.id),
-                    supabase.from('unpaid_entries').select('name,type,amount,date').eq('user_id', currentUser.id),
-                    supabase.from('transaction_floats').select('channel').eq('user_id', currentUser.id),
-                    supabase.from('settings').select('user_id').eq('user_id', currentUser.id),
-                    supabase.from('inventory_purchase_periods').select('period_number,title,start_date,end_date').eq('user_id', currentUser.id),
-                    supabase.from('inventory_purchases').select('timestamp,item_name,quantity,total_cost').eq('user_id', currentUser.id),
-                    supabase.from('categories').select('name').eq('user_id', currentUser.id)
-                ]);
-
-                const keySet = {
-                    products: new Set((cloudProducts || []).map(p => `${p.name}|${p.category}`)),
-                    sales: new Set((cloudSales || []).map(s => `${s.product_name}|${s.customer}|${s.date}|${s.time}|${s.quantity}|${parseFloat(s.total_price || 0)}`)),
-                    expenses: new Set((cloudExpenses || []).map(e => `${e.description}|${e.date}|${e.time}|${parseFloat(e.amount || 0)}`)),
-                    customers: new Set((cloudCustomers || []).map(c => `${c.name}|${c.email || ''}|${c.phone || ''}`)),
-                    invoices: new Set((cloudInvoices || []).map(i => `${i.number}|${i.customer}|${i.date}|${parseFloat(i.amount || 0)}|${i.status}`)),
-                    receipts: new Set((cloudReceipts || []).map(r => `${r.number}|${r.customer}|${r.date}|${r.time}|${parseFloat(r.amount || 0)}|${r.payment_method}`)),
-                    inventory: new Set((cloudInventory || []).map(inv => `${inv.product_name}`)),
-                    notes: new Set((cloudNotes || []).map(n => `${n.title || ''}|${n.content}|${n.date}|${n.time}`)),
-                    transactions: new Set((cloudTransactions || []).map(t => `${t.channel}|${t.date}|${t.time}|${parseFloat(t.amount || 0)}|${t.type}`)),
-                    unpaid: new Set((cloudUnpaid || []).map(u => `${u.name}|${u.type}|${u.date}|${parseFloat(u.amount || 0)}`)),
-                    floats: new Set((cloudFloats || []).map(f => `${f.channel}`)),
-                    settings: new Set((cloudSettings || []).map(s => `${s.user_id}`)),
-                    periods: new Set((cloudPeriods || []).map(p => `${p.period_number}|${p.title || ''}|${p.start_date || ''}|${p.end_date || ''}`)),
-                    purchases: new Set((cloudPurchases || []).map(p => `${p.timestamp}|${p.item_name}|${p.quantity}|${parseFloat(p.total_cost || 0)}`)),
-                    categories: new Set((cloudCategories || []).map(c => `${c.name}`))
-                };
                 // Sync products
                 if (state.products.length > 0) {
-                    const productsData = state.products
-                        .filter(p => !keySet.products.has(`${p.name}|${p.category}`))
-                        .map(p => ({
-                            user_id: currentUser.id,
-                            name: p.name,
-                            category: p.category,
-                            cost: p.cost,
-                            price: p.price,
-                            has_stock: (p.hasStock === false) ? false : true
-                        }));
-                    const { error } = await supabase
-                        .from('products')
-                        .insert(productsData);
+                    const productsData = state.products.map(p => ({
+                        user_id: currentUser.id,
+                        name: p.name,
+                        category: p.category,
+                        cost: p.cost,
+                        price: p.price,
+                        has_stock: (p.hasStock === false) ? false : true
+                    }));
+                    const { error } = await supabase.from('products').insert(productsData);
                     if (error) throw error;
                 }
 
                 // Sync categories
                 if (state.categories.length > 0) {
-                    const categoriesData = state.categories
-                        .filter(c => !keySet.categories.has(`${c}`))
-                        .map(c => ({
-                            user_id: currentUser.id,
-                            name: c
-                        }));
-                    const { error } = await supabase
-                        .from('categories')
-                        .insert(categoriesData);
+                    const categoriesData = state.categories.map(c => ({
+                        user_id: currentUser.id,
+                        name: c
+                    }));
+                    const { error } = await supabase.from('categories').insert(categoriesData);
                     if (error) console.warn('Categories insert skipped:', error.message || error);
                 }
 
                 // Sync sales
                 if (state.sales.length > 0) {
-                    const salesData = state.sales
-                        .filter(s => !keySet.sales.has(`${s.productName}|${s.customer}|${s.date}|${s.time}|${s.quantity}|${parseFloat(s.totalPrice || 0)}`))
-                        .map(s => ({
-                            user_id: currentUser.id,
-                            date: s.date,
-                            time: s.time,
-                            timestamp: s.timestamp,
-                            product_name: s.productName,
-                            customer: s.customer,
-                            quantity: s.quantity,
-                            cost_per_unit: s.costPerUnit,
-                            price_per_unit: s.pricePerUnit,
-                            total_cost: s.totalCost,
-                            total_price: s.totalPrice,
-                            profit: (s.profit !== null && s.profit !== undefined && !isNaN(parseFloat(s.profit)))
-                                ? parseFloat(s.profit)
-                                : +(parseFloat(s.totalPrice || 0) - parseFloat(s.totalCost || 0)).toFixed(2),
-                            payment: s.payment
-                        }));
-                    const { error } = await supabase
-                        .from('sales')
-                        .insert(salesData);
+                    const salesData = state.sales.map(s => ({
+                        user_id: currentUser.id,
+                        date: s.date,
+                        time: s.time,
+                        timestamp: s.timestamp,
+                        product_name: s.productName,
+                        customer: s.customer,
+                        quantity: s.quantity,
+                        cost_per_unit: s.costPerUnit,
+                        price_per_unit: s.pricePerUnit,
+                        total_cost: s.totalCost,
+                        total_price: s.totalPrice,
+                        profit: s.profit,
+                        payment: s.payment
+                    }));
+                    const { error } = await supabase.from('sales').insert(salesData);
                     if (error) throw error;
                 }
 
                 // Sync expenses
                 if (state.expenses.length > 0) {
-                    const expensesData = state.expenses
-                        .filter(e => !keySet.expenses.has(`${e.description}|${e.date}|${e.time}|${parseFloat(e.amount || 0)}`))
-                        .map(e => ({
-                            user_id: currentUser.id,
-                            date: e.date,
-                            time: e.time,
-                            timestamp: e.timestamp,
-                            description: e.description,
-                            category: e.category,
-                            amount: e.amount,
-                            payment: e.payment,
-                            comment: e.comment || ''
-                        }));
-                    const { error } = await supabase
-                        .from('expenses')
-                        .insert(expensesData);
+                    const expensesData = state.expenses.map(e => ({
+                        user_id: currentUser.id,
+                        date: e.date,
+                        time: e.time,
+                        timestamp: e.timestamp,
+                        description: e.description,
+                        category: e.category,
+                        amount: e.amount,
+                        payment: e.payment,
+                        comment: e.comment || ''
+                    }));
+                    const { error } = await supabase.from('expenses').insert(expensesData);
                     if (error) throw error;
                 }
 
                 // Sync customers
                 if (state.customers.length > 0) {
-                    const customersData = state.customers
-                        .filter(c => !keySet.customers.has(`${c.name}|${c.email || ''}|${c.phone || ''}`))
-                        .map(c => ({
-                            user_id: currentUser.id,
-                            name: c.name,
-                            email: c.email || '',
-                            phone: c.phone || '',
-                            address: c.address || '',
-                            total_purchases: c.totalPurchases || 0
-                        }));
-                    const { error } = await supabase
-                        .from('customers')
-                        .insert(customersData);
+                    const customersData = state.customers.map(c => ({
+                        user_id: currentUser.id,
+                        name: c.name,
+                        email: c.email || '',
+                        phone: c.phone || '',
+                        address: c.address || '',
+                        total_purchases: c.totalPurchases || 0
+                    }));
+                    const { error } = await supabase.from('customers').insert(customersData);
                     if (error) throw error;
                 }
 
                 // Sync invoices
                 if (state.invoices.length > 0) {
-                    const invoicesData = state.invoices
-                        .filter(i => !keySet.invoices.has(`${i.number}|${i.customer}|${i.date}|${parseFloat(i.amount || 0)}|${i.status}`))
-                        .map(i => ({
-                            user_id: currentUser.id,
-                            number: i.number,
-                            customer: i.customer,
-                            date: i.date,
-                            due_date: i.dueDate,
-                            items: i.items,
-                            amount: i.amount,
-                            status: i.status
-                        }));
-                    const { error } = await supabase
-                        .from('invoices')
-                        .insert(invoicesData);
+                    const invoicesData = state.invoices.map(i => ({
+                        user_id: currentUser.id,
+                        number: i.number,
+                        customer: i.customer,
+                        date: i.date,
+                        due_date: i.dueDate,
+                        items: i.items,
+                        amount: i.amount,
+                        status: i.status
+                    }));
+                    const { error } = await supabase.from('invoices').insert(invoicesData);
                     if (error) throw error;
                 }
 
                 // Sync receipts
                 if (state.receipts && state.receipts.length > 0) {
-                    const receiptsData = state.receipts
-                        .filter(r => !keySet.receipts.has(`${r.number}|${r.customer}|${r.date}|${r.time}|${parseFloat(r.amount || 0)}|${r.paymentMethod}`))
-                        .map(r => ({
-                            user_id: currentUser.id,
-                            number: r.number,
-                            customer: r.customer,
-                            customer_email: r.customerEmail || '',
-                            date: r.date,
-                            time: r.time,
-                            timestamp: r.timestamp,
-                            description: r.description,
-                            amount: r.amount,
-                            payment_method: r.paymentMethod
-                        }));
-                    const { error } = await supabase
-                        .from('receipts')
-                        .insert(receiptsData);
+                    const receiptsData = state.receipts.map(r => ({
+                        user_id: currentUser.id,
+                        number: r.number,
+                        customer: r.customer,
+                        customer_email: r.customerEmail || '',
+                        date: r.date,
+                        time: r.time,
+                        timestamp: r.timestamp,
+                        description: r.description,
+                        amount: r.amount,
+                        payment_method: r.paymentMethod
+                    }));
+                    const { error } = await supabase.from('receipts').insert(receiptsData);
                     if (error) throw error;
                 }
 
@@ -2698,115 +2578,87 @@
                         stock: inv.stock,
                         min_alert: inv.minAlert
                     }));
-                    // For inventory, delete existing per product then insert single row to avoid duplicates
-                    for (const row of inventoryData) {
-                        try {
-                            await supabase.from('inventory').delete().eq('user_id', currentUser.id).eq('product_name', row.product_name);
-                            const { error: invErr } = await supabase.from('inventory').insert(row);
-                            if (invErr) throw invErr;
-                        } catch (e) {
-                            console.warn('Inventory sync error for', row.product_name, e);
-                        }
-                    }
+                    const { error } = await supabase.from('inventory').insert(inventoryData);
+                    if (error) throw error;
                 }
 
                 // Sync notes
                 if (state.notes.length > 0) {
-                    const notesData = state.notes
-                        .filter(n => !keySet.notes.has(`${n.title || ''}|${n.content}|${n.date}|${n.time}`))
-                        .map(n => ({
-                            user_id: currentUser.id,
-                            title: n.title || '',
-                            content: n.content,
-                            date: n.date,
-                            time: n.time,
-                            timestamp: n.timestamp
-                        }));
-                    const { error } = await supabase
-                        .from('notes')
-                        .insert(notesData);
+                    const notesData = state.notes.map(n => ({
+                        user_id: currentUser.id,
+                        title: n.title || '',
+                        content: n.content,
+                        date: n.date,
+                        time: n.time,
+                        timestamp: n.timestamp
+                    }));
+                    const { error } = await supabase.from('notes').insert(notesData);
                     if (error) throw error;
                 }
 
                 // Sync inventory purchase Periods
                 if (state.inventoryPurchaseCycles && state.inventoryPurchaseCycles.length > 0) {
-                    const periodsData = state.inventoryPurchaseCycles
-                        .filter(c => !keySet.periods.has(`${c.number}|${c.title || ''}|${c.startDate || ''}|${c.endDate || ''}`))
-                        .map(c => ({
-                            user_id: currentUser.id,
-                            period_number: c.number,
-                            title: c.title || '',
-                            start_date: c.startDate || null,
-                            end_date: c.endDate || null,
-                            notes: c.notes || ''
-                        }));
-                    const { error: periodsErr } = await supabase
-                        .from('inventory_purchase_periods')
-                        .insert(periodsData);
+                    const periodsData = state.inventoryPurchaseCycles.map(c => ({
+                        user_id: currentUser.id,
+                        period_number: c.number,
+                        title: c.title || '',
+                        start_date: c.startDate || null,
+                        end_date: c.endDate || null,
+                        notes: c.notes || ''
+                    }));
+                    const { error: periodsErr } = await supabase.from('inventory_purchase_periods').insert(periodsData);
                     if (periodsErr) throw periodsErr;
                 }
 
                 // Sync inventory purchases
                 if (state.inventoryPurchases && state.inventoryPurchases.length > 0) {
-                    const purchasesData = state.inventoryPurchases
-                        .filter(p => !keySet.purchases.has(`${p.timestamp}|${p.itemName}|${p.quantity || 0}|${parseFloat(p.totalCost || p.buyingPrice || 0)}`))
-                        .map(p => ({
-                            user_id: currentUser.id,
-                            period_number: p.cycleNumber,
-                            item_name: p.itemName,
-                            quantity: p.quantity || 0,
-                            unit_cost: p.unitCost || p.buyingPrice || 0,
-                            total_cost: p.totalCost || p.buyingPrice || 0,
-                            purchase_date: p.purchaseDate,
-                            supplier_name: p.supplierName || '',
-                            supplier_phone: p.supplierPhone || p.supplierContact || '',
-                            supplier_address: p.supplierAddress || '',
-                            notes: p.notes || '',
-                            timestamp: p.timestamp
-                        }));
-                    const { error: purchasesErr } = await supabase
-                        .from('inventory_purchases')
-                        .insert(purchasesData);
+                    const purchasesData = state.inventoryPurchases.map(p => ({
+                        user_id: currentUser.id,
+                        period_number: p.cycleNumber,
+                        item_name: p.itemName,
+                        quantity: p.quantity || 0,
+                        unit_cost: p.unitCost || p.buyingPrice || 0,
+                        total_cost: p.totalCost || p.buyingPrice || 0,
+                        purchase_date: p.purchaseDate,
+                        supplier_name: p.supplierName || '',
+                        supplier_phone: p.supplierPhone || p.supplierContact || '',
+                        supplier_address: p.supplierAddress || '',
+                        notes: p.notes || '',
+                        timestamp: p.timestamp
+                    }));
+                    const { error: purchasesErr } = await supabase.from('inventory_purchases').insert(purchasesData);
                     if (purchasesErr) throw purchasesErr;
                 }
 
                 // Sync transactions
                 if (state.transactions.length > 0) {
-                    const transactionsData = state.transactions
-                        .filter(t => !keySet.transactions.has(`${t.channel}|${t.date}|${t.time}|${parseFloat(t.amount || 0)}|${t.type}`))
-                        .map(t => ({
-                            user_id: currentUser.id,
-                            channel: t.channel,
-                            customer_name: t.customerName,
-                            type: t.type,
-                            amount: t.amount,
-                            date: t.date,
-                            time: t.time,
-                            timestamp: t.timestamp
-                        }));
-                    const { error } = await supabase
-                        .from('transactions')
-                        .insert(transactionsData);
+                    const transactionsData = state.transactions.map(t => ({
+                        user_id: currentUser.id,
+                        channel: t.channel,
+                        customer_name: t.customerName,
+                        type: t.type,
+                        amount: t.amount,
+                        date: t.date,
+                        time: t.time,
+                        timestamp: t.timestamp
+                    }));
+                    const { error } = await supabase.from('transactions').insert(transactionsData);
                     if (error) throw error;
                 }
 
                 // Sync unpaid entries
                 if (state.unpaidEntries.length > 0) {
-                    const unpaidData = state.unpaidEntries
-                        .filter(u => !keySet.unpaid.has(`${u.name}|${u.type}|${u.date}|${parseFloat(u.amount || 0)}`))
-                        .map(u => ({
-                            user_id: currentUser.id,
-                            name: u.name,
-                            type: u.type,
-                            amount: u.amount,
-                            date: u.date,
-                            time: u.time,
-                            timestamp: u.timestamp,
-                            paid: u.paid
-                        }));
-                    const { error } = await supabase
-                        .from('unpaid_entries')
-                        .insert(unpaidData);
+                    const unpaidData = state.unpaidEntries.map(u => ({
+                        user_id: currentUser.id,
+                        name: u.name,
+                        type: u.type,
+                        amount: u.amount,
+                        date: u.date,
+                        time: u.time,
+                        timestamp: u.timestamp,
+                        paid: u.paid
+                    }));
+                    const { error } = await supabase.from('unpaid_entries').insert(unpaidData);
                     if (error) throw error;
                 }
 
@@ -2817,27 +2669,18 @@
                     initial_float: floatData.initial
                 }));
                 {
-                    // Delete existing for channel then insert to avoid duplicates
-                    for (const row of floatsData) {
-                        try {
-                            await supabase.from('transaction_floats').delete().eq('user_id', currentUser.id).eq('channel', row.channel);
-                            const { error: flErr } = await supabase.from('transaction_floats').insert(row);
-                            if (flErr) console.warn('Transaction floats insert skipped:', flErr.message || flErr);
-                        } catch (e) { console.warn('Transaction floats sync error:', e); }
-                    }
+                    const { error } = await supabase.from('transaction_floats').insert(floatsData);
+                    if (error) console.warn('Transaction floats insert skipped:', error.message || error);
                 }
 
                 // Sync settings
                 {
-                    try {
-                        await supabase.from('settings').delete().eq('user_id', currentUser.id);
-                        const { error } = await supabase.from('settings').insert({
-                            user_id: currentUser.id,
-                            daily_target: state.dailyTarget || 0,
-                            monthly_target: state.monthlyTarget || 0
-                        });
-                        if (error) console.warn('Settings insert skipped:', error.message || error);
-                    } catch (e) { console.warn('Settings sync error:', e); }
+                    const { error } = await supabase.from('settings').insert({
+                        user_id: currentUser.id,
+                        daily_target: state.dailyTarget || 0,
+                        monthly_target: state.monthlyTarget || 0
+                    });
+                    if (error) console.warn('Settings insert skipped:', error.message || error);
                 }
 
                 updateSyncIndicator('synced');
@@ -2872,9 +2715,9 @@
                     console.log('⬇️ Local data is empty, pulling from cloud...');
                     await pullDataFromSupabase();
                 } else {
-                    // Push local data to cloud (incremental)
+                    // Push local data to cloud
                     console.log('⬆️ Pushing local data to cloud...');
-                    await smartSyncToCloud();
+                    await clearAndPushAllData();
                 }
 
                 updateSyncIndicator('synced');
@@ -2890,119 +2733,48 @@
             }
         }
 
-        // Safer incremental sync that upserts only new/modified records
-        function addTimestamp(record) {
-            const now = new Date().toISOString();
-            if (!record.created_at) record.created_at = now;
-            record.last_modified = now;
-            return record;
-        }
-
-        async function smartSyncToCloud() {
-            if (!syncEnabled || !currentUser || syncLock) return;
-
-            syncLock = true;
-            updateSyncIndicator('syncing');
+        async function clearAndPushAllData() {
+            if (!syncEnabled || !currentUser) return;
 
             try {
-                console.log('⬆️ Smart sync to cloud...');
-                const userId = currentUser.id;
+                console.log('🗑️ Clearing cloud data...');
 
-                const tables = [
-                    { name: 'products', localKey: 'products', idField: 'id' },
-                    { name: 'sales', localKey: 'sales', idField: 'id' },
-                    { name: 'expenses', localKey: 'expenses', idField: 'id' },
-                    { name: 'customers', localKey: 'customers', idField: 'id' },
-                    { name: 'invoices', localKey: 'invoices', idField: 'id' },
-                    { name: 'receipts', localKey: 'receipts', idField: 'id' },
-                    { name: 'inventory', localKey: 'inventory', idField: 'id' },
-                    { name: 'notes', localKey: 'notes', idField: 'id' },
-                    { name: 'transactions', localKey: 'transactions', idField: 'id' },
-                    { name: 'unpaid_entries', localKey: 'unpaidEntries', idField: 'id' },
-                    { name: 'categories', localKey: 'categories', idField: 'id' }
+                // Delete with resilience — continue on failures
+                const deletePromises = [
+                    supabase.from('products').delete().eq('user_id', currentUser.id),
+                    supabase.from('sales').delete().eq('user_id', currentUser.id),
+                    supabase.from('categories').delete().eq('user_id', currentUser.id),
+                    supabase.from('expenses').delete().eq('user_id', currentUser.id),
+                    supabase.from('customers').delete().eq('user_id', currentUser.id),
+                    supabase.from('invoices').delete().eq('user_id', currentUser.id),
+                    supabase.from('receipts').delete().eq('user_id', currentUser.id),
+                    supabase.from('inventory').delete().eq('user_id', currentUser.id),
+                    supabase.from('notes').delete().eq('user_id', currentUser.id),
+                    supabase.from('transactions').delete().eq('user_id', currentUser.id),
+                    supabase.from('unpaid_entries').delete().eq('user_id', currentUser.id),
+                    supabase.from('transaction_floats').delete().eq('user_id', currentUser.id),
+                    supabase.from('settings').delete().eq('user_id', currentUser.id),
+                    supabase.from('inventory_purchase_periods').delete().eq('user_id', currentUser.id),
+                    supabase.from('inventory_purchases').delete().eq('user_id', currentUser.id)
                 ];
-
-                for (const table of tables) {
-                    const localData = Array.isArray(state[table.localKey]) ? state[table.localKey] : [];
-                    if (localData.length === 0) continue;
-
-                    const { data: cloudData, error: fetchError } = await supabase
-                        .from(table.name)
-                        .select('*')
-                        .eq('user_id', userId);
-
-                    if (fetchError) {
-                        console.error(`Error fetching ${table.name}:`, fetchError);
-                        continue;
+                const deleteResults = await Promise.allSettled(deletePromises);
+                deleteResults.forEach((res, idx) => {
+                    if (res.status === 'rejected') {
+                        console.warn('Delete failed for index', idx, res.reason);
                     }
+                });
 
-                    const cloudItems = cloudData || [];
-                    const itemsToUpsert = [];
+                console.log('✅ Cloud data cleared');
+                console.log('⬆️ Pushing local data to cloud...');
 
-                    for (const localItem of localData) {
-                        const localId = localItem[table.idField];
-                        if (!localId) continue; // skip items without IDs
-                        const cloudItem = cloudItems.find(c => c[table.idField] === localId);
+                // Now push all local data
+                await pushAllDataToSupabase();
 
-                        if (!cloudItem) {
-                            itemsToUpsert.push({ ...addTimestamp({ ...localItem }), user_id: userId });
-                        } else {
-                            const localTime = new Date(localItem.last_modified || localItem.timestamp || 0);
-                            const cloudTime = new Date(cloudItem.last_modified || cloudItem.timestamp || 0);
-                            if (localTime > cloudTime) {
-                                itemsToUpsert.push({ ...addTimestamp({ ...localItem }), user_id: userId });
-                            }
-                        }
-                    }
-
-                    if (itemsToUpsert.length > 0) {
-                        console.log(`Upserting ${itemsToUpsert.length} items to ${table.name}`);
-                        for (let i = 0; i < itemsToUpsert.length; i += 100) {
-                            const batch = itemsToUpsert.slice(i, i + 100);
-                            const { error: upsertError } = await supabase
-                                .from(table.name)
-                                .upsert(batch, { onConflict: table.idField });
-                            if (upsertError) {
-                                console.error(`Error upserting to ${table.name}:`, upsertError);
-                            }
-                        }
-                    }
-                }
-
-                console.log('✅ Smart sync to cloud completed');
-                updateSyncIndicator('synced');
-                showToast('Data synced successfully', 'success');
+                console.log('✅ Local data pushed to cloud');
             } catch (error) {
-                console.error('Smart sync error:', error);
-                updateSyncIndicator('error');
-                showToast('Sync failed: ' + error.message, 'error');
-            } finally {
-                syncLock = false;
+                console.error('Clear and push error:', error);
+                throw error;
             }
-        }
-
-        // Merge helper: keeps newer record by last_modified/timestamp and preserves uniques
-        function smartMergeRecords(localArray = [], cloudArray = [], idField = 'id') {
-            const merged = new Map();
-
-            cloudArray.forEach(item => {
-                merged.set(item[idField], item);
-            });
-
-            localArray.forEach(localItem => {
-                const key = localItem[idField];
-                if (!key) return;
-                const cloudItem = merged.get(key);
-                if (!cloudItem) {
-                    merged.set(key, localItem);
-                } else {
-                    const lt = new Date(localItem.last_modified || localItem.timestamp || 0);
-                    const ct = new Date(cloudItem.last_modified || cloudItem.timestamp || 0);
-                    if (lt > ct) merged.set(key, localItem);
-                }
-            });
-
-            return Array.from(merged.values());
         }
 
         async function syncInBackground() {
@@ -3010,7 +2782,7 @@
 
             try {
                 // Silent background sync - no loading indicators
-                await smartSyncToCloud();
+                await clearAndPushAllData();
                 console.log('✅ Background sync complete');
             } catch (error) {
                 console.error('❌ Background sync error:', error);
@@ -3019,120 +2791,61 @@
         }
 
         async function pullDataFromSupabase() {
-            // Ensure we have a valid session/user even if flags are out of sync
-            if (!currentUser || !syncEnabled) {
-                try {
-                    const { data: { session }, error } = await supabase.auth.getSession();
-                    if (error) {
-                        console.error('Session check error:', error);
-                        showToast('Not signed in', 'error');
-                        return false;
-                    }
-                    if (!session) {
-                        showToast('Not signed in', 'error');
-                        return false;
-                    }
-                    currentUser = session.user;
-                    syncEnabled = true;
-                } catch (e) {
-                    console.error('Session recovery failed:', e);
-                    showToast('Not signed in', 'error');
-                    return false;
-                }
-            }
+            if (!syncEnabled || !currentUser) return;
 
             try {
                 showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
+                // SAFEGUARD: Check if we have local data that should be preserved
                 const hasLocalData = state.products.length > 0 || state.sales.length > 0 ||
                     state.expenses.length > 0 || state.customers.length > 0;
 
-                console.log('📥 Pulling data from cloud (parallel)...');
+                // Quick check: count total records in cloud
+                if (hasLocalData) {
+                    const { count: cloudCount } = await supabase
+                        .from('products')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('user_id', currentUser.id);
 
-                const [
-                    { data: products, error: productsErr },
-                    { data: sales, error: salesErr },
-                    { data: expenses, error: expensesErr },
-                    { data: customers, error: customersErr },
-                    { data: invoices, error: invoicesErr },
-                    { data: receipts, error: receiptsErr },
-                    { data: inventory, error: inventoryErr },
-                    { data: notes, error: notesErr },
-                    { data: transactions, error: transactionsErr },
-                    { data: unpaidEntries, error: unpaidErr },
-                    { data: floats, error: floatsErr },
-                    { data: settings, error: settingsErr },
-                    { data: cloudCycles, error: cyclesErr },
-                    { data: cloudPurchases, error: purchasesPullErr },
-                    { data: categories, error: categoriesErr }
-                ] = await Promise.all([
-                    supabase.from('products').select('id,name,category,cost,price,has_stock').eq('user_id', currentUser.id),
-                    supabase.from('sales').select('id,date,time,timestamp,product_name,customer,quantity,cost_per_unit,price_per_unit,total_cost,total_price,payment').eq('user_id', currentUser.id).order('timestamp', { ascending: false }),
-                    supabase.from('expenses').select('id,date,time,timestamp,description,category,amount,payment,comment').eq('user_id', currentUser.id),
-                    supabase.from('customers').select('id,name,email,phone,address,total_purchases').eq('user_id', currentUser.id),
-                    supabase.from('invoices').select('id,number,customer,date,due_date,items,amount,status').eq('user_id', currentUser.id),
-                    supabase.from('receipts').select('id,number,customer,customer_email,date,time,timestamp,description,amount,payment_method').eq('user_id', currentUser.id),
-                    supabase.from('inventory').select('id,product_name,stock,min_alert').eq('user_id', currentUser.id),
-                    supabase.from('notes').select('id,title,content,date,time,timestamp').eq('user_id', currentUser.id),
-                    supabase.from('transactions').select('id,channel,customer_name,type,amount,date,time,timestamp').eq('user_id', currentUser.id),
-                    supabase.from('unpaid_entries').select('id,name,type,amount,date,time,timestamp,paid').eq('user_id', currentUser.id),
-                    supabase.from('transaction_floats').select('id,channel,initial_float').eq('user_id', currentUser.id),
-                    supabase.from('settings').select('id,daily_target,monthly_target').eq('user_id', currentUser.id).single(),
-                    supabase.from('inventory_purchase_periods').select('id,period_number,title,start_date,end_date,notes').eq('user_id', currentUser.id),
-                    supabase.from('inventory_purchases').select('id,period_number,item_name,quantity,unit_cost,total_cost,purchase_date,supplier_name,supplier_phone,supplier_address,notes,timestamp').eq('user_id', currentUser.id),
-                    supabase.from('categories').select('id,name').eq('user_id', currentUser.id)
-                ]);
-
-                // Log per-table errors for diagnostics
-                if (productsErr) console.warn('Products pull error:', productsErr.message || productsErr);
-                if (salesErr) console.warn('Sales pull error:', salesErr.message || salesErr);
-                if (expensesErr) console.warn('Expenses pull error:', expensesErr.message || expensesErr);
-                if (customersErr) console.warn('Customers pull error:', customersErr.message || customersErr);
-                if (invoicesErr) console.warn('Invoices pull error:', invoicesErr.message || invoicesErr);
-                if (receiptsErr) console.warn('Receipts pull error:', receiptsErr.message || receiptsErr);
-                if (inventoryErr) console.warn('Inventory pull error:', inventoryErr.message || inventoryErr);
-                if (notesErr) console.warn('Notes pull error:', notesErr.message || notesErr);
-                if (transactionsErr) console.warn('Transactions pull error:', transactionsErr.message || transactionsErr);
-                if (unpaidErr) console.warn('Unpaid pull error:', unpaidErr.message || unpaidErr);
-                if (floatsErr) console.warn('Floats pull error:', floatsErr.message || floatsErr);
-                if (categoriesErr) console.warn('Categories pull error:', categoriesErr.message || categoriesErr);
-
-                const totalRecords = (
-                    (products?.length || 0) + (sales?.length || 0) + (expenses?.length || 0) +
-                    (customers?.length || 0) + (invoices?.length || 0) + (receipts?.length || 0) +
-                    (inventory?.length || 0) + (notes?.length || 0) + (transactions?.length || 0) +
-                    (unpaidEntries?.length || 0) + (cloudCycles?.length || 0) + (cloudPurchases?.length || 0) +
-                    (categories?.length || 0)
-                );
-
-                // Always proceed to hydrate state from cloud (even if local exists)
-                // This avoids false negatives when RLS or filters return empty sets
-
-                // Replace local cache only when cloud has data
-                if (totalRecords > 0) {
-                    try { localStorage.removeItem('financeManagerData'); } catch (e) { /* no-op */ }
+                    if (cloudCount === 0) {
+                        console.log('⚠️ Cloud data is empty, preserving local data');
+                        console.log('💡 Use "Push to Cloud" if you want to upload your local data');
+                        return; // Don't overwrite local data with empty cloud data
+                    }
                 }
 
+                console.log('📥 Pulling data from cloud...');
+
+                // Products
+                const { data: products } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
                 if (products && products.length > 0) {
                     const cloudProducts = products.map(p => ({
-                        id: p.id ? `P-${p.id}` : `P-${(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+                        // Use stable ID derived from name to avoid duplicate IDs between offline and cloud
+                        id: `P-${(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
                         name: p.name,
                         category: p.category,
                         cost: parseFloat(p.cost),
                         price: parseFloat(p.price),
-                        hasStock: (p.has_stock === false) ? false : true,
-                        last_modified: p.last_modified,
-                        timestamp: p.timestamp
+                        hasStock: (p.has_stock === false) ? false : true
                     }));
-                    state.products = smartMergeRecords(state.products, cloudProducts, 'id');
+                    // Merge with any existing local products and deduplicate by content
+                    state.products = deduplicateByContent([...state.products, ...cloudProducts], 'products');
                 }
 
+                // Sales
+                const { data: sales } = await supabase
+                    .from('sales')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('timestamp', { ascending: false });
                 if (sales && sales.length > 0) {
-                    const cloudSales = sales.map(s => ({
-                        id: s.id ? `S-${s.id}` : `S-${s.timestamp}`,
+                    state.sales = sales.map(s => ({
+                        id: `S-${s.timestamp}`,
                         date: s.date,
                         time: s.time,
                         timestamp: s.timestamp,
-                        last_modified: s.last_modified,
                         productName: s.product_name,
                         customer: s.customer,
                         quantity: s.quantity,
@@ -3140,84 +2853,101 @@
                         pricePerUnit: parseFloat(s.price_per_unit),
                         totalCost: parseFloat(s.total_cost),
                         totalPrice: parseFloat(s.total_price),
-                        profit: (s.profit !== null && s.profit !== undefined && !isNaN(parseFloat(s.profit)))
-                            ? parseFloat(s.profit)
-                            : +(parseFloat(s.total_price || 0) - parseFloat(s.total_cost || 0)).toFixed(2),
+                        profit: parseFloat(s.profit),
                         payment: s.payment
                     }));
-                    state.sales = smartMergeRecords(state.sales, cloudSales, 'id');
                 }
 
+                // Categories
+                const { data: categories } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
                 if (categories && categories.length > 0) {
-                    // Keep categories as names array in state (IDs are used only in cloud)
-                    state.categories = categories.map(c => c.name);
+                    const cloudCategories = categories.map(c => c.name).filter(Boolean);
+                    // Merge cloud + local category names uniquely
+                    const mergedCats = Array.from(new Set([...(state.categories || []), ...cloudCategories]));
+                    state.categories = mergedCats;
                 }
 
-                if (expenses && expenses.length > 0) {
-                    const cloudExpenses = expenses.map(e => ({
-                        id: e.id ? `E-${e.id}` : `E-${e.timestamp}`,
-                        date: e.date,
-                        time: e.time,
-                        timestamp: e.timestamp,
-                        last_modified: e.last_modified,
-                        description: e.description,
-                        category: e.category,
-                        amount: parseFloat(e.amount),
-                        payment: e.payment,
-                        comment: e.comment
-                    }));
-                    state.expenses = smartMergeRecords(state.expenses, cloudExpenses, 'id');
-                }
+                // Expenses
+                const { data: expenses } = await supabase
+                    .from('expenses')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                // Expenses
+                if (expenses && expenses.length > 0) state.expenses = expenses.map(e => ({
+                    id: `E-${e.timestamp}`,
+                    date: e.date,
+                    time: e.time,
+                    timestamp: e.timestamp,
+                    description: e.description,
+                    category: e.category,
+                    amount: parseFloat(e.amount),
+                    payment: e.payment,
+                    comment: e.comment
+                }));
 
-                if (customers && customers.length > 0) {
-                    const cloudCustomers = customers.map(c => ({
-                        id: c.id ? `C-${c.id}` : `C-${(c.name || '').replace(/\s+/g, '_')}_${Date.now()}`,
-                        name: c.name,
-                        email: c.email || '',
-                        phone: c.phone || '',
-                        address: c.address || '',
-                        totalPurchases: parseFloat(c.total_purchases || 0),
-                        last_modified: c.last_modified,
-                        timestamp: c.timestamp
-                    }));
-                    state.customers = smartMergeRecords(state.customers, cloudCustomers, 'id');
-                }
+                // Customers
+                const { data: customers } = await supabase
+                    .from('customers')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                // Customers
+                if (customers && customers.length > 0) state.customers = customers.map(c => ({
+                    id: `C-${c.name.replace(/\s+/g, '_')}_${Date.now()}`,
+                    name: c.name,
+                    email: c.email || '',
+                    phone: c.phone || '',
+                    address: c.address || '',
+                    totalPurchases: parseFloat(c.total_purchases || 0)
+                }));
 
-                if (invoices && invoices.length > 0) {
-                    const cloudInvoices = invoices.map(i => ({
-                        id: i.id ? `INV-${i.id}` : `INV-${i.number}`,
-                        number: i.number,
-                        customer: i.customer,
-                        date: i.date,
-                        dueDate: i.due_date,
-                        items: i.items,
-                        amount: parseFloat(i.amount),
-                        status: i.status,
-                        last_modified: i.last_modified,
-                        timestamp: i.timestamp
-                    }));
-                    state.invoices = smartMergeRecords(state.invoices, cloudInvoices, 'id');
-                }
+                // Invoices
+                const { data: invoices } = await supabase
+                    .from('invoices')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                // Invoices
+                if (invoices && invoices.length > 0) state.invoices = invoices.map(i => ({
+                    id: `INV-${i.number}`,
+                    number: i.number,
+                    customer: i.customer,
+                    date: i.date,
+                    dueDate: i.due_date,
+                    items: i.items,
+                    amount: parseFloat(i.amount),
+                    status: i.status
+                }));
 
-                if (receipts && receipts.length > 0) {
-                    const cloudReceipts = receipts.map(r => ({
-                        id: r.id ? `RCPT-${r.id}` : `RCPT-${r.timestamp}`,
-                        number: r.number,
-                        customer: r.customer,
-                        customerEmail: r.customer_email || '',
-                        date: r.date,
-                        time: r.time,
-                        timestamp: r.timestamp,
-                        last_modified: r.last_modified,
-                        description: r.description,
-                        amount: parseFloat(r.amount),
-                        paymentMethod: r.payment_method
-                    }));
-                    state.receipts = smartMergeRecords(state.receipts, cloudReceipts, 'id');
-                }
+                // Receipts
+                const { data: receipts } = await supabase
+                    .from('receipts')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (receipts && receipts.length > 0) state.receipts = receipts.map(r => ({
+                    id: `RCPT-${r.timestamp}`,
+                    number: r.number,
+                    customer: r.customer,
+                    customerEmail: r.customer_email || '',
+                    date: r.date,
+                    time: r.time,
+                    timestamp: r.timestamp,
+                    description: r.description,
+                    amount: parseFloat(r.amount),
+                    paymentMethod: r.payment_method
+                }));
 
+                // Inventory
+                const { data: inventory } = await supabase
+                    .from('inventory')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
                 if (inventory && inventory.length > 0) {
-                    if (!state.inventory) state.inventory = {};
+                    // Preserve existing inventory if not in cloud
+                    if (!state.inventory) {
+                        state.inventory = {};
+                    }
                     inventory.forEach(item => {
                         state.inventory[item.product_name] = {
                             stock: parseInt(item.stock) || 0,
@@ -3226,49 +2956,61 @@
                     });
                 }
 
-                if (notes && notes.length > 0) {
-                    const cloudNotes = notes.map(n => ({
-                        id: n.id ? `N-${n.id}` : `N-${n.timestamp}`,
-                        title: n.title || '',
-                        content: n.content,
-                        date: n.date,
-                        time: n.time,
-                        timestamp: n.timestamp,
-                        last_modified: n.last_modified
-                    }));
-                    state.notes = smartMergeRecords(state.notes, cloudNotes, 'id');
-                }
+                // Don't reset inventory if cloud has no data - keep local data
+                // Notes
+                const { data: notes } = await supabase
+                    .from('notes')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                // Notes
+                if (notes && notes.length > 0) state.notes = notes.map(n => ({
+                    id: `N-${n.timestamp}`,
+                    title: n.title || '',
+                    content: n.content,
+                    date: n.date,
+                    time: n.time,
+                    timestamp: n.timestamp
+                }));
 
-                if (transactions && transactions.length > 0) {
-                    const cloudTransactions = transactions.map(t => ({
-                        id: t.id ? `T-${t.id}` : `T-${t.timestamp}`,
-                        channel: t.channel,
-                        customerName: t.customer_name,
-                        type: t.type,
-                        amount: parseFloat(t.amount),
-                        date: t.date,
-                        time: t.time,
-                        timestamp: t.timestamp,
-                        last_modified: t.last_modified
-                    }));
-                    state.transactions = smartMergeRecords(state.transactions, cloudTransactions, 'id');
-                }
+                // Transactions
+                const { data: transactions } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                // Transactions
+                if (transactions && transactions.length > 0) state.transactions = transactions.map(t => ({
+                    id: `T-${t.timestamp}`,
+                    channel: t.channel,
+                    customerName: t.customer_name,
+                    type: t.type,
+                    amount: parseFloat(t.amount),
+                    date: t.date,
+                    time: t.time,
+                    timestamp: t.timestamp
+                }));
 
-                if (unpaidEntries && unpaidEntries.length > 0) {
-                    const cloudUnpaid = unpaidEntries.map(u => ({
-                        id: u.id ? `U-${u.id}` : `U-${u.timestamp}`,
-                        name: u.name,
-                        type: u.type,
-                        amount: parseFloat(u.amount),
-                        date: u.date,
-                        time: u.time,
-                        timestamp: u.timestamp,
-                        last_modified: u.last_modified,
-                        paid: u.paid
-                    }));
-                    state.unpaidEntries = smartMergeRecords(state.unpaidEntries, cloudUnpaid, 'id');
-                }
+                // Unpaid entries
+                const { data: unpaidEntries } = await supabase
+                    .from('unpaid_entries')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                // Unpaid entries
+                if (unpaidEntries && unpaidEntries.length > 0) state.unpaidEntries = unpaidEntries.map(u => ({
+                    id: `U-${u.timestamp}`,
+                    name: u.name,
+                    type: u.type,
+                    amount: parseFloat(u.amount),
+                    date: u.date,
+                    time: u.time,
+                    timestamp: u.timestamp,
+                    paid: u.paid
+                }));
 
+                // Transaction floats
+                const { data: floats } = await supabase
+                    .from('transaction_floats')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
                 if (floats && floats.length > 0) {
                     floats.forEach(f => {
                         if (state.transactionFloats[f.channel]) {
@@ -3277,12 +3019,23 @@
                     });
                 }
 
-                if (settings && !settingsErr) {
+                // Settings
+                const { data: settings } = await supabase
+                    .from('settings')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .single();
+                if (settings) {
                     state.dailyTarget = parseFloat(settings.daily_target || 0);
                     state.monthlyTarget = parseFloat(settings.monthly_target || 0);
                 }
 
-                if (cyclesErr) console.warn('Pull periods error:', cyclesErr?.message || cyclesErr);
+                // Inventory purchase Periods (cycles)
+                const { data: cloudCycles, error: cyclesErr } = await supabase
+                    .from('inventory_purchase_periods')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (cyclesErr) console.warn('Pull periods error:', cyclesErr.message || cyclesErr);
                 if (cloudCycles && cloudCycles.length > 0) {
                     state.inventoryPurchaseCycles = cloudCycles.map(c => ({
                         id: generateID('invCycle'),
@@ -3294,7 +3047,12 @@
                     }));
                 }
 
-                if (purchasesPullErr) console.warn('Pull purchases error:', purchasesPullErr?.message || purchasesPullErr);
+                // Inventory purchases
+                const { data: cloudPurchases, error: purchasesPullErr } = await supabase
+                    .from('inventory_purchases')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (purchasesPullErr) console.warn('Pull purchases error:', purchasesPullErr.message || purchasesPullErr);
                 if (cloudPurchases && cloudPurchases.length > 0) {
                     state.inventoryPurchases = cloudPurchases.map(p => ({
                         id: generateID('invPurchase'),
@@ -3314,7 +3072,9 @@
 
                 calculateFloatBalances();
                 saveData();
-                setTimeout(() => { render(); }, 100);
+                setTimeout(() => {
+                    render();
+                }, 100);
             } catch (error) {
                 console.error('Pull error:', error);
             }
@@ -3801,47 +3561,9 @@
             setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, Math.max(1000, durationMs || 3000));
         }
 
-        // Persistent loading toast with blink animation
-        function showLoadingToast(message = 'Loading Your Data, Please wait...') {
-            try {
-                if (window.__loadingToast) {
-                    const span = window.__loadingToast.querySelector('span');
-                    if (span) span.textContent = message;
-                    return;
-                }
-                const t = document.createElement('div');
-                t.className = 'toast toast-info toast-loading';
-                const span = document.createElement('span');
-                span.textContent = message;
-                t.appendChild(span);
-                document.body.appendChild(t);
-                requestAnimationFrame(() => t.classList.add('show'));
-                window.__loadingToast = t;
-            } catch (e) { /* no-op */ }
-        }
-
-        function hideLoadingToast() {
-            try {
-                const t = window.__loadingToast;
-                if (!t) return;
-                t.classList.remove('show');
-                setTimeout(() => { try { t.remove(); } catch (e) { } }, 200);
-                window.__loadingToast = null;
-            } catch (e) { /* no-op */ }
-        }
-
         function showConfirm(text, onYes) {
             if (confirm(text)) {
                 onYes();
-            }
-        }
-
-        // Refresh button handler — trigger native page reload
-        function refreshApp() {
-            try {
-                window.location.reload();
-            } catch (e) {
-                location.reload();
             }
         }
 
@@ -4427,36 +4149,30 @@
                 return showToast('Not signed in', 'error');
             }
 
-            if (!confirm('Load your cloud data into the app now?')) {
+            if (!confirm('This will replace ALL local data with cloud data. Continue?')) {
                 return;
             }
 
             updateSyncIndicator('syncing');
-            showLoadingToast();
+            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
 
             try {
                 console.log('⬇️ Pulling data from cloud...');
 
-                // Do not clear local storage preemptively; rely on pull to hydrate state
+                // Clear local storage first
+                localStorage.removeItem('financeManagerData');
 
                 // Pull everything from cloud
                 await pullDataFromSupabase();
 
-                hideLoadingToast();
                 updateSyncIndicator('synced');
                 showToast('Data pulled from cloud successfully!', 'success');
                 render();
-                // Persist and re-render UI after pull
-                try { saveData(); } catch (e) { console.warn('Failed to save after pull:', e); }
-                try { render(); } catch (e) { /* no-op */ }
             } catch (error) {
                 console.error('Pull error:', error);
                 showToast('Pull failed: ' + error.message, 'error');
-                hideLoadingToast();
                 updateSyncIndicator('synced');
-                return false;
             }
-            return true;
         }
 
         async function pushToCloud() {
@@ -4464,23 +4180,21 @@
                 return showToast('Not signed in', 'error');
             }
 
-            if (!confirm('Sync your local changes to the cloud?')) {
+            if (!confirm('This will replace ALL cloud data with local data. Continue?')) {
                 return;
             }
 
             updateSyncIndicator('syncing');
-            showLoadingToast();
+            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
 
             try {
                 console.log('⬆️ Pushing data to cloud...');
-                await smartSyncToCloud();
-                hideLoadingToast();
+                await clearAndPushAllData();
                 updateSyncIndicator('synced');
                 showToast('Data pushed to cloud successfully!', 'success');
             } catch (error) {
                 console.error('Push error:', error);
                 showToast('Push failed: ' + error.message, 'error');
-                hideLoadingToast();
                 updateSyncIndicator('synced');
             }
         }
@@ -9609,9 +9323,7 @@
             hours = hours % 12;
             hours = hours ? hours : 12; // Convert 0 to 12
 
-            const dateStr = `${year}-${month}-${day}`;
-            const timeStr = `${hours}:${minutes}:${seconds} ${ampm}`;
-            dateElement.innerHTML = `${dateStr}<br>${timeStr}`;
+            dateElement.textContent = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${ampm}`;
         }
 
         function render() {
@@ -9889,18 +9601,6 @@
         setInterval(() => {
             saveData();
         }, 15000);
-
-        // Auto-sync every 2 minutes when signed in
-        setInterval(async () => {
-            try {
-                if (syncEnabled && currentUser && !syncLock && navigator.onLine) {
-                    await pullDataFromSupabase();
-                    await smartSyncToCloud();
-                }
-            } catch (e) {
-                console.log('Background sync skipped:', e?.message || e);
-            }
-        }, 120000);
 
         // PWA Manifest (find this section and replace it)
         const manifestData = {
@@ -10419,25 +10119,25 @@
 
                 switch (type) {
                     case 'sales':
-                        contentKey = `${item.productName}|${item.customer}|${item.date}|${item.time}|${item.quantity}|${item.totalPrice}|${item.timestamp || ''}`;
+                        contentKey = `${item.productName}|${item.customer}|${item.date}|${item.time}|${item.quantity}|${item.totalPrice}`;
                         break;
                     case 'products':
                         contentKey = `${item.name}|${item.category}`;
                         break;
                     case 'expenses':
-                        contentKey = `${item.description}|${item.date}|${item.time}|${item.amount}|${item.timestamp || ''}`;
+                        contentKey = `${item.description}|${item.date}|${item.time}|${item.amount}`;
                         break;
                     case 'customers':
                         contentKey = `${item.name}|${item.email || ''}|${item.phone || ''}`;
                         break;
                     case 'transactions':
-                        contentKey = `${item.channel}|${item.date}|${item.time}|${item.amount}|${item.type}|${item.timestamp || ''}`;
+                        contentKey = `${item.channel}|${item.date}|${item.time}|${item.amount}|${item.type}`;
                         break;
                     case 'unpaid':
-                        contentKey = `${item.name}|${item.type}|${item.date}|${item.amount}|${item.timestamp || ''}`;
+                        contentKey = `${item.name}|${item.type}|${item.date}|${item.amount}`;
                         break;
                     case 'notes':
-                        contentKey = `${item.content}|${item.date}|${item.time}|${item.timestamp || ''}`;
+                        contentKey = `${item.content}|${item.date}|${item.time}`;
                         break;
                     default:
                         contentKey = JSON.stringify(item);
@@ -10459,27 +10159,6 @@
             return Array.from(uniqueMap.values());
         }
 
-        // ID-first deduplication: prefer unique IDs, use deterministic fallback
-        function deduplicateByID(items, type) {
-            if (!Array.isArray(items) || items.length === 0) return items;
-            const uniqueById = new Map();
-            for (const item of items) {
-                let id = item.id;
-                if (!id) {
-                    id = generateDeterministicID(type, item);
-                    item.id = id;
-                }
-                if (!uniqueById.has(id)) {
-                    uniqueById.set(id, item);
-                } else {
-                    // Merge same-id entries (keep original id)
-                    const existing = uniqueById.get(id);
-                    uniqueById.set(id, { ...existing, ...item, id: existing.id });
-                }
-            }
-            return Array.from(uniqueById.values());
-        }
-
         // ============================================
         // FIX 3: Improved Smart Merge
         // ============================================
@@ -10487,7 +10166,7 @@
         async function smartMergeDataFixed() {
             try {
                 updateSyncIndicator('syncing');
-                showLoadingToast();
+                showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                 console.log('🔄 Starting smart merge with duplicate prevention...');
 
                 const localData = {
@@ -10519,7 +10198,6 @@
                         .eq('user_id', currentUser.id);
                     if (products) {
                         cloudData.products = products.map(p => ({
-                            id: p.id ? `P-${p.id}` : undefined,
                             name: p.name,
                             category: p.category,
                             cost: parseFloat(p.cost),
@@ -10535,7 +10213,6 @@
                         .order('timestamp', { ascending: false });
                     if (sales) {
                         cloudData.sales = sales.map(s => ({
-                            id: s.id ? `S-${s.id}` : undefined,
                             date: s.date,
                             time: s.time,
                             timestamp: s.timestamp,
@@ -10546,9 +10223,7 @@
                             pricePerUnit: parseFloat(s.price_per_unit),
                             totalCost: parseFloat(s.total_cost),
                             totalPrice: parseFloat(s.total_price),
-                            profit: (s.profit !== null && s.profit !== undefined && !isNaN(parseFloat(s.profit)))
-                                ? parseFloat(s.profit)
-                                : +(parseFloat(s.total_price || 0) - parseFloat(s.total_cost || 0)).toFixed(2),
+                            profit: parseFloat(s.profit),
                             payment: s.payment
                         }));
                     }
@@ -10559,7 +10234,6 @@
                         .eq('user_id', currentUser.id);
                     if (expenses) {
                         cloudData.expenses = expenses.map(e => ({
-                            id: e.id ? `E-${e.id}` : undefined,
                             date: e.date,
                             time: e.time,
                             timestamp: e.timestamp,
@@ -10577,7 +10251,6 @@
                         .eq('user_id', currentUser.id);
                     if (customers) {
                         cloudData.customers = customers.map(c => ({
-                            id: c.id ? `C-${c.id}` : undefined,
                             name: c.name,
                             email: c.email || '',
                             phone: c.phone || '',
@@ -10592,7 +10265,6 @@
                         .eq('user_id', currentUser.id);
                     if (transactions) {
                         cloudData.transactions = transactions.map(t => ({
-                            id: t.id ? `T-${t.id}` : undefined,
                             channel: t.channel,
                             customerName: t.customer_name,
                             type: t.type,
@@ -10609,7 +10281,6 @@
                         .eq('user_id', currentUser.id);
                     if (unpaidEntries) {
                         cloudData.unpaidEntries = unpaidEntries.map(u => ({
-                            id: u.id ? `U-${u.id}` : undefined,
                             name: u.name,
                             type: u.type,
                             amount: parseFloat(u.amount),
@@ -10626,7 +10297,6 @@
                         .eq('user_id', currentUser.id);
                     if (notes) {
                         cloudData.notes = notes.map(n => ({
-                            id: n.id ? `N-${n.id}` : undefined,
                             title: n.title || '',
                             content: n.content,
                             date: n.date,
@@ -10666,28 +10336,25 @@
                 saveData();
 
                 console.log('⬆️  Pushing merged data to cloud...');
-                await smartSyncToCloud();
+                await clearAndPushAllData();
 
                 updateSyncIndicator('synced');
-                hideLoadingToast();
                 console.log('✅ Smart merge completed successfully');
 
             } catch (error) {
                 console.error('Smart merge error:', error);
                 updateSyncIndicator('synced');
-                hideLoadingToast();
                 throw error;
             }
         }
 
         window.smartMergeData = smartMergeDataFixed;
-        try { smartMergeData = smartMergeDataFixed; } catch (e) { /* no-op */ }
 
         // ============================================
         // FIX 4: Sync Lock
         // ============================================
 
-        syncLock = false;
+        let syncLock = false;
 
         async function syncInBackgroundSafe() {
             if (!syncEnabled || !currentUser) return;
@@ -10698,9 +10365,7 @@
 
             syncLock = true;
             try {
-                // Background sync: pull latest then upsert local changes
-                await pullDataFromSupabase();
-                await smartSyncToCloud();
+                await clearAndPushAllData();
                 console.log('✅ Background sync complete');
             } catch (error) {
                 console.error('❌ Background sync error:', error);
@@ -10728,13 +10393,13 @@
                 notes: state.notes.length
             };
 
-            state.sales = deduplicateByID(state.sales, 'sales');
-            state.products = deduplicateByID(state.products, 'products');
-            state.expenses = deduplicateByID(state.expenses, 'expenses');
-            state.customers = deduplicateByID(state.customers, 'customers');
-            state.transactions = deduplicateByID(state.transactions, 'transactions');
-            state.unpaidEntries = deduplicateByID(state.unpaidEntries, 'unpaid');
-            state.notes = deduplicateByID(state.notes, 'notes');
+            state.sales = deduplicateByContent(state.sales, 'sales');
+            state.products = deduplicateByContent(state.products, 'products');
+            state.expenses = deduplicateByContent(state.expenses, 'expenses');
+            state.customers = deduplicateByContent(state.customers, 'customers');
+            state.transactions = deduplicateByContent(state.transactions, 'transactions');
+            state.unpaidEntries = deduplicateByContent(state.unpaidEntries, 'unpaid');
+            state.notes = deduplicateByContent(state.notes, 'notes');
 
             const afterCounts = {
                 sales: state.sales.length,
@@ -10764,7 +10429,7 @@
             saveData();
 
             if (syncEnabled && currentUser) {
-                await smartSyncToCloud();
+                await clearAndPushAllData();
             }
 
             render();
@@ -10792,60 +10457,60 @@
                 notes: 0
             };
 
-            // Check sales by ID
+            // Check sales
             const salesMap = new Map();
             state.sales.forEach(s => {
-                const id = s.id || generateDeterministicID('sales', s);
-                if (salesMap.has(id)) duplicateCounts.sales++;
-                salesMap.set(id, true);
+                const key = `${s.productName}|${s.customer}|${s.date}|${s.time}`;
+                if (salesMap.has(key)) duplicateCounts.sales++;
+                salesMap.set(key, true);
             });
 
-            // Check products by ID
+            // Check products
             const productsMap = new Map();
             state.products.forEach(p => {
-                const id = p.id || generateDeterministicID('products', p);
-                if (productsMap.has(id)) duplicateCounts.products++;
-                productsMap.set(id, true);
+                const key = `${p.name}|${p.category}`;
+                if (productsMap.has(key)) duplicateCounts.products++;
+                productsMap.set(key, true);
             });
 
-            // Check expenses by ID
+            // Check expenses
             const expensesMap = new Map();
             state.expenses.forEach(e => {
-                const id = e.id || generateDeterministicID('expenses', e);
-                if (expensesMap.has(id)) duplicateCounts.expenses++;
-                expensesMap.set(id, true);
+                const key = `${e.description}|${e.date}|${e.time}`;
+                if (expensesMap.has(key)) duplicateCounts.expenses++;
+                expensesMap.set(key, true);
             });
 
-            // Check customers by ID
+            // Check customers
             const customersMap = new Map();
             state.customers.forEach(c => {
-                const id = c.id || generateDeterministicID('customers', c);
-                if (customersMap.has(id)) duplicateCounts.customers++;
-                customersMap.set(id, true);
+                const key = `${c.name}|${c.email || ''}`;
+                if (customersMap.has(key)) duplicateCounts.customers++;
+                customersMap.set(key, true);
             });
 
-            // Check transactions by ID
+            // Check transactions
             const transactionsMap = new Map();
             state.transactions.forEach(t => {
-                const id = t.id || generateDeterministicID('transactions', t);
-                if (transactionsMap.has(id)) duplicateCounts.transactions++;
-                transactionsMap.set(id, true);
+                const key = `${t.channel}|${t.date}|${t.time}|${t.amount}`;
+                if (transactionsMap.has(key)) duplicateCounts.transactions++;
+                transactionsMap.set(key, true);
             });
 
-            // Check unpaid by ID
+            // Check unpaid
             const unpaidMap = new Map();
             state.unpaidEntries.forEach(u => {
-                const id = u.id || generateDeterministicID('unpaid', u);
-                if (unpaidMap.has(id)) duplicateCounts.unpaidEntries++;
-                unpaidMap.set(id, true);
+                const key = `${u.name}|${u.type}|${u.date}`;
+                if (unpaidMap.has(key)) duplicateCounts.unpaidEntries++;
+                unpaidMap.set(key, true);
             });
 
-            // Check notes by ID
+            // Check notes
             const notesMap = new Map();
             state.notes.forEach(n => {
-                const id = n.id || generateDeterministicID('notes', n);
-                if (notesMap.has(id)) duplicateCounts.notes++;
-                notesMap.set(id, true);
+                const key = `${n.content}|${n.date}|${n.time}`;
+                if (notesMap.has(key)) duplicateCounts.notes++;
+                notesMap.set(key, true);
             });
 
             const totalDuplicates = Object.values(duplicateCounts).reduce((a, b) => a + b, 0);
@@ -11306,20 +10971,17 @@
 
                     try {
                         if (localHasData) {
-                            showLoadingToast();
+                            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                             await smartMergeData();
-                            hideLoadingToast();
                             showToast('Local and cloud data merged successfully', 'success');
                         } else {
-                            showLoadingToast();
+                            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                             await pullDataFromSupabase();
-                            hideLoadingToast();
                             showToast('Cloud data loaded', 'success');
                         }
                     } catch (syncError) {
                         console.error('Sync error after sign in:', syncError);
                         showToast('Signed in but sync failed. Try manual sync.', 'error');
-                        hideLoadingToast();
                     }
 
                     return data;
@@ -11521,10 +11183,8 @@
                             } else {
                                 authBannerEl.innerHTML = "You’re not signed in — tap to sign in and sync.";
                                 authBannerEl.style.display = 'block';
-                                authBannerEl.onclick = async () => {
+                                authBannerEl.onclick = () => {
                                     try {
-                                        // Force a fresh sign-in page: sign out silently in background, then navigate
-                                        try { await signOut(true); } catch (e) { /* no-op */ }
                                         switchTab('account');
                                         setTimeout(() => {
                                             try { switchAuthTab('login'); } catch (e) { }
@@ -11553,12 +11213,6 @@
                             } catch (e) { /* no-op */ }
                         });
                         window.addEventListener('offline', () => {
-                            // Clear local auth so UI doesn't appear signed in while offline
-                            try {
-                                currentUser = null;
-                                syncEnabled = false;
-                                updateSyncIndicator('offline');
-                            } catch (e) { /* no-op */ }
                             updateOfflineBanner();
                             window.updateAuthBanner && window.updateAuthBanner();
                         });
@@ -11623,13 +11277,10 @@
                 });
 
                 // Handle app state changes
-                document.addEventListener('visibilitychange', async function () {
-                    if (document.visibilityState === 'visible' && syncEnabled && currentUser) {
-                        try {
-                            await pullDataFromSupabase();
-                        } catch (e) {
-                            console.log('Visibility sync failed:', e);
-                        }
+                document.addEventListener('visibilitychange', function () {
+                    if (document.visibilityState === 'visible') {
+                        // App became visible - could refresh data here
+                        console.log('App became visible');
                     }
                 });
             });
