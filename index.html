@@ -2497,16 +2497,70 @@
             updateSyncIndicator('syncing');
 
             try {
+                // Build cloud content-key sets to avoid duplicate inserts
+                const [
+                    { data: cloudProducts },
+                    { data: cloudSales },
+                    { data: cloudExpenses },
+                    { data: cloudCustomers },
+                    { data: cloudInvoices },
+                    { data: cloudReceipts },
+                    { data: cloudInventory },
+                    { data: cloudNotes },
+                    { data: cloudTransactions },
+                    { data: cloudUnpaid },
+                    { data: cloudFloats },
+                    { data: cloudSettings },
+                    { data: cloudPeriods },
+                    { data: cloudPurchases },
+                    { data: cloudCategories }
+                ] = await Promise.all([
+                    supabase.from('products').select('name,category').eq('user_id', currentUser.id),
+                    supabase.from('sales').select('date,time,timestamp,product_name,customer,quantity,total_price').eq('user_id', currentUser.id),
+                    supabase.from('expenses').select('date,time,timestamp,description,amount').eq('user_id', currentUser.id),
+                    supabase.from('customers').select('name,email,phone').eq('user_id', currentUser.id),
+                    supabase.from('invoices').select('number,customer,date,amount,status').eq('user_id', currentUser.id),
+                    supabase.from('receipts').select('number,customer,date,time,amount,payment_method,timestamp').eq('user_id', currentUser.id),
+                    supabase.from('inventory').select('product_name').eq('user_id', currentUser.id),
+                    supabase.from('notes').select('title,content,date,time,timestamp').eq('user_id', currentUser.id),
+                    supabase.from('transactions').select('channel,type,amount,date,time').eq('user_id', currentUser.id),
+                    supabase.from('unpaid_entries').select('name,type,amount,date').eq('user_id', currentUser.id),
+                    supabase.from('transaction_floats').select('channel').eq('user_id', currentUser.id),
+                    supabase.from('settings').select('user_id').eq('user_id', currentUser.id),
+                    supabase.from('inventory_purchase_periods').select('period_number,title,start_date,end_date').eq('user_id', currentUser.id),
+                    supabase.from('inventory_purchases').select('timestamp,item_name,quantity,total_cost').eq('user_id', currentUser.id),
+                    supabase.from('categories').select('name').eq('user_id', currentUser.id)
+                ]);
+
+                const keySet = {
+                    products: new Set((cloudProducts || []).map(p => `${p.name}|${p.category}`)),
+                    sales: new Set((cloudSales || []).map(s => `${s.product_name}|${s.customer}|${s.date}|${s.time}|${s.quantity}|${parseFloat(s.total_price || 0)}`)),
+                    expenses: new Set((cloudExpenses || []).map(e => `${e.description}|${e.date}|${e.time}|${parseFloat(e.amount || 0)}`)),
+                    customers: new Set((cloudCustomers || []).map(c => `${c.name}|${c.email || ''}|${c.phone || ''}`)),
+                    invoices: new Set((cloudInvoices || []).map(i => `${i.number}|${i.customer}|${i.date}|${parseFloat(i.amount || 0)}|${i.status}`)),
+                    receipts: new Set((cloudReceipts || []).map(r => `${r.number}|${r.customer}|${r.date}|${r.time}|${parseFloat(r.amount || 0)}|${r.payment_method}`)),
+                    inventory: new Set((cloudInventory || []).map(inv => `${inv.product_name}`)),
+                    notes: new Set((cloudNotes || []).map(n => `${n.title || ''}|${n.content}|${n.date}|${n.time}`)),
+                    transactions: new Set((cloudTransactions || []).map(t => `${t.channel}|${t.date}|${t.time}|${parseFloat(t.amount || 0)}|${t.type}`)),
+                    unpaid: new Set((cloudUnpaid || []).map(u => `${u.name}|${u.type}|${u.date}|${parseFloat(u.amount || 0)}`)),
+                    floats: new Set((cloudFloats || []).map(f => `${f.channel}`)),
+                    settings: new Set((cloudSettings || []).map(s => `${s.user_id}`)),
+                    periods: new Set((cloudPeriods || []).map(p => `${p.period_number}|${p.title || ''}|${p.start_date || ''}|${p.end_date || ''}`)),
+                    purchases: new Set((cloudPurchases || []).map(p => `${p.timestamp}|${p.item_name}|${p.quantity}|${parseFloat(p.total_cost || 0)}`)),
+                    categories: new Set((cloudCategories || []).map(c => `${c.name}`))
+                };
                 // Sync products
                 if (state.products.length > 0) {
-                    const productsData = state.products.map(p => ({
-                        user_id: currentUser.id,
-                        name: p.name,
-                        category: p.category,
-                        cost: p.cost,
-                        price: p.price,
-                        has_stock: (p.hasStock === false) ? false : true
-                    }));
+                    const productsData = state.products
+                        .filter(p => !keySet.products.has(`${p.name}|${p.category}`))
+                        .map(p => ({
+                            user_id: currentUser.id,
+                            name: p.name,
+                            category: p.category,
+                            cost: p.cost,
+                            price: p.price,
+                            has_stock: (p.hasStock === false) ? false : true
+                        }));
                     const { error } = await supabase
                         .from('products')
                         .insert(productsData);
@@ -2515,10 +2569,12 @@
 
                 // Sync categories
                 if (state.categories.length > 0) {
-                    const categoriesData = state.categories.map(c => ({
-                        user_id: currentUser.id,
-                        name: c
-                    }));
+                    const categoriesData = state.categories
+                        .filter(c => !keySet.categories.has(`${c}`))
+                        .map(c => ({
+                            user_id: currentUser.id,
+                            name: c
+                        }));
                     const { error } = await supabase
                         .from('categories')
                         .insert(categoriesData);
@@ -2527,23 +2583,25 @@
 
                 // Sync sales
                 if (state.sales.length > 0) {
-                    const salesData = state.sales.map(s => ({
-                        user_id: currentUser.id,
-                        date: s.date,
-                        time: s.time,
-                        timestamp: s.timestamp,
-                        product_name: s.productName,
-                        customer: s.customer,
-                        quantity: s.quantity,
-                        cost_per_unit: s.costPerUnit,
-                        price_per_unit: s.pricePerUnit,
-                        total_cost: s.totalCost,
-                        total_price: s.totalPrice,
-                        profit: (s.profit !== null && s.profit !== undefined && !isNaN(parseFloat(s.profit)))
-                            ? parseFloat(s.profit)
-                            : +(parseFloat(s.totalPrice || 0) - parseFloat(s.totalCost || 0)).toFixed(2),
-                        payment: s.payment
-                    }));
+                    const salesData = state.sales
+                        .filter(s => !keySet.sales.has(`${s.productName}|${s.customer}|${s.date}|${s.time}|${s.quantity}|${parseFloat(s.totalPrice || 0)}`))
+                        .map(s => ({
+                            user_id: currentUser.id,
+                            date: s.date,
+                            time: s.time,
+                            timestamp: s.timestamp,
+                            product_name: s.productName,
+                            customer: s.customer,
+                            quantity: s.quantity,
+                            cost_per_unit: s.costPerUnit,
+                            price_per_unit: s.pricePerUnit,
+                            total_cost: s.totalCost,
+                            total_price: s.totalPrice,
+                            profit: (s.profit !== null && s.profit !== undefined && !isNaN(parseFloat(s.profit)))
+                                ? parseFloat(s.profit)
+                                : +(parseFloat(s.totalPrice || 0) - parseFloat(s.totalCost || 0)).toFixed(2),
+                            payment: s.payment
+                        }));
                     const { error } = await supabase
                         .from('sales')
                         .insert(salesData);
@@ -2552,17 +2610,19 @@
 
                 // Sync expenses
                 if (state.expenses.length > 0) {
-                    const expensesData = state.expenses.map(e => ({
-                        user_id: currentUser.id,
-                        date: e.date,
-                        time: e.time,
-                        timestamp: e.timestamp,
-                        description: e.description,
-                        category: e.category,
-                        amount: e.amount,
-                        payment: e.payment,
-                        comment: e.comment || ''
-                    }));
+                    const expensesData = state.expenses
+                        .filter(e => !keySet.expenses.has(`${e.description}|${e.date}|${e.time}|${parseFloat(e.amount || 0)}`))
+                        .map(e => ({
+                            user_id: currentUser.id,
+                            date: e.date,
+                            time: e.time,
+                            timestamp: e.timestamp,
+                            description: e.description,
+                            category: e.category,
+                            amount: e.amount,
+                            payment: e.payment,
+                            comment: e.comment || ''
+                        }));
                     const { error } = await supabase
                         .from('expenses')
                         .insert(expensesData);
@@ -2571,14 +2631,16 @@
 
                 // Sync customers
                 if (state.customers.length > 0) {
-                    const customersData = state.customers.map(c => ({
-                        user_id: currentUser.id,
-                        name: c.name,
-                        email: c.email || '',
-                        phone: c.phone || '',
-                        address: c.address || '',
-                        total_purchases: c.totalPurchases || 0
-                    }));
+                    const customersData = state.customers
+                        .filter(c => !keySet.customers.has(`${c.name}|${c.email || ''}|${c.phone || ''}`))
+                        .map(c => ({
+                            user_id: currentUser.id,
+                            name: c.name,
+                            email: c.email || '',
+                            phone: c.phone || '',
+                            address: c.address || '',
+                            total_purchases: c.totalPurchases || 0
+                        }));
                     const { error } = await supabase
                         .from('customers')
                         .insert(customersData);
@@ -2587,16 +2649,18 @@
 
                 // Sync invoices
                 if (state.invoices.length > 0) {
-                    const invoicesData = state.invoices.map(i => ({
-                        user_id: currentUser.id,
-                        number: i.number,
-                        customer: i.customer,
-                        date: i.date,
-                        due_date: i.dueDate,
-                        items: i.items,
-                        amount: i.amount,
-                        status: i.status
-                    }));
+                    const invoicesData = state.invoices
+                        .filter(i => !keySet.invoices.has(`${i.number}|${i.customer}|${i.date}|${parseFloat(i.amount || 0)}|${i.status}`))
+                        .map(i => ({
+                            user_id: currentUser.id,
+                            number: i.number,
+                            customer: i.customer,
+                            date: i.date,
+                            due_date: i.dueDate,
+                            items: i.items,
+                            amount: i.amount,
+                            status: i.status
+                        }));
                     const { error } = await supabase
                         .from('invoices')
                         .insert(invoicesData);
@@ -2605,18 +2669,20 @@
 
                 // Sync receipts
                 if (state.receipts && state.receipts.length > 0) {
-                    const receiptsData = state.receipts.map(r => ({
-                        user_id: currentUser.id,
-                        number: r.number,
-                        customer: r.customer,
-                        customer_email: r.customerEmail || '',
-                        date: r.date,
-                        time: r.time,
-                        timestamp: r.timestamp,
-                        description: r.description,
-                        amount: r.amount,
-                        payment_method: r.paymentMethod
-                    }));
+                    const receiptsData = state.receipts
+                        .filter(r => !keySet.receipts.has(`${r.number}|${r.customer}|${r.date}|${r.time}|${parseFloat(r.amount || 0)}|${r.paymentMethod}`))
+                        .map(r => ({
+                            user_id: currentUser.id,
+                            number: r.number,
+                            customer: r.customer,
+                            customer_email: r.customerEmail || '',
+                            date: r.date,
+                            time: r.time,
+                            timestamp: r.timestamp,
+                            description: r.description,
+                            amount: r.amount,
+                            payment_method: r.paymentMethod
+                        }));
                     const { error } = await supabase
                         .from('receipts')
                         .insert(receiptsData);
@@ -2631,22 +2697,30 @@
                         stock: inv.stock,
                         min_alert: inv.minAlert
                     }));
-                    const { error } = await supabase
-                        .from('inventory')
-                        .insert(inventoryData);
-                    if (error) throw error;
+                    // For inventory, delete existing per product then insert single row to avoid duplicates
+                    for (const row of inventoryData) {
+                        try {
+                            await supabase.from('inventory').delete().eq('user_id', currentUser.id).eq('product_name', row.product_name);
+                            const { error: invErr } = await supabase.from('inventory').insert(row);
+                            if (invErr) throw invErr;
+                        } catch (e) {
+                            console.warn('Inventory sync error for', row.product_name, e);
+                        }
+                    }
                 }
 
                 // Sync notes
                 if (state.notes.length > 0) {
-                    const notesData = state.notes.map(n => ({
-                        user_id: currentUser.id,
-                        title: n.title || '',
-                        content: n.content,
-                        date: n.date,
-                        time: n.time,
-                        timestamp: n.timestamp
-                    }));
+                    const notesData = state.notes
+                        .filter(n => !keySet.notes.has(`${n.title || ''}|${n.content}|${n.date}|${n.time}`))
+                        .map(n => ({
+                            user_id: currentUser.id,
+                            title: n.title || '',
+                            content: n.content,
+                            date: n.date,
+                            time: n.time,
+                            timestamp: n.timestamp
+                        }));
                     const { error } = await supabase
                         .from('notes')
                         .insert(notesData);
@@ -2655,14 +2729,16 @@
 
                 // Sync inventory purchase Periods
                 if (state.inventoryPurchaseCycles && state.inventoryPurchaseCycles.length > 0) {
-                    const periodsData = state.inventoryPurchaseCycles.map(c => ({
-                        user_id: currentUser.id,
-                        period_number: c.number,
-                        title: c.title || '',
-                        start_date: c.startDate || null,
-                        end_date: c.endDate || null,
-                        notes: c.notes || ''
-                    }));
+                    const periodsData = state.inventoryPurchaseCycles
+                        .filter(c => !keySet.periods.has(`${c.number}|${c.title || ''}|${c.startDate || ''}|${c.endDate || ''}`))
+                        .map(c => ({
+                            user_id: currentUser.id,
+                            period_number: c.number,
+                            title: c.title || '',
+                            start_date: c.startDate || null,
+                            end_date: c.endDate || null,
+                            notes: c.notes || ''
+                        }));
                     const { error: periodsErr } = await supabase
                         .from('inventory_purchase_periods')
                         .insert(periodsData);
@@ -2671,20 +2747,22 @@
 
                 // Sync inventory purchases
                 if (state.inventoryPurchases && state.inventoryPurchases.length > 0) {
-                    const purchasesData = state.inventoryPurchases.map(p => ({
-                        user_id: currentUser.id,
-                        period_number: p.cycleNumber,
-                        item_name: p.itemName,
-                        quantity: p.quantity || 0,
-                        unit_cost: p.unitCost || p.buyingPrice || 0,
-                        total_cost: p.totalCost || p.buyingPrice || 0,
-                        purchase_date: p.purchaseDate,
-                        supplier_name: p.supplierName || '',
-                        supplier_phone: p.supplierPhone || p.supplierContact || '',
-                        supplier_address: p.supplierAddress || '',
-                        notes: p.notes || '',
-                        timestamp: p.timestamp
-                    }));
+                    const purchasesData = state.inventoryPurchases
+                        .filter(p => !keySet.purchases.has(`${p.timestamp}|${p.itemName}|${p.quantity || 0}|${parseFloat(p.totalCost || p.buyingPrice || 0)}`))
+                        .map(p => ({
+                            user_id: currentUser.id,
+                            period_number: p.cycleNumber,
+                            item_name: p.itemName,
+                            quantity: p.quantity || 0,
+                            unit_cost: p.unitCost || p.buyingPrice || 0,
+                            total_cost: p.totalCost || p.buyingPrice || 0,
+                            purchase_date: p.purchaseDate,
+                            supplier_name: p.supplierName || '',
+                            supplier_phone: p.supplierPhone || p.supplierContact || '',
+                            supplier_address: p.supplierAddress || '',
+                            notes: p.notes || '',
+                            timestamp: p.timestamp
+                        }));
                     const { error: purchasesErr } = await supabase
                         .from('inventory_purchases')
                         .insert(purchasesData);
@@ -2693,16 +2771,18 @@
 
                 // Sync transactions
                 if (state.transactions.length > 0) {
-                    const transactionsData = state.transactions.map(t => ({
-                        user_id: currentUser.id,
-                        channel: t.channel,
-                        customer_name: t.customerName,
-                        type: t.type,
-                        amount: t.amount,
-                        date: t.date,
-                        time: t.time,
-                        timestamp: t.timestamp
-                    }));
+                    const transactionsData = state.transactions
+                        .filter(t => !keySet.transactions.has(`${t.channel}|${t.date}|${t.time}|${parseFloat(t.amount || 0)}|${t.type}`))
+                        .map(t => ({
+                            user_id: currentUser.id,
+                            channel: t.channel,
+                            customer_name: t.customerName,
+                            type: t.type,
+                            amount: t.amount,
+                            date: t.date,
+                            time: t.time,
+                            timestamp: t.timestamp
+                        }));
                     const { error } = await supabase
                         .from('transactions')
                         .insert(transactionsData);
@@ -2711,16 +2791,18 @@
 
                 // Sync unpaid entries
                 if (state.unpaidEntries.length > 0) {
-                    const unpaidData = state.unpaidEntries.map(u => ({
-                        user_id: currentUser.id,
-                        name: u.name,
-                        type: u.type,
-                        amount: u.amount,
-                        date: u.date,
-                        time: u.time,
-                        timestamp: u.timestamp,
-                        paid: u.paid
-                    }));
+                    const unpaidData = state.unpaidEntries
+                        .filter(u => !keySet.unpaid.has(`${u.name}|${u.type}|${u.date}|${parseFloat(u.amount || 0)}`))
+                        .map(u => ({
+                            user_id: currentUser.id,
+                            name: u.name,
+                            type: u.type,
+                            amount: u.amount,
+                            date: u.date,
+                            time: u.time,
+                            timestamp: u.timestamp,
+                            paid: u.paid
+                        }));
                     const { error } = await supabase
                         .from('unpaid_entries')
                         .insert(unpaidData);
@@ -2734,20 +2816,27 @@
                     initial_float: floatData.initial
                 }));
                 {
-                    const { error } = await supabase
-                        .from('transaction_floats')
-                        .insert(floatsData);
-                    if (error) console.warn('Transaction floats insert skipped:', error.message || error);
+                    // Delete existing for channel then insert to avoid duplicates
+                    for (const row of floatsData) {
+                        try {
+                            await supabase.from('transaction_floats').delete().eq('user_id', currentUser.id).eq('channel', row.channel);
+                            const { error: flErr } = await supabase.from('transaction_floats').insert(row);
+                            if (flErr) console.warn('Transaction floats insert skipped:', flErr.message || flErr);
+                        } catch (e) { console.warn('Transaction floats sync error:', e); }
+                    }
                 }
 
                 // Sync settings
                 {
-                    const { error } = await supabase.from('settings').insert({
-                        user_id: currentUser.id,
-                        daily_target: state.dailyTarget || 0,
-                        monthly_target: state.monthlyTarget || 0
-                    });
-                    if (error) console.warn('Settings insert skipped:', error.message || error);
+                    try {
+                        await supabase.from('settings').delete().eq('user_id', currentUser.id);
+                        const { error } = await supabase.from('settings').insert({
+                            user_id: currentUser.id,
+                            daily_target: state.dailyTarget || 0,
+                            monthly_target: state.monthlyTarget || 0
+                        });
+                        if (error) console.warn('Settings insert skipped:', error.message || error);
+                    } catch (e) { console.warn('Settings sync error:', e); }
                 }
 
                 updateSyncIndicator('synced');
