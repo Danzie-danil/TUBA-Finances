@@ -98,6 +98,12 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.12);
         }
 
+        /* Auth banner (same style, clickable) */
+        .auth-banner {
+            background: linear-gradient(145deg, #1976d2, #0d47a1);
+            cursor: pointer;
+        }
+
         /* Splash screen styles */
         .privacy-blur {
             filter: blur(8px);
@@ -1558,6 +1564,9 @@
 
         <!-- Offline status banner inserted below header so it does not overlay content -->
         <div id="offlineBanner" class="offline-banner" role="status" aria-live="polite" aria-atomic="true"></div>
+        <!-- Not signed-in banner (click to go to Sign In) -->
+        <div id="authBanner" class="offline-banner auth-banner" role="status" aria-live="polite" aria-atomic="true">
+        </div>
 
         <div class="content" id="app"></div>
         <div class="bottom-nav" id="bottomNav"></div>
@@ -2020,6 +2029,8 @@
                 await loadUserProfile();
                 // Hydrate logo base64 for immediate UI/PDF usage
                 try { await ensureLogoReady(); } catch (e) { /* no-op */ }
+                // Update auth banner visibility
+                try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { /* no-op */ }
 
                 // Upload logo if selected locally
                 if (state.userLogoDataUrl) {
@@ -2248,10 +2259,12 @@
                 }
 
                 showToast('Signed out successfully', 'info');
+                try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { /* no-op */ }
                 render();
             } catch (error) {
                 console.error('Sign out error:', error);
                 showToast('Signed out (with errors)', 'info');
+                try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { /* no-op */ }
                 render();
             }
         }
@@ -10648,6 +10661,7 @@
                     // Hydrate profile and logo
                     await loadUserProfile();
                     try { await ensureLogoReady(); } catch (e) { /* no-op */ }
+                    try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { /* no-op */ }
 
                     // Load user profile first
                     await loadUserProfile();
@@ -10853,8 +10867,33 @@
                             }
                         };
 
+                        // Not signed-in banner — mirrors offline style and is clickable
+                        const authBannerEl = document.getElementById('authBanner');
+                        window.updateAuthBanner = () => {
+                            if (!authBannerEl) return;
+                            if (currentUser && syncEnabled) {
+                                authBannerEl.style.display = 'none';
+                                authBannerEl.textContent = '';
+                                authBannerEl.onclick = null;
+                            } else {
+                                authBannerEl.innerHTML = "You’re not signed in — tap to sign in and sync.";
+                                authBannerEl.style.display = 'block';
+                                authBannerEl.onclick = () => {
+                                    try {
+                                        switchTab('account');
+                                        setTimeout(() => {
+                                            try { switchAuthTab('login'); } catch (e) { }
+                                            const lf = document.getElementById('loginForm');
+                                            lf && lf.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }, 50);
+                                    } catch (e) { /* no-op */ }
+                                };
+                            }
+                        };
+
                         // Initial state and event listeners
                         updateOfflineBanner();
+                        window.updateAuthBanner && window.updateAuthBanner();
                         window.addEventListener('online', () => {
                             updateOfflineBanner();
                             try {
