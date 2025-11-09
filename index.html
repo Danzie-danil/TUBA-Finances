@@ -2480,7 +2480,9 @@
                         price: p.price,
                         has_stock: (p.hasStock === false) ? false : true
                     }));
-                    const { error } = await supabase.from('products').insert(productsData);
+                    const { error } = await supabase
+                        .from('products')
+                        .upsert(productsData, { onConflict: 'user_id,name' });
                     if (error) throw error;
                 }
 
@@ -2490,7 +2492,9 @@
                         user_id: currentUser.id,
                         name: c
                     }));
-                    const { error } = await supabase.from('categories').insert(categoriesData);
+                    const { error } = await supabase
+                        .from('categories')
+                        .upsert(categoriesData, { onConflict: 'user_id,name' });
                     if (error) console.warn('Categories insert skipped:', error.message || error);
                 }
 
@@ -2508,10 +2512,14 @@
                         price_per_unit: s.pricePerUnit,
                         total_cost: s.totalCost,
                         total_price: s.totalPrice,
-                        profit: s.profit,
+                        profit: (s.profit !== null && s.profit !== undefined && !isNaN(parseFloat(s.profit)))
+                            ? parseFloat(s.profit)
+                            : +(parseFloat(s.totalPrice || 0) - parseFloat(s.totalCost || 0)).toFixed(2),
                         payment: s.payment
                     }));
-                    const { error } = await supabase.from('sales').insert(salesData);
+                    const { error } = await supabase
+                        .from('sales')
+                        .upsert(salesData, { onConflict: 'user_id,timestamp,product_name,customer' });
                     if (error) throw error;
                 }
 
@@ -2528,7 +2536,9 @@
                         payment: e.payment,
                         comment: e.comment || ''
                     }));
-                    const { error } = await supabase.from('expenses').insert(expensesData);
+                    const { error } = await supabase
+                        .from('expenses')
+                        .upsert(expensesData, { onConflict: 'user_id,timestamp,description,amount' });
                     if (error) throw error;
                 }
 
@@ -2542,7 +2552,9 @@
                         address: c.address || '',
                         total_purchases: c.totalPurchases || 0
                     }));
-                    const { error } = await supabase.from('customers').insert(customersData);
+                    const { error } = await supabase
+                        .from('customers')
+                        .upsert(customersData, { onConflict: 'user_id,name' });
                     if (error) throw error;
                 }
 
@@ -2558,7 +2570,9 @@
                         amount: i.amount,
                         status: i.status
                     }));
-                    const { error } = await supabase.from('invoices').insert(invoicesData);
+                    const { error } = await supabase
+                        .from('invoices')
+                        .upsert(invoicesData, { onConflict: 'user_id,number' });
                     if (error) throw error;
                 }
 
@@ -2576,7 +2590,9 @@
                         amount: r.amount,
                         payment_method: r.paymentMethod
                     }));
-                    const { error } = await supabase.from('receipts').insert(receiptsData);
+                    const { error } = await supabase
+                        .from('receipts')
+                        .upsert(receiptsData, { onConflict: 'user_id,timestamp,number' });
                     if (error) throw error;
                 }
 
@@ -2588,7 +2604,9 @@
                         stock: inv.stock,
                         min_alert: inv.minAlert
                     }));
-                    const { error } = await supabase.from('inventory').insert(inventoryData);
+                    const { error } = await supabase
+                        .from('inventory')
+                        .upsert(inventoryData, { onConflict: 'user_id,product_name' });
                     if (error) throw error;
                 }
 
@@ -2602,7 +2620,9 @@
                         time: n.time,
                         timestamp: n.timestamp
                     }));
-                    const { error } = await supabase.from('notes').insert(notesData);
+                    const { error } = await supabase
+                        .from('notes')
+                        .upsert(notesData, { onConflict: 'user_id,timestamp' });
                     if (error) throw error;
                 }
 
@@ -2616,7 +2636,9 @@
                         end_date: c.endDate || null,
                         notes: c.notes || ''
                     }));
-                    const { error: periodsErr } = await supabase.from('inventory_purchase_periods').insert(periodsData);
+                    const { error: periodsErr } = await supabase
+                        .from('inventory_purchase_periods')
+                        .upsert(periodsData, { onConflict: 'user_id,period_number' });
                     if (periodsErr) throw periodsErr;
                 }
 
@@ -2636,7 +2658,9 @@
                         notes: p.notes || '',
                         timestamp: p.timestamp
                     }));
-                    const { error: purchasesErr } = await supabase.from('inventory_purchases').insert(purchasesData);
+                    const { error: purchasesErr } = await supabase
+                        .from('inventory_purchases')
+                        .upsert(purchasesData, { onConflict: 'user_id,timestamp' });
                     if (purchasesErr) throw purchasesErr;
                 }
 
@@ -2652,7 +2676,9 @@
                         time: t.time,
                         timestamp: t.timestamp
                     }));
-                    const { error } = await supabase.from('transactions').insert(transactionsData);
+                    const { error } = await supabase
+                        .from('transactions')
+                        .upsert(transactionsData, { onConflict: 'user_id,timestamp,channel,type,amount' });
                     if (error) throw error;
                 }
 
@@ -2668,7 +2694,9 @@
                         timestamp: u.timestamp,
                         paid: u.paid
                     }));
-                    const { error } = await supabase.from('unpaid_entries').insert(unpaidData);
+                    const { error } = await supabase
+                        .from('unpaid_entries')
+                        .upsert(unpaidData, { onConflict: 'user_id,timestamp,name,amount' });
                     if (error) throw error;
                 }
 
@@ -2679,17 +2707,19 @@
                     initial_float: floatData.initial
                 }));
                 {
-                    const { error } = await supabase.from('transaction_floats').insert(floatsData);
+                    const { error } = await supabase
+                        .from('transaction_floats')
+                        .upsert(floatsData, { onConflict: 'user_id,channel' });
                     if (error) console.warn('Transaction floats insert skipped:', error.message || error);
                 }
 
                 // Sync settings
                 {
-                    const { error } = await supabase.from('settings').insert({
+                    const { error } = await supabase.from('settings').upsert({
                         user_id: currentUser.id,
                         daily_target: state.dailyTarget || 0,
                         monthly_target: state.monthlyTarget || 0
-                    });
+                    }, { onConflict: 'user_id' });
                     if (error) console.warn('Settings insert skipped:', error.message || error);
                 }
 
@@ -2768,11 +2798,18 @@
                     supabase.from('inventory_purchases').delete().eq('user_id', currentUser.id)
                 ];
                 const deleteResults = await Promise.allSettled(deletePromises);
+                let deleteErrors = [];
                 deleteResults.forEach((res, idx) => {
                     if (res.status === 'rejected') {
-                        console.warn('Delete failed for index', idx, res.reason);
+                        deleteErrors.push(res.reason);
+                    } else if (res.status === 'fulfilled' && res.value && res.value.error) {
+                        deleteErrors.push(res.value.error);
                     }
                 });
+                if (deleteErrors.length > 0) {
+                    console.warn('Delete errors:', deleteErrors);
+                    throw new Error('Cloud delete failed. Check Supabase policies for delete permission.');
+                }
 
                 console.log('✅ Cloud data cleared');
                 console.log('⬆️ Pushing local data to cloud...');
@@ -2886,7 +2923,9 @@
                         pricePerUnit: parseFloat(s.price_per_unit),
                         totalCost: parseFloat(s.total_cost),
                         totalPrice: parseFloat(s.total_price),
-                        profit: parseFloat(s.profit),
+                        profit: (s.profit !== null && s.profit !== undefined && !isNaN(parseFloat(s.profit)))
+                            ? parseFloat(s.profit)
+                            : +(parseFloat(s.total_price || 0) - parseFloat(s.total_cost || 0)).toFixed(2),
                         payment: s.payment
                     }));
                 }
@@ -10219,7 +10258,9 @@
                             pricePerUnit: parseFloat(s.price_per_unit),
                             totalCost: parseFloat(s.total_cost),
                             totalPrice: parseFloat(s.total_price),
-                            profit: parseFloat(s.profit),
+                            profit: (s.profit !== null && s.profit !== undefined && !isNaN(parseFloat(s.profit)))
+                                ? parseFloat(s.profit)
+                                : +(parseFloat(s.total_price || 0) - parseFloat(s.total_cost || 0)).toFixed(2),
                             payment: s.payment
                         }));
                     }
@@ -10347,6 +10388,7 @@
         }
 
         window.smartMergeData = smartMergeDataFixed;
+        try { smartMergeData = smartMergeDataFixed; } catch (e) { /* no-op */ }
 
         // ============================================
         // FIX 4: Sync Lock
