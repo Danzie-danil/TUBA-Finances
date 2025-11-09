@@ -2733,46 +2733,553 @@
             }
         }
 
+        // Helper: attempt upsert; fallback to manual path when DB lacks unique constraints
+        async function safeUpsert(table, payload, onConflictCols) {
+            if (!payload || (Array.isArray(payload) && payload.length === 0)) return true;
+            try {
+                const { error } = await supabase.from(table).upsert(payload, { onConflict: onConflictCols });
+                if (error) throw error;
+                console.log(`✅ Upsert succeeded for ${table} on conflict ${onConflictCols}`);
+                return true;
+            } catch (err) {
+                console.warn(`⚠️ Upsert failed for ${table} (likely missing unique constraint on ${onConflictCols}). Fallback to manual merge.`, err?.message || err);
+                return false;
+            }
+        }
+
         async function clearAndPushAllData() {
+            // Non-destructive merge: insert new records only; update existing by natural keys
             if (!syncEnabled || !currentUser) return;
 
+            const errorContext = (ctx, err) => {
+                const msg = (err && (err.message || err.error_description || err.details)) || 'Unknown error';
+                console.error(`❌ ${ctx}:`, err);
+                showToast(`${ctx} failed: ${msg}`, 'error');
+            };
+
             try {
-                console.log('🗑️ Clearing cloud data...');
+                console.log('🔄 Merging local data into cloud (no deletions)...');
 
-                // Delete with resilience — continue on failures
-                const deletePromises = [
-                    supabase.from('products').delete().eq('user_id', currentUser.id),
-                    supabase.from('sales').delete().eq('user_id', currentUser.id),
-                    supabase.from('categories').delete().eq('user_id', currentUser.id),
-                    supabase.from('expenses').delete().eq('user_id', currentUser.id),
-                    supabase.from('customers').delete().eq('user_id', currentUser.id),
-                    supabase.from('invoices').delete().eq('user_id', currentUser.id),
-                    supabase.from('receipts').delete().eq('user_id', currentUser.id),
-                    supabase.from('inventory').delete().eq('user_id', currentUser.id),
-                    supabase.from('notes').delete().eq('user_id', currentUser.id),
-                    supabase.from('transactions').delete().eq('user_id', currentUser.id),
-                    supabase.from('unpaid_entries').delete().eq('user_id', currentUser.id),
-                    supabase.from('transaction_floats').delete().eq('user_id', currentUser.id),
-                    supabase.from('settings').delete().eq('user_id', currentUser.id),
-                    supabase.from('inventory_purchase_periods').delete().eq('user_id', currentUser.id),
-                    supabase.from('inventory_purchases').delete().eq('user_id', currentUser.id)
-                ];
-                const deleteResults = await Promise.allSettled(deletePromises);
-                deleteResults.forEach((res, idx) => {
-                    if (res.status === 'rejected') {
-                        console.warn('Delete failed for index', idx, res.reason);
+                // Fetch current cloud snapshot to compute diffs
+                const cloud = await fetchCloudDataDirect();
+
+                // Helper to build content keys consistent with deduplicateByContent
+                const contentKeyFor = (type, item) => {
+                    switch (type) {
+                        case 'sales':
+                            return `${item.productName}|${item.customer}|${item.date}|${item.time}|${item.quantity}|${item.totalPrice}`;
+                        case 'products':
+                            return `${item.name}|${item.category}`;
+                        case 'expenses':
+                            return `${item.description}|${item.date}|${item.time}|${item.amount}`;
+                        case 'customers':
+                            return `${item.name}|${item.email || ''}|${item.phone || ''}`;
+                        case 'transactions':
+                            return `${item.channel}|${item.date}|${item.time}|${item.amount}|${item.type}`;
+                        case 'unpaid':
+                            return `${item.name}|${item.type}|${item.date}|${item.amount}`;
+                        case 'notes':
+                            return `${item.content}|${item.date}|${item.time}`;
+                        default:
+                            return JSON.stringify(item);
                     }
-                });
+                };
 
-                console.log('✅ Cloud data cleared');
-                console.log('⬆️ Pushing local data to cloud...');
+                // Build cloud key sets
+                const cloudKeys = {
+                    sales: new Set(cloud.sales.map(i => contentKeyFor('sales', i))),
+                    products: new Set(cloud.products.map(i => contentKeyFor('products', i))),
+                    expenses: new Set(cloud.expenses.map(i => contentKeyFor('expenses', i))),
+                    customers: new Set(cloud.customers.map(i => contentKeyFor('customers', i))),
+                    transactions: new Set(cloud.transactions.map(i => contentKeyFor('transactions', i))),
+                    unpaidEntries: new Set(cloud.unpaidEntries.map(i => contentKeyFor('unpaid', i))),
+                    notes: new Set(cloud.notes.map(i => contentKeyFor('notes', i))),
+                    categories: new Set((cloud.categories || []))
+                };
 
-                // Now push all local data
-                await pushAllDataToSupabase();
+                // Ensure local state is deduplicated before computing diffs
+                state.sales = deduplicateByContent(state.sales, 'sales');
+                state.products = deduplicateByContent(state.products, 'products');
+                state.expenses = deduplicateByContent(state.expenses, 'expenses');
+                state.customers = deduplicateByContent(state.customers, 'customers');
+                state.transactions = deduplicateByContent(state.transactions, 'transactions');
+                state.unpaidEntries = deduplicateByContent(state.unpaidEntries, 'unpaid');
+                state.notes = deduplicateByContent(state.notes, 'notes');
 
-                console.log('✅ Local data pushed to cloud');
+                // Compute inserts per type
+                const toInsert = {
+                    sales: state.sales.filter(i => !cloudKeys.sales.has(contentKeyFor('sales', i))),
+                    products: state.products.filter(i => !cloudKeys.products.has(contentKeyFor('products', i))),
+                    expenses: state.expenses.filter(i => !cloudKeys.expenses.has(contentKeyFor('expenses', i))),
+                    customers: state.customers.filter(i => !cloudKeys.customers.has(contentKeyFor('customers', i))),
+                    transactions: state.transactions.filter(i => !cloudKeys.transactions.has(contentKeyFor('transactions', i))),
+                    unpaidEntries: state.unpaidEntries.filter(i => !cloudKeys.unpaidEntries.has(contentKeyFor('unpaid', i))),
+                    notes: state.notes.filter(i => !cloudKeys.notes.has(contentKeyFor('notes', i))),
+                    categories: (state.categories || []).filter(name => !cloudKeys.categories.has(name))
+                };
+
+                // Insert missing records
+                // Products: try upsert by natural key (user_id,name,category)
+                {
+                    const allPayload = state.products.map(p => ({
+                        user_id: currentUser.id,
+                        name: p.name,
+                        category: p.category,
+                        cost: p.cost,
+                        price: p.price,
+                        has_stock: (p.hasStock === false) ? false : true
+                    }));
+                    const ok = await safeUpsert('products', allPayload, 'user_id,name,category');
+                    if (!ok) {
+                        // Fallback: insert missing
+                        if (toInsert.products.length > 0) {
+                            const payload = toInsert.products.map(p => ({
+                                user_id: currentUser.id,
+                                name: p.name,
+                                category: p.category,
+                                cost: p.cost,
+                                price: p.price,
+                                has_stock: (p.hasStock === false) ? false : true
+                            }));
+                            const { error } = await supabase.from('products').insert(payload);
+                            if (error) errorContext('Insert products', error);
+                        }
+                    }
+                }
+                // Update products where they already exist (by natural key)
+                for (const p of state.products) {
+                    try {
+                        const { data, error } = await supabase
+                            .from('products')
+                            .update({ cost: p.cost, price: p.price, has_stock: (p.hasStock === false) ? false : true })
+                            .eq('user_id', currentUser.id)
+                            .eq('name', p.name)
+                            .eq('category', p.category);
+                        if (error) errorContext('Update product', error);
+                    } catch (e) { errorContext('Update product', e); }
+                }
+
+                // Categories: try upsert by (user_id,name)
+                {
+                    const allPayload = (state.categories || []).map(c => ({ user_id: currentUser.id, name: c }));
+                    const ok = await safeUpsert('categories', allPayload, 'user_id,name');
+                    if (!ok) {
+                        if (toInsert.categories.length > 0) {
+                            const payload = toInsert.categories.map(c => ({ user_id: currentUser.id, name: c }));
+                            const { error } = await supabase.from('categories').insert(payload);
+                            if (error) errorContext('Insert categories', error);
+                        }
+                    }
+                }
+
+                // Sales: try upsert by (user_id,timestamp,product_name,customer)
+                {
+                    const allPayload = state.sales.map(s => ({
+                        user_id: currentUser.id,
+                        date: s.date,
+                        time: s.time,
+                        timestamp: s.timestamp,
+                        product_name: s.productName,
+                        customer: s.customer,
+                        quantity: s.quantity,
+                        cost_per_unit: s.costPerUnit,
+                        price_per_unit: s.pricePerUnit,
+                        total_cost: s.totalCost,
+                        total_price: s.totalPrice,
+                        profit: s.profit,
+                        payment: s.payment
+                    }));
+                    const ok = await safeUpsert('sales', allPayload, 'user_id,timestamp,product_name,customer');
+                    if (!ok) {
+                        if (toInsert.sales.length > 0) {
+                            const payload = toInsert.sales.map(s => ({
+                                user_id: currentUser.id,
+                                date: s.date,
+                                time: s.time,
+                                timestamp: s.timestamp,
+                                product_name: s.productName,
+                                customer: s.customer,
+                                quantity: s.quantity,
+                                cost_per_unit: s.costPerUnit,
+                                price_per_unit: s.pricePerUnit,
+                                total_cost: s.totalCost,
+                                total_price: s.totalPrice,
+                                profit: s.profit,
+                                payment: s.payment
+                            }));
+                            const { error } = await supabase.from('sales').insert(payload);
+                            if (error) errorContext('Insert sales', error);
+                        }
+                    }
+                }
+
+                // Expenses: try upsert by (user_id,timestamp,description,category)
+                {
+                    const allPayload = state.expenses.map(e => ({
+                        user_id: currentUser.id,
+                        date: e.date,
+                        time: e.time,
+                        timestamp: e.timestamp,
+                        description: e.description,
+                        category: e.category,
+                        amount: e.amount,
+                        payment: e.payment,
+                        comment: e.comment || ''
+                    }));
+                    const ok = await safeUpsert('expenses', allPayload, 'user_id,timestamp,description,category');
+                    if (!ok) {
+                        if (toInsert.expenses.length > 0) {
+                            const payload = toInsert.expenses.map(e => ({
+                                user_id: currentUser.id,
+                                date: e.date,
+                                time: e.time,
+                                timestamp: e.timestamp,
+                                description: e.description,
+                                category: e.category,
+                                amount: e.amount,
+                                payment: e.payment,
+                                comment: e.comment || ''
+                            }));
+                            const { error } = await supabase.from('expenses').insert(payload);
+                            if (error) errorContext('Insert expenses', error);
+                        }
+                    }
+                }
+
+                // Customers: try upsert by (user_id,name,email,phone)
+                {
+                    const allPayload = state.customers.map(c => ({
+                        user_id: currentUser.id,
+                        name: c.name,
+                        email: c.email || '',
+                        phone: c.phone || '',
+                        address: c.address || '',
+                        total_purchases: c.totalPurchases || 0
+                    }));
+                    const ok = await safeUpsert('customers', allPayload, 'user_id,name,email,phone');
+                    if (!ok) {
+                        if (toInsert.customers.length > 0) {
+                            const payload = toInsert.customers.map(c => ({
+                                user_id: currentUser.id,
+                                name: c.name,
+                                email: c.email || '',
+                                phone: c.phone || '',
+                                address: c.address || '',
+                                total_purchases: c.totalPurchases || 0
+                            }));
+                            const { error } = await supabase.from('customers').insert(payload);
+                            if (error) errorContext('Insert customers', error);
+                        }
+                    }
+                }
+                for (const c of state.customers) {
+                    try {
+                        const { data, error } = await supabase
+                            .from('customers')
+                            .update({ address: c.address || '', total_purchases: c.totalPurchases || 0 })
+                            .eq('user_id', currentUser.id)
+                            .eq('name', c.name)
+                            .eq('email', c.email || '')
+                            .eq('phone', c.phone || '');
+                        if (error) errorContext('Update customer', error);
+                    } catch (e) { errorContext('Update customer', e); }
+                }
+
+                // Invoices
+                if (state.invoices && state.invoices.length > 0) {
+                    // Avoid duplicates by number
+                    let existingInvoiceNumbers = new Set();
+                    try {
+                        const { data: cloudInv, error: invErr } = await supabase
+                            .from('invoices')
+                            .select('number')
+                            .eq('user_id', currentUser.id);
+                        if (invErr) errorContext('Fetch invoices for diff', invErr);
+                        if (cloudInv) existingInvoiceNumbers = new Set(cloudInv.map(x => x.number));
+                    } catch (e) { errorContext('Fetch invoices for diff', e); }
+
+                    const payload = state.invoices
+                        .filter(i => !existingInvoiceNumbers.has(i.number))
+                        .map(i => ({
+                            user_id: currentUser.id,
+                            number: i.number,
+                            customer: i.customer,
+                            date: i.date,
+                            due_date: i.dueDate,
+                            items: i.items,
+                            amount: i.amount,
+                            status: i.status
+                        }));
+                    const { error } = await supabase.from('invoices').insert(payload);
+                    if (error) errorContext('Insert invoices', error);
+                }
+
+                // Receipts
+                if (toInsert.notes.length > 0) {
+                    // handled below in notes section
+                }
+                if (state.receipts && state.receipts.length > 0) {
+                    // Build existing keys from cloud
+                    let cloudReceiptKeys = new Set();
+                    try {
+                        const { data: cloudRcpt, error: rcErr } = await supabase
+                            .from('receipts')
+                            .select('number,timestamp')
+                            .eq('user_id', currentUser.id);
+                        if (rcErr) errorContext('Fetch receipts for diff', rcErr);
+                        if (cloudRcpt) cloudReceiptKeys = new Set(cloudRcpt.map(r => `${r.number}|${r.timestamp}`));
+                    } catch (e) { errorContext('Fetch receipts for diff', e); }
+                    const payload = state.receipts
+                        .filter(r => !cloudReceiptKeys.has(`${r.number}|${r.timestamp}`))
+                        .map(r => ({
+                            user_id: currentUser.id,
+                            number: r.number,
+                            customer: r.customer,
+                            customer_email: r.customerEmail || '',
+                            date: r.date,
+                            time: r.time,
+                            timestamp: r.timestamp,
+                            description: r.description,
+                            amount: r.amount,
+                            payment_method: r.paymentMethod
+                        }));
+                    if (payload.length > 0) {
+                        const { error } = await supabase.from('receipts').insert(payload);
+                        if (error) errorContext('Insert receipts', error);
+                    }
+                }
+
+                // Inventory
+                if (state.inventory && Object.keys(state.inventory).length > 0) {
+                    // Build existing product_name keys from cloud
+                    let cloudInvKeys = new Set();
+                    try {
+                        const { data: cloudInv, error: invErr } = await supabase
+                            .from('inventory')
+                            .select('product_name')
+                            .eq('user_id', currentUser.id);
+                        if (invErr) errorContext('Fetch inventory for diff', invErr);
+                        if (cloudInv) cloudInvKeys = new Set(cloudInv.map(i => i.product_name));
+                    } catch (e) { errorContext('Fetch inventory for diff', e); }
+                    const payload = Object.entries(state.inventory)
+                        .filter(([productName]) => !cloudInvKeys.has(productName))
+                        .map(([productName, inv]) => ({
+                            user_id: currentUser.id,
+                            product_name: productName,
+                            stock: inv.stock,
+                            min_alert: inv.minAlert
+                        }));
+                    if (payload.length > 0) {
+                        const { error } = await supabase.from('inventory').insert(payload);
+                        if (error) errorContext('Insert inventory', error);
+                    }
+                    // Update existing inventory stock/min_alert
+                    for (const [productName, inv] of Object.entries(state.inventory)) {
+                        try {
+                            const { data, error } = await supabase
+                                .from('inventory')
+                                .update({ stock: inv.stock, min_alert: inv.minAlert })
+                                .eq('user_id', currentUser.id)
+                                .eq('product_name', productName);
+                            if (error) errorContext('Update inventory', error);
+                        } catch (e) { errorContext('Update inventory', e); }
+                    }
+                }
+
+                // Notes: try upsert by (user_id,timestamp,content)
+                {
+                    const allPayload = state.notes.map(n => ({
+                        user_id: currentUser.id,
+                        title: n.title || '',
+                        content: n.content,
+                        date: n.date,
+                        time: n.time,
+                        timestamp: n.timestamp
+                    }));
+                    const ok = await safeUpsert('notes', allPayload, 'user_id,timestamp,content');
+                    if (!ok) {
+                        if (toInsert.notes.length > 0) {
+                            const payload = toInsert.notes.map(n => ({
+                                user_id: currentUser.id,
+                                title: n.title || '',
+                                content: n.content,
+                                date: n.date,
+                                time: n.time,
+                                timestamp: n.timestamp
+                            }));
+                            const { error } = await supabase.from('notes').insert(payload);
+                            if (error) errorContext('Insert notes', error);
+                        }
+                    }
+                }
+
+                // Transactions: try upsert by (user_id,timestamp,channel,type,amount)
+                {
+                    const allPayload = state.transactions.map(t => ({
+                        user_id: currentUser.id,
+                        channel: t.channel,
+                        customer_name: t.customerName,
+                        type: t.type,
+                        amount: t.amount,
+                        date: t.date,
+                        time: t.time,
+                        timestamp: t.timestamp
+                    }));
+                    const ok = await safeUpsert('transactions', allPayload, 'user_id,timestamp,channel,type,amount');
+                    if (!ok) {
+                        if (toInsert.transactions.length > 0) {
+                            const payload = toInsert.transactions.map(t => ({
+                                user_id: currentUser.id,
+                                channel: t.channel,
+                                customer_name: t.customerName,
+                                type: t.type,
+                                amount: t.amount,
+                                date: t.date,
+                                time: t.time,
+                                timestamp: t.timestamp
+                            }));
+                            const { error } = await supabase.from('transactions').insert(payload);
+                            if (error) errorContext('Insert transactions', error);
+                        }
+                    }
+                }
+
+                // Unpaid entries: try upsert by (user_id,timestamp,name)
+                {
+                    const allPayload = state.unpaidEntries.map(u => ({
+                        user_id: currentUser.id,
+                        name: u.name,
+                        type: u.type,
+                        amount: u.amount,
+                        date: u.date,
+                        time: u.time,
+                        timestamp: u.timestamp,
+                        paid: u.paid
+                    }));
+                    const ok = await safeUpsert('unpaid_entries', allPayload, 'user_id,timestamp,name');
+                    if (!ok) {
+                        if (toInsert.unpaidEntries.length > 0) {
+                            const payload = toInsert.unpaidEntries.map(u => ({
+                                user_id: currentUser.id,
+                                name: u.name,
+                                type: u.type,
+                                amount: u.amount,
+                                date: u.date,
+                                time: u.time,
+                                timestamp: u.timestamp,
+                                paid: u.paid
+                            }));
+                            const { error } = await supabase.from('unpaid_entries').insert(payload);
+                            if (error) errorContext('Insert unpaid entries', error);
+                        }
+                    }
+                }
+
+                // Transaction floats: update or insert by channel
+                for (const [channel, floatData] of Object.entries(state.transactionFloats || {})) {
+                    try {
+                        const { data, error } = await supabase
+                            .from('transaction_floats')
+                            .update({ initial_float: floatData.initial })
+                            .eq('user_id', currentUser.id)
+                            .eq('channel', channel);
+                        if (error) errorContext('Update transaction float', error);
+                        if (!error && Array.isArray(data) && data.length === 0) {
+                            const { error: insErr } = await supabase
+                                .from('transaction_floats')
+                                .insert({ user_id: currentUser.id, channel, initial_float: floatData.initial });
+                            if (insErr) errorContext('Insert transaction float', insErr);
+                        }
+                    } catch (e) { errorContext('Upsert transaction float', e); }
+                }
+
+                // Settings: update or insert per user
+                try {
+                    const { data, error } = await supabase
+                        .from('settings')
+                        .update({
+                            daily_target: state.dailyTarget || 0,
+                            monthly_target: state.monthlyTarget || 0
+                        })
+                        .eq('user_id', currentUser.id);
+                    if (error) errorContext('Update settings', error);
+                    if (!error && Array.isArray(data) && data.length === 0) {
+                        const { error: insErr } = await supabase
+                            .from('settings')
+                            .insert({
+                                user_id: currentUser.id,
+                                daily_target: state.dailyTarget || 0,
+                                monthly_target: state.monthlyTarget || 0
+                            });
+                        if (insErr) errorContext('Insert settings', insErr);
+                    }
+                } catch (e) { errorContext('Upsert settings', e); }
+
+                // Inventory purchase periods
+                if (state.inventoryPurchaseCycles && state.inventoryPurchaseCycles.length > 0) {
+                    let cloudPeriodKeys = new Set();
+                    try {
+                        const { data: cloudPeriods, error: perErr } = await supabase
+                            .from('inventory_purchase_periods')
+                            .select('period_number,title')
+                            .eq('user_id', currentUser.id);
+                        if (perErr) errorContext('Fetch purchase periods for diff', perErr);
+                        if (cloudPeriods) cloudPeriodKeys = new Set(cloudPeriods.map(c => `${c.period_number}|${c.title || ''}`));
+                    } catch (e) { errorContext('Fetch purchase periods for diff', e); }
+                    const payload = state.inventoryPurchaseCycles
+                        .filter(c => !cloudPeriodKeys.has(`${c.number}|${c.title || ''}`))
+                        .map(c => ({
+                            user_id: currentUser.id,
+                            period_number: c.number,
+                            title: c.title || '',
+                            start_date: c.startDate || null,
+                            end_date: c.endDate || null,
+                            notes: c.notes || ''
+                        }));
+                    if (payload.length > 0) {
+                        const { error } = await supabase.from('inventory_purchase_periods').insert(payload);
+                        if (error) errorContext('Insert inventory purchase periods', error);
+                    }
+                }
+
+                // Inventory purchases
+                if (state.inventoryPurchases && state.inventoryPurchases.length > 0) {
+                    let cloudPurchaseKeys = new Set();
+                    try {
+                        const { data: cloudPurch, error: cpErr } = await supabase
+                            .from('inventory_purchases')
+                            .select('item_name,purchase_date,timestamp,quantity')
+                            .eq('user_id', currentUser.id);
+                        if (cpErr) errorContext('Fetch purchases for diff', cpErr);
+                        if (cloudPurch) cloudPurchaseKeys = new Set(cloudPurch.map(p => `${p.item_name}|${p.timestamp || p.purchase_date || ''}|${p.quantity || 0}`));
+                    } catch (e) { errorContext('Fetch purchases for diff', e); }
+                    const payload = state.inventoryPurchases
+                        .filter(p => !cloudPurchaseKeys.has(`${p.itemName}|${p.timestamp || p.purchaseDate || ''}|${p.quantity || 0}`))
+                        .map(p => ({
+                            user_id: currentUser.id,
+                            period_number: p.cycleNumber,
+                            item_name: p.itemName,
+                            quantity: p.quantity || 0,
+                            unit_cost: p.unitCost || p.buyingPrice || 0,
+                            total_cost: p.totalCost || p.buyingPrice || 0,
+                            purchase_date: p.purchaseDate,
+                            supplier_name: p.supplierName || '',
+                            supplier_phone: p.supplierPhone || p.supplierContact || '',
+                            supplier_address: p.supplierAddress || '',
+                            notes: p.notes || '',
+                            timestamp: p.timestamp
+                        }));
+                    if (payload.length > 0) {
+                        const { error } = await supabase.from('inventory_purchases').insert(payload);
+                        if (error) errorContext('Insert inventory purchases', error);
+                    }
+                }
+
+                updateSyncIndicator('synced');
+                console.log('✅ Cloud merge complete');
             } catch (error) {
-                console.error('Clear and push error:', error);
+                errorContext('Cloud merge', error);
+                updateSyncIndicator('synced');
                 throw error;
             }
         }
@@ -2834,15 +3341,14 @@
                     state.products = deduplicateByContent([...state.products, ...cloudProducts], 'products');
                 }
 
-                // Sales
+                // Sales (merge + dedup)
                 const { data: sales } = await supabase
                     .from('sales')
                     .select('*')
                     .eq('user_id', currentUser.id)
                     .order('timestamp', { ascending: false });
                 if (sales && sales.length > 0) {
-                    state.sales = sales.map(s => ({
-                        id: `S-${s.timestamp}`,
+                    const cloudSales = sales.map(s => ({
                         date: s.date,
                         time: s.time,
                         timestamp: s.timestamp,
@@ -2856,6 +3362,7 @@
                         profit: parseFloat(s.profit),
                         payment: s.payment
                     }));
+                    state.sales = deduplicateByContent([...state.sales, ...cloudSales], 'sales');
                 }
 
                 // Categories
@@ -2870,73 +3377,83 @@
                     state.categories = mergedCats;
                 }
 
-                // Expenses
+                // Expenses (merge + dedup)
                 const { data: expenses } = await supabase
                     .from('expenses')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Expenses
-                if (expenses && expenses.length > 0) state.expenses = expenses.map(e => ({
-                    id: `E-${e.timestamp}`,
-                    date: e.date,
-                    time: e.time,
-                    timestamp: e.timestamp,
-                    description: e.description,
-                    category: e.category,
-                    amount: parseFloat(e.amount),
-                    payment: e.payment,
-                    comment: e.comment
-                }));
+                if (expenses && expenses.length > 0) {
+                    const cloudExpenses = expenses.map(e => ({
+                        date: e.date,
+                        time: e.time,
+                        timestamp: e.timestamp,
+                        description: e.description,
+                        category: e.category,
+                        amount: parseFloat(e.amount),
+                        payment: e.payment,
+                        comment: e.comment
+                    }));
+                    state.expenses = deduplicateByContent([...state.expenses, ...cloudExpenses], 'expenses');
+                }
 
-                // Customers
+                // Customers (merge + dedup)
                 const { data: customers } = await supabase
                     .from('customers')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Customers
-                if (customers && customers.length > 0) state.customers = customers.map(c => ({
-                    id: `C-${c.name.replace(/\s+/g, '_')}_${Date.now()}`,
-                    name: c.name,
-                    email: c.email || '',
-                    phone: c.phone || '',
-                    address: c.address || '',
-                    totalPurchases: parseFloat(c.total_purchases || 0)
-                }));
+                if (customers && customers.length > 0) {
+                    const cloudCustomers = customers.map(c => ({
+                        name: c.name,
+                        email: c.email || '',
+                        phone: c.phone || '',
+                        address: c.address || '',
+                        totalPurchases: parseFloat(c.total_purchases || 0)
+                    }));
+                    state.customers = deduplicateByContent([...state.customers, ...cloudCustomers], 'customers');
+                }
 
-                // Invoices
+                // Invoices (merge)
                 const { data: invoices } = await supabase
                     .from('invoices')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Invoices
-                if (invoices && invoices.length > 0) state.invoices = invoices.map(i => ({
-                    id: `INV-${i.number}`,
-                    number: i.number,
-                    customer: i.customer,
-                    date: i.date,
-                    dueDate: i.due_date,
-                    items: i.items,
-                    amount: parseFloat(i.amount),
-                    status: i.status
-                }));
+                if (invoices && invoices.length > 0) {
+                    const cloudInvoices = invoices.map(i => ({
+                        number: i.number,
+                        customer: i.customer,
+                        date: i.date,
+                        dueDate: i.due_date,
+                        items: i.items,
+                        amount: parseFloat(i.amount),
+                        status: i.status
+                    }));
+                    // No dedicated dedup function; merge by number
+                    const existingByNumber = new Map((state.invoices || []).map(x => [x.number, x]));
+                    cloudInvoices.forEach(inv => { if (!existingByNumber.has(inv.number)) existingByNumber.set(inv.number, inv); });
+                    state.invoices = Array.from(existingByNumber.values());
+                }
 
-                // Receipts
+                // Receipts (merge)
                 const { data: receipts } = await supabase
                     .from('receipts')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                if (receipts && receipts.length > 0) state.receipts = receipts.map(r => ({
-                    id: `RCPT-${r.timestamp}`,
-                    number: r.number,
-                    customer: r.customer,
-                    customerEmail: r.customer_email || '',
-                    date: r.date,
-                    time: r.time,
-                    timestamp: r.timestamp,
-                    description: r.description,
-                    amount: parseFloat(r.amount),
-                    paymentMethod: r.payment_method
-                }));
+                if (receipts && receipts.length > 0) {
+                    const cloudReceipts = receipts.map(r => ({
+                        number: r.number,
+                        customer: r.customer,
+                        customerEmail: r.customer_email || '',
+                        date: r.date,
+                        time: r.time,
+                        timestamp: r.timestamp,
+                        description: r.description,
+                        amount: parseFloat(r.amount),
+                        paymentMethod: r.payment_method
+                    }));
+                    const existingByKey = new Map((state.receipts || []).map(x => [`${x.number}|${x.timestamp}`, x]));
+                    cloudReceipts.forEach(rc => { const key = `${rc.number}|${rc.timestamp}`; if (!existingByKey.has(key)) existingByKey.set(key, rc); });
+                    state.receipts = Array.from(existingByKey.values());
+                }
 
                 // Inventory
                 const { data: inventory } = await supabase
@@ -2957,54 +3474,57 @@
                 }
 
                 // Don't reset inventory if cloud has no data - keep local data
-                // Notes
+                // Notes (merge + dedup)
                 const { data: notes } = await supabase
                     .from('notes')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Notes
-                if (notes && notes.length > 0) state.notes = notes.map(n => ({
-                    id: `N-${n.timestamp}`,
-                    title: n.title || '',
-                    content: n.content,
-                    date: n.date,
-                    time: n.time,
-                    timestamp: n.timestamp
-                }));
+                if (notes && notes.length > 0) {
+                    const cloudNotes = notes.map(n => ({
+                        title: n.title || '',
+                        content: n.content,
+                        date: n.date,
+                        time: n.time,
+                        timestamp: n.timestamp
+                    }));
+                    state.notes = deduplicateByContent([...state.notes, ...cloudNotes], 'notes');
+                }
 
-                // Transactions
+                // Transactions (merge + dedup)
                 const { data: transactions } = await supabase
                     .from('transactions')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Transactions
-                if (transactions && transactions.length > 0) state.transactions = transactions.map(t => ({
-                    id: `T-${t.timestamp}`,
-                    channel: t.channel,
-                    customerName: t.customer_name,
-                    type: t.type,
-                    amount: parseFloat(t.amount),
-                    date: t.date,
-                    time: t.time,
-                    timestamp: t.timestamp
-                }));
+                if (transactions && transactions.length > 0) {
+                    const cloudTransactions = transactions.map(t => ({
+                        channel: t.channel,
+                        customerName: t.customer_name,
+                        type: t.type,
+                        amount: parseFloat(t.amount),
+                        date: t.date,
+                        time: t.time,
+                        timestamp: t.timestamp
+                    }));
+                    state.transactions = deduplicateByContent([...state.transactions, ...cloudTransactions], 'transactions');
+                }
 
-                // Unpaid entries
+                // Unpaid entries (merge + dedup)
                 const { data: unpaidEntries } = await supabase
                     .from('unpaid_entries')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Unpaid entries
-                if (unpaidEntries && unpaidEntries.length > 0) state.unpaidEntries = unpaidEntries.map(u => ({
-                    id: `U-${u.timestamp}`,
-                    name: u.name,
-                    type: u.type,
-                    amount: parseFloat(u.amount),
-                    date: u.date,
-                    time: u.time,
-                    timestamp: u.timestamp,
-                    paid: u.paid
-                }));
+                if (unpaidEntries && unpaidEntries.length > 0) {
+                    const cloudUnpaid = unpaidEntries.map(u => ({
+                        name: u.name,
+                        type: u.type,
+                        amount: parseFloat(u.amount),
+                        date: u.date,
+                        time: u.time,
+                        timestamp: u.timestamp,
+                        paid: u.paid
+                    }));
+                    state.unpaidEntries = deduplicateByContent([...state.unpaidEntries, ...cloudUnpaid], 'unpaid');
+                }
 
                 // Transaction floats
                 const { data: floats } = await supabase
@@ -3077,6 +3597,7 @@
                 }, 100);
             } catch (error) {
                 console.error('Pull error:', error);
+                showToast('Cloud pull failed: ' + (error?.message || 'Unknown error'), 'error');
             }
         }
         async function pushToSupabase(table, data) {
