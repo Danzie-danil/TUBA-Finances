@@ -2811,14 +2811,17 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (products && products.length > 0) {
-                    state.products = products.map(p => ({
-                        id: `P-${p.name.replace(/\s+/g, '_')}_${Date.now()}`,
+                    const cloudProducts = products.map(p => ({
+                        // Use stable ID derived from name to avoid duplicate IDs between offline and cloud
+                        id: `P-${(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
                         name: p.name,
                         category: p.category,
                         cost: parseFloat(p.cost),
                         price: parseFloat(p.price),
                         hasStock: (p.has_stock === false) ? false : true
                     }));
+                    // Merge with any existing local products and deduplicate by content
+                    state.products = deduplicateByContent([...state.products, ...cloudProducts], 'products');
                 }
 
                 // Sales
@@ -2850,7 +2853,12 @@
                     .from('categories')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                if (categories && categories.length > 0) state.categories = categories.map(c => c.name);
+                if (categories && categories.length > 0) {
+                    const cloudCategories = categories.map(c => c.name).filter(Boolean);
+                    // Merge cloud + local category names uniquely
+                    const mergedCats = Array.from(new Set([...(state.categories || []), ...cloudCategories]));
+                    state.categories = mergedCats;
+                }
 
                 // Expenses
                 const { data: expenses } = await supabase
