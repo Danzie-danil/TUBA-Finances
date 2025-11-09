@@ -3083,6 +3083,30 @@
             return { dataUrl, format };
         }
 
+        // Ensure logo base64 is hydrated before PDF generation
+        async function ensureLogoReady() {
+            if (state.userLogoDataUrl) return true;
+            if (state.userLogoPublicUrl) {
+                try {
+                    const res = await fetch(state.userLogoPublicUrl, { cache: 'no-cache' });
+                    const blob = await res.blob();
+                    const reader = new FileReader();
+                    const base64 = await new Promise((resolve, reject) => {
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                    state.userLogoDataUrl = base64;
+                    state.userLogoMime = blob.type.includes('png') ? 'image/png' : 'image/jpeg';
+                    saveData();
+                    return true;
+                } catch (e) {
+                    console.warn('ensureLogoReady: failed to hydrate logo from URL', e);
+                }
+            }
+            return false;
+        }
+
         // Draw logo inside a circular placeholder, clipped to the circle and filling it
         function drawLogo(doc, x, y, size, options = {}) {
             const logo = getLogoForPdf();
@@ -5808,7 +5832,8 @@
         }
 
         // Inventory PDF generators
-        function downloadInventoryPurchasesReportPDF() {
+        async function downloadInventoryPurchasesReportPDF() {
+            await ensureLogoReady();
             try {
                 const { jsPDF } = window.jspdf || {};
                 if (!jsPDF) {
@@ -5946,7 +5971,8 @@
             }
         }
 
-        function downloadInventoryCyclePDF(cycleNumber) {
+        async function downloadInventoryCyclePDF(cycleNumber) {
+            await ensureLogoReady();
             try {
                 const { jsPDF } = window.jspdf || {};
                 if (!jsPDF) {
@@ -6964,7 +6990,8 @@
             if (syncEnabled) syncInBackground();
         }
 
-        function downloadReceiptPDF(idx) {
+        async function downloadReceiptPDF(idx) {
+            await ensureLogoReady();
             const receipt = state.receipts[idx];
             if (!receipt) return showToast("Receipt not found", "error");
 
@@ -7305,7 +7332,8 @@
             if (syncEnabled) syncInBackground();
         }
 
-        function downloadInvoicePDF(i) {
+        async function downloadInvoicePDF(i) {
+            await ensureLogoReady();
             const inv = state.invoices[i];
             if (!inv) return showToast("Invoice not found", "error");
 
@@ -7533,7 +7561,8 @@
             showToast("Invoice PDF downloaded", "success");
         }
 
-        function downloadSaleReceiptPDF(timestamp) {
+        async function downloadSaleReceiptPDF(timestamp) {
+            await ensureLogoReady();
             const sale = state.sales.find(s => s.timestamp === timestamp);
             if (!sale) return showToast("Sale not found", "error");
 
@@ -8430,7 +8459,8 @@
                 });
             }, 100);
         }
-        function downloadSalesReportPDF() {
+        async function downloadSalesReportPDF() {
+            await ensureLogoReady();
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
             const pageWidth = 595.28;
@@ -8581,7 +8611,8 @@
             showToast("PDF downloaded successfully!", "success");
         }
 
-        function downloadDailyReportPDF() {
+        async function downloadDailyReportPDF() {
+            await ensureLogoReady();
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
             const pageWidth = 595.28;
