@@ -1882,9 +1882,7 @@
                         currentUser = session.user;
                         syncEnabled = true;
                         updateSyncIndicator('synced');
-                        try { showLoadingToast(); } catch (e) { }
-                        await pullDataFromSupabase();
-                        try { hideLoadingToast(); } catch (e) { }
+                        // No auto-pull on auth state change; pulling is triggered explicitly in signIn()
                     } else if (event === 'SIGNED_OUT') {
                         currentUser = null;
                         syncEnabled = false;
@@ -1894,9 +1892,7 @@
                         console.log('✅ Token refreshed');
                         currentUser = session.user;
                         syncEnabled = true;
-                        try { showLoadingToast(); } catch (e) { }
-                        await pullDataFromSupabase();
-                        try { hideLoadingToast(); } catch (e) { }
+                        // No auto-pull on token refresh; keep session active only
                     }
                 });
 
@@ -1923,16 +1919,13 @@
                     // Load user profile
                     await loadUserProfile();
 
-                    // Always hydrate cloud data on restore
-                    try { showLoadingToast(); } catch (e) { }
-                    await pullDataFromSupabase();
-                    try { hideLoadingToast(); } catch (e) { }
+                    // Do NOT auto-pull on restore; user will pull after explicit sign-in
 
                     // REMOVED: Automatic data pull on refresh that was clearing local data
                     // Users can manually sync using the sync button if needed
                     // await pullDataFromSupabase();
 
-                    console.log('✅ Session restored successfully (cloud data hydrated)');
+                    console.log('✅ Session restored successfully (no auto-pull)');
                     return true;
                 }
 
