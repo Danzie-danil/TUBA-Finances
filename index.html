@@ -2238,7 +2238,8 @@
                         cost: p.cost,
                         price: p.price
                     }));
-                    await supabase.from('products').insert(productsData);
+                    const { error } = await supabase.from('products').insert(productsData);
+                    if (error) throw error;
                 }
 
                 // Sync categories
@@ -2247,7 +2248,8 @@
                         user_id: currentUser.id,
                         name: c
                     }));
-                    await supabase.from('categories').insert(categoriesData);
+                    const { error } = await supabase.from('categories').insert(categoriesData);
+                    if (error) console.warn('Categories insert skipped:', error.message || error);
                 }
 
                 // Sync sales
@@ -2267,7 +2269,8 @@
                         profit: s.profit,
                         payment: s.payment
                     }));
-                    await supabase.from('sales').insert(salesData);
+                    const { error } = await supabase.from('sales').insert(salesData);
+                    if (error) throw error;
                 }
 
                 // Sync expenses
@@ -2283,7 +2286,8 @@
                         payment: e.payment,
                         comment: e.comment || ''
                     }));
-                    await supabase.from('expenses').insert(expensesData);
+                    const { error } = await supabase.from('expenses').insert(expensesData);
+                    if (error) throw error;
                 }
 
                 // Sync customers
@@ -2296,7 +2300,8 @@
                         address: c.address || '',
                         total_purchases: c.totalPurchases || 0
                     }));
-                    await supabase.from('customers').insert(customersData);
+                    const { error } = await supabase.from('customers').insert(customersData);
+                    if (error) throw error;
                 }
 
                 // Sync invoices
@@ -2311,7 +2316,8 @@
                         amount: i.amount,
                         status: i.status
                     }));
-                    await supabase.from('invoices').insert(invoicesData);
+                    const { error } = await supabase.from('invoices').insert(invoicesData);
+                    if (error) throw error;
                 }
 
                 // Sync receipts
@@ -2328,7 +2334,8 @@
                         amount: r.amount,
                         payment_method: r.paymentMethod
                     }));
-                    await supabase.from('receipts').insert(receiptsData);
+                    const { error } = await supabase.from('receipts').insert(receiptsData);
+                    if (error) throw error;
                 }
 
                 // Sync inventory
@@ -2339,7 +2346,8 @@
                         stock: inv.stock,
                         min_alert: inv.minAlert
                     }));
-                    await supabase.from('inventory').insert(inventoryData);
+                    const { error } = await supabase.from('inventory').insert(inventoryData);
+                    if (error) throw error;
                 }
 
                 // Sync notes
@@ -2352,27 +2360,29 @@
                         time: n.time,
                         timestamp: n.timestamp
                     }));
-                    await supabase.from('notes').insert(notesData);
+                    const { error } = await supabase.from('notes').insert(notesData);
+                    if (error) throw error;
                 }
 
-                // Sync inventory purchase Periods (cycles)
+                // Sync inventory purchase Periods
                 if (state.inventoryPurchaseCycles && state.inventoryPurchaseCycles.length > 0) {
-                    const cyclesData = state.inventoryPurchaseCycles.map(c => ({
+                    const periodsData = state.inventoryPurchaseCycles.map(c => ({
                         user_id: currentUser.id,
-                        cycle_number: c.number,
+                        period_number: c.number,
                         title: c.title || '',
                         start_date: c.startDate || null,
                         end_date: c.endDate || null,
                         notes: c.notes || ''
                     }));
-                    await supabase.from('inventory_purchase_cycles').insert(cyclesData);
+                    const { error: periodsErr } = await supabase.from('inventory_purchase_periods').insert(periodsData);
+                    if (periodsErr) throw periodsErr;
                 }
 
                 // Sync inventory purchases
                 if (state.inventoryPurchases && state.inventoryPurchases.length > 0) {
                     const purchasesData = state.inventoryPurchases.map(p => ({
                         user_id: currentUser.id,
-                        cycle_number: p.cycleNumber,
+                        period_number: p.cycleNumber,
                         item_name: p.itemName,
                         quantity: p.quantity || 0,
                         unit_cost: p.unitCost || p.buyingPrice || 0,
@@ -2384,7 +2394,8 @@
                         notes: p.notes || '',
                         timestamp: p.timestamp
                     }));
-                    await supabase.from('inventory_purchases').insert(purchasesData);
+                    const { error: purchasesErr } = await supabase.from('inventory_purchases').insert(purchasesData);
+                    if (purchasesErr) throw purchasesErr;
                 }
 
                 // Sync transactions
@@ -2399,7 +2410,8 @@
                         time: t.time,
                         timestamp: t.timestamp
                     }));
-                    await supabase.from('transactions').insert(transactionsData);
+                    const { error } = await supabase.from('transactions').insert(transactionsData);
+                    if (error) throw error;
                 }
 
                 // Sync unpaid entries
@@ -2414,7 +2426,8 @@
                         timestamp: u.timestamp,
                         paid: u.paid
                     }));
-                    await supabase.from('unpaid_entries').insert(unpaidData);
+                    const { error } = await supabase.from('unpaid_entries').insert(unpaidData);
+                    if (error) throw error;
                 }
 
                 // Sync transaction floats
@@ -2423,14 +2436,20 @@
                     channel: channel,
                     initial_float: floatData.initial
                 }));
-                await supabase.from('transaction_floats').insert(floatsData);
+                {
+                    const { error } = await supabase.from('transaction_floats').insert(floatsData);
+                    if (error) console.warn('Transaction floats insert skipped:', error.message || error);
+                }
 
                 // Sync settings
-                await supabase.from('settings').insert({
-                    user_id: currentUser.id,
-                    daily_target: state.dailyTarget || 0,
-                    monthly_target: state.monthlyTarget || 0
-                });
+                {
+                    const { error } = await supabase.from('settings').insert({
+                        user_id: currentUser.id,
+                        daily_target: state.dailyTarget || 0,
+                        monthly_target: state.monthlyTarget || 0
+                    });
+                    if (error) console.warn('Settings insert skipped:', error.message || error);
+                }
 
                 updateSyncIndicator('synced');
             } catch (error) {
@@ -2488,8 +2507,8 @@
             try {
                 console.log('🗑️ Clearing cloud data...');
 
-                // Wait for ALL deletes to complete before proceeding
-                await Promise.all([
+                // Delete with resilience — continue on failures
+                const deletePromises = [
                     supabase.from('products').delete().eq('user_id', currentUser.id),
                     supabase.from('sales').delete().eq('user_id', currentUser.id),
                     supabase.from('categories').delete().eq('user_id', currentUser.id),
@@ -2503,9 +2522,15 @@
                     supabase.from('unpaid_entries').delete().eq('user_id', currentUser.id),
                     supabase.from('transaction_floats').delete().eq('user_id', currentUser.id),
                     supabase.from('settings').delete().eq('user_id', currentUser.id),
-                    supabase.from('inventory_purchase_cycles').delete().eq('user_id', currentUser.id),
+                    supabase.from('inventory_purchase_periods').delete().eq('user_id', currentUser.id),
                     supabase.from('inventory_purchases').delete().eq('user_id', currentUser.id)
-                ]);
+                ];
+                const deleteResults = await Promise.allSettled(deletePromises);
+                deleteResults.forEach((res, idx) => {
+                    if (res.status === 'rejected') {
+                        console.warn('Delete failed for index', idx, res.reason);
+                    }
+                });
 
                 console.log('✅ Cloud data cleared');
                 console.log('⬆️ Pushing local data to cloud...');
@@ -2764,14 +2789,15 @@
                 }
 
                 // Inventory purchase Periods (cycles)
-                const { data: cloudCycles } = await supabase
-                    .from('inventory_purchase_cycles')
+                const { data: cloudCycles, error: cyclesErr } = await supabase
+                    .from('inventory_purchase_periods')
                     .select('*')
                     .eq('user_id', currentUser.id);
+                if (cyclesErr) console.warn('Pull periods error:', cyclesErr.message || cyclesErr);
                 if (cloudCycles && cloudCycles.length > 0) {
                     state.inventoryPurchaseCycles = cloudCycles.map(c => ({
                         id: generateID('invCycle'),
-                        number: c.cycle_number,
+                        number: c.period_number,
                         title: c.title || '',
                         startDate: c.start_date || '',
                         endDate: c.end_date || '',
@@ -2780,14 +2806,15 @@
                 }
 
                 // Inventory purchases
-                const { data: cloudPurchases } = await supabase
+                const { data: cloudPurchases, error: purchasesPullErr } = await supabase
                     .from('inventory_purchases')
                     .select('*')
                     .eq('user_id', currentUser.id);
+                if (purchasesPullErr) console.warn('Pull purchases error:', purchasesPullErr.message || purchasesPullErr);
                 if (cloudPurchases && cloudPurchases.length > 0) {
                     state.inventoryPurchases = cloudPurchases.map(p => ({
                         id: generateID('invPurchase'),
-                        cycleNumber: p.cycle_number,
+                        cycleNumber: p.period_number,
                         itemName: p.item_name,
                         quantity: parseInt(p.quantity || 0, 10),
                         unitCost: parseFloat(p.unit_cost || 0),
