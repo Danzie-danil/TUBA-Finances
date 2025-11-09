@@ -1882,7 +1882,9 @@
                         currentUser = session.user;
                         syncEnabled = true;
                         updateSyncIndicator('synced');
-                        await maybeAutoPullCloudData();
+                        try { showLoadingToast(); } catch (e) { }
+                        await pullDataFromSupabase();
+                        try { hideLoadingToast(); } catch (e) { }
                     } else if (event === 'SIGNED_OUT') {
                         currentUser = null;
                         syncEnabled = false;
@@ -1892,7 +1894,9 @@
                         console.log('✅ Token refreshed');
                         currentUser = session.user;
                         syncEnabled = true;
-                        await maybeAutoPullCloudData();
+                        try { showLoadingToast(); } catch (e) { }
+                        await pullDataFromSupabase();
+                        try { hideLoadingToast(); } catch (e) { }
                     }
                 });
 
@@ -1919,14 +1923,16 @@
                     // Load user profile
                     await loadUserProfile();
 
-                    // Auto-pull cloud data when local data is empty
-                    await maybeAutoPullCloudData();
+                    // Always hydrate cloud data on restore
+                    try { showLoadingToast(); } catch (e) { }
+                    await pullDataFromSupabase();
+                    try { hideLoadingToast(); } catch (e) { }
 
                     // REMOVED: Automatic data pull on refresh that was clearing local data
                     // Users can manually sync using the sync button if needed
                     // await pullDataFromSupabase();
 
-                    console.log('✅ Session restored successfully (local data preserved)');
+                    console.log('✅ Session restored successfully (cloud data hydrated)');
                     return true;
                 }
 
@@ -3173,7 +3179,6 @@
         let cachedStats = null;
         let lastStatsUpdate = 0;
         let isSyncing = false;
-        let pendingSyncTimer = null; // debounce immediate background sync after saves
         let idCounters = {              // ADD THIS ENTIRE OBJECT
             sales: 0,
             products: 0,
@@ -3442,13 +3447,6 @@
             cachedStats = null; // Clear cache when data changes
             try {
                 localStorage.setItem('financeManagerData', JSON.stringify(state));
-                // Immediately schedule a background sync after any user data change
-                if (syncEnabled && currentUser) {
-                    try { if (pendingSyncTimer) clearTimeout(pendingSyncTimer); } catch (e) { /* no-op */ }
-                    pendingSyncTimer = setTimeout(() => {
-                        try { window.syncInBackground && window.syncInBackground(); } catch (e) { console.warn('Background sync trigger failed:', e); }
-                    }, 500); // small debounce to coalesce rapid saves
-                }
             } catch (e) {
                 console.error('Error saving data:', e);
                 showToast('Error saving data!', 'error');
@@ -10446,7 +10444,8 @@
 
             syncLock = true;
             try {
-                await clearAndPushAllData();
+                // Background sync should NOT clear cloud — push incremental data only
+                await pushAllDataToSupabase();
                 console.log('✅ Background sync complete');
             } catch (error) {
                 console.error('❌ Background sync error:', error);
