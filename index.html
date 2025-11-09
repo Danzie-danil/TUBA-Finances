@@ -96,12 +96,22 @@
             font-weight: 600;
             padding: 6px 12px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .offline-banner.clickable {
+            cursor: pointer;
         }
 
         /* Auth banner (same style, clickable) */
         .auth-banner {
             background: linear-gradient(145deg, #1976d2, #0d47a1);
             cursor: pointer;
+            position: sticky;
+            top: 0;
+            z-index: 50;
         }
 
         /* Splash screen styles */
@@ -1525,6 +1535,28 @@
             <div class="side-nav-item" onclick="navigateToTab('notes')">
                 <span class="side-nav-icon">📝</span>
                 <span>Notes</span>
+            </div>
+        </div>
+
+        <!-- Offline Info Modal -->
+        <div class="modal" id="offlineInfoModal">
+            <div class="modal-content">
+                <div class="modal-title">Offline Usage</div>
+                <div style="font-size: 13px; color: #333; line-height: 1.5;">
+                    <p>You’re offline. All changes are saved locally and will sync when you’re back online.</p>
+                    <p><strong>How to save a local backup:</strong><br>
+                        Tap the top-right save button (💾) or click the “Consider Local Backup” toast to export a JSON
+                        file.</p>
+                    <p><strong>When back online:</strong><br>
+                        Click the sync indicator (“☁️ Synced → Click to 🔄”) to push data silently, or use Account →
+                        Push to Cloud.</p>
+                    <p><strong>Tip:</strong> You can continue recording sales, products, expenses, etc., while offline —
+                        they’ll sync later.</p>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+                    <button class="btn-small btn-success" onclick="exportData('Saved', 2000)">Backup Now</button>
+                    <button class="btn-small btn-secondary" onclick="closeOfflineInfoModal()">Close</button>
+                </div>
             </div>
         </div>
 
@@ -8232,6 +8264,24 @@
             });
         }
 
+        // Offline info modal control
+        function openOfflineInfoModal() {
+            const modal = document.getElementById('offlineInfoModal');
+            if (!modal) return;
+            modal.classList.add('show');
+            const handleOutside = (e) => {
+                if (e.target === modal) {
+                    closeOfflineInfoModal();
+                }
+            };
+            modal.addEventListener('click', handleOutside, { once: true });
+        }
+
+        function closeOfflineInfoModal() {
+            const modal = document.getElementById('offlineInfoModal');
+            if (modal) modal.classList.remove('show');
+        }
+
         function deleteNoteFromModal() {
             if (state.currentNoteIndex === null) return;
             showConfirm("Delete this note?", function () {
@@ -10861,9 +10911,13 @@
                             if (navigator.onLine) {
                                 offlineBannerEl.style.display = 'none';
                                 offlineBannerEl.textContent = '';
+                                offlineBannerEl.onclick = null;
+                                offlineBannerEl.classList.remove('clickable');
                             } else {
-                                offlineBannerEl.textContent = "You’re offline — changes are saved locally and will sync.";
+                                offlineBannerEl.innerHTML = "You’re offline — Changes are saved locally <span style='opacity:0.9'>(Click for Info)</span>";
                                 offlineBannerEl.style.display = 'block';
+                                offlineBannerEl.onclick = () => { try { openOfflineInfoModal(); } catch (e) { } };
+                                offlineBannerEl.classList.add('clickable');
                             }
                         };
 
@@ -10871,7 +10925,11 @@
                         const authBannerEl = document.getElementById('authBanner');
                         window.updateAuthBanner = () => {
                             if (!authBannerEl) return;
-                            if (currentUser && syncEnabled) {
+                            if (!navigator.onLine) {
+                                authBannerEl.style.display = 'none';
+                                authBannerEl.textContent = '';
+                                authBannerEl.onclick = null;
+                            } else if (currentUser && syncEnabled) {
                                 authBannerEl.style.display = 'none';
                                 authBannerEl.textContent = '';
                                 authBannerEl.onclick = null;
@@ -10896,6 +10954,7 @@
                         window.updateAuthBanner && window.updateAuthBanner();
                         window.addEventListener('online', () => {
                             updateOfflineBanner();
+                            window.updateAuthBanner && window.updateAuthBanner();
                             try {
                                 if (navigator.serviceWorker && navigator.serviceWorker.ready) {
                                     navigator.serviceWorker.ready.then(reg => {
@@ -10906,7 +10965,10 @@
                                 }
                             } catch (e) { /* no-op */ }
                         });
-                        window.addEventListener('offline', updateOfflineBanner);
+                        window.addEventListener('offline', () => {
+                            updateOfflineBanner();
+                            window.updateAuthBanner && window.updateAuthBanner();
+                        });
 
                         // Check for updates
                         registration.addEventListener('updatefound', () => {
