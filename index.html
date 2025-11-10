@@ -2955,10 +2955,18 @@
          * Push merged data to cloud using upsert strategy (no deletion)
          */
         async function pushMergedDataToCloud() {
-            if (!syncEnabled || !currentUser) return;
+            if (!syncEnabled || !currentUser) {
+                console.warn('⏸️ [PUSH] Cannot push: sync disabled or not signed in');
+                return;
+            }
 
             try {
-                console.log('⬆️ [PUSH] Starting push to cloud...');
+                console.log('⬆️ [PUSH] Starting push to cloud...', {
+                    products: state.products?.length || 0,
+                    sales: state.sales?.length || 0,
+                    expenses: state.expenses?.length || 0,
+                    customers: state.customers?.length || 0
+                });
 
                 // Use upsert for all tables to avoid duplicates
                 const upsertOptions = { onConflict: 'user_id' };
@@ -2977,15 +2985,28 @@
                     let { error } = await supabase.from('products').upsert(productsData, { 
                         onConflict: 'user_id,name,category' 
                     });
-                    if (error && error.message?.includes('unique constraint') || error.message?.includes('duplicate key')) {
-                        console.warn('⚠️ [PUSH] Products upsert failed (constraint missing?), trying insert with deduplication...');
-                        // Fallback: delete existing and insert (safer than plain insert)
-                        await supabase.from('products').delete().eq('user_id', currentUser.id).in('name', productsData.map(p => p.name));
-                        const { error: insertError } = await supabase.from('products').insert(productsData);
-                        if (insertError) console.warn('⚠️ [PUSH] Products insert error:', insertError.message);
-                        else console.log('✅ [PUSH] Products synced (fallback):', productsData.length);
+                    if (error && (error.message?.includes('unique constraint') || error.message?.includes('duplicate key') || error.message?.includes('no unique'))) {
+                        console.warn('⚠️ [PUSH] Products upsert failed (constraint missing?), using insert with deduplication...');
+                        // Fetch existing to avoid duplicates
+                        const { data: existing } = await supabase.from('products')
+                            .select('name,category')
+                            .eq('user_id', currentUser.id);
+                        const existingKeys = new Set((existing || []).map(p => `${p.name}|${p.category}`));
+                        const newProducts = productsData.filter(p => !existingKeys.has(`${p.name}|${p.category}`));
+                        if (newProducts.length > 0) {
+                            const { error: insertError } = await supabase.from('products').insert(newProducts);
+                            if (insertError) {
+                                console.error('❌ [PUSH] Products insert error:', insertError);
+                                throw insertError; // Re-throw to surface the error
+                            } else {
+                                console.log('✅ [PUSH] Products synced (fallback):', newProducts.length, 'new records');
+                            }
+                        } else {
+                            console.log('✅ [PUSH] Products already synced (no new records)');
+                        }
                     } else if (error) {
-                        console.warn('⚠️ [PUSH] Products error:', error.message);
+                        console.error('❌ [PUSH] Products error:', error);
+                        throw error; // Re-throw to surface the error
                     } else {
                         console.log('✅ [PUSH] Products synced:', productsData.length);
                     }
@@ -3307,7 +3328,63 @@
         }
 
         /**
-         * Background sync - silent sync without UI indicators
+         * Quick push - immediately pushes local data to cloud (for new data creation)
+         * This is faster than full sync and used when user creates new data
+         */
+        async function quickPushToCloud() {
+            if (!syncEnabled || !currentUser) {
+                console.warn('⏸️ [QUICK] Cannot push: sync disabled or not signed in', {
+                    syncEnabled,
+                    hasUser: !!currentUser,
+                    userId: currentUser?.id
+                });
+                return;
+            }
+            
+            // Don't block if sync is in progress, but queue it
+            if (isSyncing) {
+                console.log('⏸️ [QUICK] Sync in progress, will sync later');
+                // Schedule a retry after a short delay
+                setTimeout(() => {
+                    if (!isSyncing && syncEnabled && currentUser) {
+                        quickPushToCloud().catch(err => {
+                            console.error('❌ [QUICK] Retry push error:', err);
+                        });
+                    }
+                }, 2000);
+                return;
+            }
+
+            isSyncing = true;
+            try {
+                console.log('⬆️ [QUICK] Pushing new data to cloud...', {
+                    products: state.products?.length || 0,
+                    sales: state.sales?.length || 0,
+                    expenses: state.expenses?.length || 0
+                });
+                
+                // Direct push without pull/merge - just push what we have
+                await pushMergedDataToCloud();
+                
+                console.log('✅ [QUICK] Quick push complete - data sent to Supabase');
+            } catch (error) {
+                console.error('❌ [QUICK] Quick push error:', error);
+                console.error('❌ [QUICK] Error details:', {
+                    message: error?.message,
+                    code: error?.code,
+                    details: error?.details,
+                    hint: error?.hint
+                });
+                // Re-throw so caller can handle it if needed
+                throw error;
+            } finally {
+                isSyncing = false;
+            }
+        }
+
+        /**
+         * Background sync - full sync (pull + merge + push)
+         * Use this for periodic syncs, not for immediate data creation
          */
         async function syncInBackground() {
             if (!syncEnabled || !currentUser) return;
@@ -3320,7 +3397,7 @@
 
             isSyncing = true;
             try {
-                console.log('🔄 [BG] Starting background sync...');
+                console.log('🔄 [BG] Starting full background sync...');
                 
                 // Use new unified system but silently
                 const cloudData = await fetchCloudDataDirect();
@@ -5235,8 +5312,12 @@
             // Friendly reminder to save a local backup (max 3 per day)
             maybeShowBackupReminder();
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            // Immediately push new data to cloud
+            if (syncEnabled && currentUser) {
+                quickPushToCloud().catch(err => {
+                    console.error('❌ Failed to push sale to cloud:', err);
+                });
+            }
         }
 
         function renderTransactions() {
@@ -5448,8 +5529,12 @@
             render();
             showToast("Transaction recorded", "success");
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            // Immediately push new data to cloud
+            if (syncEnabled && currentUser) {
+                quickPushToCloud().catch(err => {
+                    console.error('❌ Failed to push transaction to cloud:', err);
+                });
+            }
         }
 
         function editTransactionByTimestamp(ts) {
@@ -5674,8 +5759,12 @@
             render();
             showToast("Product added successfully!", "success");
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            // Immediately push new data to cloud
+            if (syncEnabled && currentUser) {
+                quickPushToCloud().catch(err => {
+                    console.error('❌ Failed to push product to cloud:', err);
+                });
+            }
         }
 
         function editProductIndex(i) {
@@ -6072,8 +6161,12 @@
             render();
             showToast("Expense added", "success");
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            // Immediately push new data to cloud
+            if (syncEnabled && currentUser) {
+                quickPushToCloud().catch(err => {
+                    console.error('❌ Failed to push expense to cloud:', err);
+                });
+            }
         }
 
         function editExpenseIndex(i) {
@@ -6957,8 +7050,12 @@
             render();
             showToast("Customer added", "success");
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            // Immediately push new data to cloud
+            if (syncEnabled && currentUser) {
+                quickPushToCloud().catch(err => {
+                    console.error('❌ Failed to push customer to cloud:', err);
+                });
+            }
         }
         function editCustomerIndex(i) {
             const c = state.customers[i];
@@ -8578,8 +8675,12 @@
             render();
             showToast("Unpaid entry added", "success");
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            // Immediately push new data to cloud
+            if (syncEnabled && currentUser) {
+                quickPushToCloud().catch(err => {
+                    console.error('❌ Failed to push unpaid entry to cloud:', err);
+                });
+            }
         }
 
         function markAsPaid(timestamp) {
@@ -8774,8 +8875,12 @@
             render();
             showToast("Note saved", "success");
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            // Immediately push new data to cloud
+            if (syncEnabled && currentUser) {
+                quickPushToCloud().catch(err => {
+                    console.error('❌ Failed to push note to cloud:', err);
+                });
+            }
         }
 
         function openNoteModal(index) {
