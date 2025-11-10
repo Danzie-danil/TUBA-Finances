@@ -2163,20 +2163,27 @@
         }
 
         // Silent push-to-cloud for sync indicator click (no confirmation)
+        /**
+         * Silent push to cloud - no confirmation, minimal UI feedback
+         */
         async function pushToCloudSilent() {
-            if (!syncEnabled || !currentUser) {
-                return showToast('Not signed in', 'error');
-            }
+            if (!syncEnabled || !currentUser) return;
 
+            if (isSyncing) return;
+
+            isSyncing = true;
             updateSyncIndicator('syncing');
             try {
-                await clearAndPushAllData();
+                console.log('⬆️ [SILENT] Pushing to cloud...');
+                await pushMergedDataToCloud();
+                calculateFloatBalances();
+                saveData();
                 updateSyncIndicator('synced');
-                showToast('Data pushed to cloud successfully!', 'success');
             } catch (error) {
-                console.error('Push error:', error);
+                console.error('❌ [SILENT] Push error:', error);
                 updateSyncIndicator('synced');
-                showToast('Push failed: ' + error.message, 'error');
+            } finally {
+                isSyncing = false;
             }
         }
 
@@ -2702,10 +2709,23 @@
             }
         }
 
+        // ============================================
+        // NEW UNIFIED SYNC SYSTEM
+        // ============================================
+        
+        /**
+         * Core sync function - intelligently syncs data between local and cloud
+         * Strategy: Always merge, never replace. Pull cloud data and merge with local.
+         */
         async function syncAllData() {
-            if (!syncEnabled || !currentUser) return;
+            if (!syncEnabled || !currentUser) {
+                showToast('Please sign in to sync', 'error');
+                return;
+            }
+            
             if (isSyncing) {
-                console.log('Sync already in progress, skipping...');
+                console.log('⏸️ Sync already in progress, skipping...');
+                showToast('Sync already in progress...', 'info');
                 return;
             }
 
@@ -2713,50 +2733,522 @@
             updateSyncIndicator('syncing');
 
             try {
-                console.log('🔄 Starting sync...');
+                console.log('🔄 [SYNC] Starting unified sync...');
+                showToast('Syncing data...', 'info', null, null, 5000);
 
-                // Check if local data is essentially empty
-                const localIsEmpty =
-                    state.sales.length === 0 &&
-                    state.products.length === 0 &&
-                    state.expenses.length === 0;
-
-                if (localIsEmpty) {
-                    // Pull from cloud if local is empty
-                    console.log('⬇️ Local data is empty, pulling from cloud...');
-                    await pullDataFromSupabase();
-                    // pullDataFromSupabase already saves data, but ensure it's saved
-                    saveData();
-                } else {
-                    // Push local data to cloud
-                    console.log('⬆️ Pushing local data to cloud...');
-                    await clearAndPushAllData();
-                    // clearAndPushAllData now saves data, but ensure it's saved
-                    saveData();
-                }
-
-                // Ensure float balances are calculated
-                calculateFloatBalances();
+                // Step 1: Pull cloud data and merge with local
+                console.log('📥 [SYNC] Step 1: Pulling cloud data...');
+                const cloudData = await fetchCloudDataDirect();
                 
+                console.log('📊 [SYNC] Cloud data received:', {
+                    products: cloudData.products.length,
+                    sales: cloudData.sales.length,
+                    expenses: cloudData.expenses.length,
+                    customers: cloudData.customers.length,
+                    transactions: cloudData.transactions.length,
+                    notes: cloudData.notes.length
+                });
+
+                // Step 2: Transform cloud data to local format
+                console.log('🔄 [SYNC] Step 2: Transforming cloud data...');
+                const transformedCloud = transformCloudDataToLocal(cloudData);
+
+                // Step 3: Merge cloud with local
+                console.log('🔀 [SYNC] Step 3: Merging data...');
+                mergeCloudDataIntoLocal(transformedCloud);
+
+                // Step 4: Save merged data locally
+                console.log('💾 [SYNC] Step 4: Saving local data...');
+                calculateFloatBalances();
+                saveData();
+
+                // Step 5: Push merged data back to cloud (upsert strategy)
+                console.log('⬆️ [SYNC] Step 5: Pushing merged data to cloud...');
+                await pushMergedDataToCloud();
+
                 updateSyncIndicator('synced');
-                showToast('Data synced successfully!', 'success');
-                console.log('✅ Sync complete');
+                showToast('✅ Data synced successfully!', 'success');
+                console.log('✅ [SYNC] Complete!');
                 render();
+                
             } catch (error) {
-                console.error('❌ Sync error:', error);
+                console.error('❌ [SYNC] Error:', error);
                 updateSyncIndicator('synced');
                 const errorMessage = error?.message || error?.error_description || error?.details || 'Unknown error';
                 showToast('Sync failed: ' + errorMessage, 'error');
                 
-                // Try to save data even if sync failed
+                // Always try to save local data even if sync failed
                 try {
                     saveData();
                     calculateFloatBalances();
                 } catch (saveErr) {
-                    console.error('Failed to save data after sync error:', saveErr);
+                    console.error('❌ [SYNC] Failed to save after error:', saveErr);
                 }
             } finally {
                 isSyncing = false;
+            }
+        }
+
+        /**
+         * Transform cloud data from Supabase format to local app format
+         */
+        function transformCloudDataToLocal(cloudData) {
+            const transformed = {
+                products: [],
+                sales: [],
+                expenses: [],
+                customers: [],
+                transactions: [],
+                unpaidEntries: [],
+                notes: [],
+                categories: []
+            };
+
+            // Transform products
+            if (cloudData.products && Array.isArray(cloudData.products)) {
+                transformed.products = cloudData.products.map(p => ({
+                    id: `P-${(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+                    name: p.name,
+                    category: p.category,
+                    cost: parseFloat(p.cost || 0),
+                    price: parseFloat(p.price || 0),
+                    hasStock: p.has_stock !== false
+                }));
+            }
+
+            // Transform sales
+            if (cloudData.sales && Array.isArray(cloudData.sales)) {
+                transformed.sales = cloudData.sales.map(s => ({
+                    id: `S-${s.timestamp || Date.now()}`,
+                    date: s.date,
+                    time: s.time,
+                    timestamp: s.timestamp,
+                    productName: s.product_name,
+                    customer: s.customer,
+                    quantity: s.quantity,
+                    costPerUnit: parseFloat(s.cost_per_unit || 0),
+                    pricePerUnit: parseFloat(s.price_per_unit || 0),
+                    totalCost: parseFloat(s.total_cost || 0),
+                    totalPrice: parseFloat(s.total_price || 0),
+                    profit: parseFloat(s.profit || 0),
+                    payment: s.payment
+                }));
+            }
+
+            // Transform expenses
+            if (cloudData.expenses && Array.isArray(cloudData.expenses)) {
+                transformed.expenses = cloudData.expenses.map(e => ({
+                    id: `E-${e.timestamp || Date.now()}`,
+                    date: e.date,
+                    time: e.time,
+                    timestamp: e.timestamp,
+                    description: e.description,
+                    category: e.category,
+                    amount: parseFloat(e.amount || 0),
+                    payment: e.payment,
+                    comment: e.comment || ''
+                }));
+            }
+
+            // Transform customers
+            if (cloudData.customers && Array.isArray(cloudData.customers)) {
+                transformed.customers = cloudData.customers.map(c => ({
+                    id: `C-${c.name.replace(/\s+/g, '_')}_${Date.now()}`,
+                    name: c.name,
+                    email: c.email || '',
+                    phone: c.phone || '',
+                    address: c.address || '',
+                    totalPurchases: parseFloat(c.total_purchases || 0)
+                }));
+            }
+
+            // Transform transactions
+            if (cloudData.transactions && Array.isArray(cloudData.transactions)) {
+                transformed.transactions = cloudData.transactions.map(t => ({
+                    id: `T-${t.timestamp || Date.now()}`,
+                    channel: t.channel,
+                    customerName: t.customer_name,
+                    type: t.type,
+                    amount: parseFloat(t.amount || 0),
+                    date: t.date,
+                    time: t.time,
+                    timestamp: t.timestamp
+                }));
+            }
+
+            // Transform unpaid entries
+            if (cloudData.unpaidEntries && Array.isArray(cloudData.unpaidEntries)) {
+                transformed.unpaidEntries = cloudData.unpaidEntries.map(u => ({
+                    id: `U-${u.timestamp || Date.now()}`,
+                    name: u.name,
+                    type: u.type,
+                    amount: parseFloat(u.amount || 0),
+                    date: u.date,
+                    time: u.time,
+                    timestamp: u.timestamp,
+                    paid: u.paid
+                }));
+            }
+
+            // Transform notes
+            if (cloudData.notes && Array.isArray(cloudData.notes)) {
+                transformed.notes = cloudData.notes.map(n => ({
+                    id: `N-${n.timestamp || Date.now()}`,
+                    title: n.title || '',
+                    content: n.content,
+                    date: n.date,
+                    time: n.time,
+                    timestamp: n.timestamp
+                }));
+            }
+
+            // Transform categories
+            if (cloudData.categories && Array.isArray(cloudData.categories)) {
+                transformed.categories = cloudData.categories;
+            }
+
+            return transformed;
+        }
+
+        /**
+         * Merge cloud data into local state, preserving local data and avoiding duplicates
+         */
+        function mergeCloudDataIntoLocal(transformedCloud) {
+            // Ensure state arrays exist
+            if (!state.products) state.products = [];
+            if (!state.sales) state.sales = [];
+            if (!state.expenses) state.expenses = [];
+            if (!state.customers) state.customers = [];
+            if (!state.transactions) state.transactions = [];
+            if (!state.unpaidEntries) state.unpaidEntries = [];
+            if (!state.notes) state.notes = [];
+            if (!state.categories) state.categories = [];
+
+            console.log('📱 [MERGE] Local data before merge:', {
+                products: state.products.length,
+                sales: state.sales.length,
+                expenses: state.expenses.length,
+                customers: state.customers.length
+            });
+
+            // Merge each data type with deduplication
+            state.products = deduplicateByContent([...state.products, ...transformedCloud.products], 'products');
+            state.sales = deduplicateByContent([...state.sales, ...transformedCloud.sales], 'sales');
+            state.expenses = deduplicateByContent([...state.expenses, ...transformedCloud.expenses], 'expenses');
+            state.customers = deduplicateByContent([...state.customers, ...transformedCloud.customers], 'customers');
+            state.transactions = deduplicateByContent([...state.transactions, ...transformedCloud.transactions], 'transactions');
+            state.unpaidEntries = deduplicateByContent([...state.unpaidEntries, ...transformedCloud.unpaidEntries], 'unpaid');
+            state.notes = deduplicateByContent([...state.notes, ...transformedCloud.notes], 'notes');
+            
+            // Categories: simple union
+            state.categories = Array.from(new Set([...state.categories, ...transformedCloud.categories]));
+
+            console.log('📊 [MERGE] Local data after merge:', {
+                products: state.products.length,
+                sales: state.sales.length,
+                expenses: state.expenses.length,
+                customers: state.customers.length
+            });
+        }
+
+        /**
+         * Push merged data to cloud using upsert strategy (no deletion)
+         */
+        async function pushMergedDataToCloud() {
+            if (!syncEnabled || !currentUser) return;
+
+            try {
+                console.log('⬆️ [PUSH] Starting push to cloud...');
+
+                // Use upsert for all tables to avoid duplicates
+                const upsertOptions = { onConflict: 'user_id' };
+
+                // Push products (upsert by user_id, name, category)
+                if (state.products.length > 0) {
+                    const productsData = state.products.map(p => ({
+                        user_id: currentUser.id,
+                        name: p.name,
+                        category: p.category,
+                        cost: p.cost,
+                        price: p.price,
+                        has_stock: p.hasStock !== false
+                    }));
+                    // Try upsert first, fallback to insert if unique constraint doesn't exist
+                    let { error } = await supabase.from('products').upsert(productsData, { 
+                        onConflict: 'user_id,name,category' 
+                    });
+                    if (error && error.message?.includes('unique constraint') || error.message?.includes('duplicate key')) {
+                        console.warn('⚠️ [PUSH] Products upsert failed (constraint missing?), trying insert with deduplication...');
+                        // Fallback: delete existing and insert (safer than plain insert)
+                        await supabase.from('products').delete().eq('user_id', currentUser.id).in('name', productsData.map(p => p.name));
+                        const { error: insertError } = await supabase.from('products').insert(productsData);
+                        if (insertError) console.warn('⚠️ [PUSH] Products insert error:', insertError.message);
+                        else console.log('✅ [PUSH] Products synced (fallback):', productsData.length);
+                    } else if (error) {
+                        console.warn('⚠️ [PUSH] Products error:', error.message);
+                    } else {
+                        console.log('✅ [PUSH] Products synced:', productsData.length);
+                    }
+                }
+
+                // Push sales (upsert by user_id, timestamp, product_name, customer)
+                if (state.sales.length > 0) {
+                    const salesData = state.sales.map(s => ({
+                        user_id: currentUser.id,
+                        date: s.date,
+                        time: s.time,
+                        timestamp: s.timestamp,
+                        product_name: s.productName,
+                        customer: s.customer,
+                        quantity: s.quantity,
+                        cost_per_unit: s.costPerUnit,
+                        price_per_unit: s.pricePerUnit,
+                        total_cost: s.totalCost,
+                        total_price: s.totalPrice,
+                        profit: s.profit,
+                        payment: s.payment
+                    }));
+                    let { error } = await supabase.from('sales').upsert(salesData, {
+                        onConflict: 'user_id,timestamp,product_name,customer'
+                    });
+                    if (error && (error.message?.includes('unique constraint') || error.message?.includes('duplicate key') || error.message?.includes('no unique'))) {
+                        console.warn('⚠️ [PUSH] Sales upsert failed (constraint missing?), using insert...');
+                        // Fetch existing timestamps to avoid duplicates
+                        const { data: existing } = await supabase.from('sales')
+                            .select('timestamp,product_name,customer')
+                            .eq('user_id', currentUser.id)
+                            .in('timestamp', salesData.map(s => s.timestamp));
+                        const existingKeys = new Set((existing || []).map(s => `${s.timestamp}|${s.product_name}|${s.customer}`));
+                        const newSales = salesData.filter(s => !existingKeys.has(`${s.timestamp}|${s.product_name}|${s.customer}`));
+                        if (newSales.length > 0) {
+                            const { error: insertError } = await supabase.from('sales').insert(newSales);
+                            if (insertError) console.warn('⚠️ [PUSH] Sales insert error:', insertError.message);
+                            else console.log('✅ [PUSH] Sales synced (fallback):', newSales.length, 'new records');
+                        } else {
+                            console.log('✅ [PUSH] Sales already synced (no new records)');
+                        }
+                    } else if (error) {
+                        console.warn('⚠️ [PUSH] Sales error:', error.message);
+                    } else {
+                        console.log('✅ [PUSH] Sales synced:', salesData.length);
+                    }
+                }
+
+                // Push expenses
+                if (state.expenses.length > 0) {
+                    const expensesData = state.expenses.map(e => ({
+                        user_id: currentUser.id,
+                        date: e.date,
+                        time: e.time,
+                        timestamp: e.timestamp,
+                        description: e.description,
+                        category: e.category,
+                        amount: e.amount,
+                        payment: e.payment,
+                        comment: e.comment || ''
+                    }));
+                    let { error } = await supabase.from('expenses').upsert(expensesData, {
+                        onConflict: 'user_id,timestamp,description'
+                    });
+                    if (error && (error.message?.includes('unique constraint') || error.message?.includes('duplicate key') || error.message?.includes('no unique'))) {
+                        console.warn('⚠️ [PUSH] Expenses upsert failed (constraint missing?), using insert...');
+                        const { data: existing } = await supabase.from('expenses')
+                            .select('timestamp,description')
+                            .eq('user_id', currentUser.id)
+                            .in('timestamp', expensesData.map(e => e.timestamp));
+                        const existingKeys = new Set((existing || []).map(e => `${e.timestamp}|${e.description}`));
+                        const newExpenses = expensesData.filter(e => !existingKeys.has(`${e.timestamp}|${e.description}`));
+                        if (newExpenses.length > 0) {
+                            const { error: insertError } = await supabase.from('expenses').insert(newExpenses);
+                            if (insertError) console.warn('⚠️ [PUSH] Expenses insert error:', insertError.message);
+                            else console.log('✅ [PUSH] Expenses synced (fallback):', newExpenses.length, 'new records');
+                        } else {
+                            console.log('✅ [PUSH] Expenses already synced (no new records)');
+                        }
+                    } else if (error) {
+                        console.warn('⚠️ [PUSH] Expenses error:', error.message);
+                    } else {
+                        console.log('✅ [PUSH] Expenses synced:', expensesData.length);
+                    }
+                }
+
+                // Push customers
+                if (state.customers.length > 0) {
+                    const customersData = state.customers.map(c => ({
+                        user_id: currentUser.id,
+                        name: c.name,
+                        email: c.email || '',
+                        phone: c.phone || '',
+                        address: c.address || '',
+                        total_purchases: c.totalPurchases || 0
+                    }));
+                    let { error } = await supabase.from('customers').upsert(customersData, {
+                        onConflict: 'user_id,name,email,phone'
+                    });
+                    if (error && (error.message?.includes('unique constraint') || error.message?.includes('duplicate key') || error.message?.includes('no unique'))) {
+                        console.warn('⚠️ [PUSH] Customers upsert failed (constraint missing?), using insert...');
+                        const { data: existing } = await supabase.from('customers')
+                            .select('name,email,phone')
+                            .eq('user_id', currentUser.id);
+                        const existingKeys = new Set((existing || []).map(c => `${c.name}|${c.email || ''}|${c.phone || ''}`));
+                        const newCustomers = customersData.filter(c => !existingKeys.has(`${c.name}|${c.email}|${c.phone}`));
+                        if (newCustomers.length > 0) {
+                            const { error: insertError } = await supabase.from('customers').insert(newCustomers);
+                            if (insertError) console.warn('⚠️ [PUSH] Customers insert error:', insertError.message);
+                            else console.log('✅ [PUSH] Customers synced (fallback):', newCustomers.length, 'new records');
+                        } else {
+                            console.log('✅ [PUSH] Customers already synced (no new records)');
+                        }
+                    } else if (error) {
+                        console.warn('⚠️ [PUSH] Customers error:', error.message);
+                    } else {
+                        console.log('✅ [PUSH] Customers synced:', customersData.length);
+                    }
+                }
+
+                // Push transactions
+                if (state.transactions.length > 0) {
+                    const transactionsData = state.transactions.map(t => ({
+                        user_id: currentUser.id,
+                        channel: t.channel,
+                        customer_name: t.customerName,
+                        type: t.type,
+                        amount: t.amount,
+                        date: t.date,
+                        time: t.time,
+                        timestamp: t.timestamp
+                    }));
+                    let { error } = await supabase.from('transactions').upsert(transactionsData, {
+                        onConflict: 'user_id,timestamp,channel'
+                    });
+                    if (error && (error.message?.includes('unique constraint') || error.message?.includes('duplicate key') || error.message?.includes('no unique'))) {
+                        console.warn('⚠️ [PUSH] Transactions upsert failed (constraint missing?), using insert...');
+                        const { data: existing } = await supabase.from('transactions')
+                            .select('timestamp,channel')
+                            .eq('user_id', currentUser.id)
+                            .in('timestamp', transactionsData.map(t => t.timestamp));
+                        const existingKeys = new Set((existing || []).map(t => `${t.timestamp}|${t.channel}`));
+                        const newTransactions = transactionsData.filter(t => !existingKeys.has(`${t.timestamp}|${t.channel}`));
+                        if (newTransactions.length > 0) {
+                            const { error: insertError } = await supabase.from('transactions').insert(newTransactions);
+                            if (insertError) console.warn('⚠️ [PUSH] Transactions insert error:', insertError.message);
+                            else console.log('✅ [PUSH] Transactions synced (fallback):', newTransactions.length, 'new records');
+                        } else {
+                            console.log('✅ [PUSH] Transactions already synced (no new records)');
+                        }
+                    } else if (error) {
+                        console.warn('⚠️ [PUSH] Transactions error:', error.message);
+                    } else {
+                        console.log('✅ [PUSH] Transactions synced:', transactionsData.length);
+                    }
+                }
+
+                // Push unpaid entries
+                if (state.unpaidEntries.length > 0) {
+                    const unpaidData = state.unpaidEntries.map(u => ({
+                        user_id: currentUser.id,
+                        name: u.name,
+                        type: u.type,
+                        amount: u.amount,
+                        date: u.date,
+                        time: u.time,
+                        timestamp: u.timestamp,
+                        paid: u.paid
+                    }));
+                    let { error } = await supabase.from('unpaid_entries').upsert(unpaidData, {
+                        onConflict: 'user_id,timestamp,name'
+                    });
+                    if (error && (error.message?.includes('unique constraint') || error.message?.includes('duplicate key') || error.message?.includes('no unique'))) {
+                        console.warn('⚠️ [PUSH] Unpaid entries upsert failed (constraint missing?), using insert...');
+                        const { data: existing } = await supabase.from('unpaid_entries')
+                            .select('timestamp,name')
+                            .eq('user_id', currentUser.id)
+                            .in('timestamp', unpaidData.map(u => u.timestamp));
+                        const existingKeys = new Set((existing || []).map(u => `${u.timestamp}|${u.name}`));
+                        const newUnpaid = unpaidData.filter(u => !existingKeys.has(`${u.timestamp}|${u.name}`));
+                        if (newUnpaid.length > 0) {
+                            const { error: insertError } = await supabase.from('unpaid_entries').insert(newUnpaid);
+                            if (insertError) console.warn('⚠️ [PUSH] Unpaid entries insert error:', insertError.message);
+                            else console.log('✅ [PUSH] Unpaid entries synced (fallback):', newUnpaid.length, 'new records');
+                        } else {
+                            console.log('✅ [PUSH] Unpaid entries already synced (no new records)');
+                        }
+                    } else if (error) {
+                        console.warn('⚠️ [PUSH] Unpaid entries error:', error.message);
+                    } else {
+                        console.log('✅ [PUSH] Unpaid entries synced:', unpaidData.length);
+                    }
+                }
+
+                // Push notes
+                if (state.notes.length > 0) {
+                    const notesData = state.notes.map(n => ({
+                        user_id: currentUser.id,
+                        title: n.title || '',
+                        content: n.content,
+                        date: n.date,
+                        time: n.time,
+                        timestamp: n.timestamp
+                    }));
+                    let { error } = await supabase.from('notes').upsert(notesData, {
+                        onConflict: 'user_id,timestamp'
+                    });
+                    if (error && (error.message?.includes('unique constraint') || error.message?.includes('duplicate key') || error.message?.includes('no unique'))) {
+                        console.warn('⚠️ [PUSH] Notes upsert failed (constraint missing?), using insert...');
+                        const { data: existing } = await supabase.from('notes')
+                            .select('timestamp')
+                            .eq('user_id', currentUser.id)
+                            .in('timestamp', notesData.map(n => n.timestamp));
+                        const existingTimestamps = new Set((existing || []).map(n => n.timestamp));
+                        const newNotes = notesData.filter(n => !existingTimestamps.has(n.timestamp));
+                        if (newNotes.length > 0) {
+                            const { error: insertError } = await supabase.from('notes').insert(newNotes);
+                            if (insertError) console.warn('⚠️ [PUSH] Notes insert error:', insertError.message);
+                            else console.log('✅ [PUSH] Notes synced (fallback):', newNotes.length, 'new records');
+                        } else {
+                            console.log('✅ [PUSH] Notes already synced (no new records)');
+                        }
+                    } else if (error) {
+                        console.warn('⚠️ [PUSH] Notes error:', error.message);
+                    } else {
+                        console.log('✅ [PUSH] Notes synced:', notesData.length);
+                    }
+                }
+
+                // Push categories
+                if (state.categories && state.categories.length > 0) {
+                    const categoriesData = state.categories.map(c => ({
+                        user_id: currentUser.id,
+                        name: c
+                    }));
+                    let { error } = await supabase.from('categories').upsert(categoriesData, {
+                        onConflict: 'user_id,name'
+                    });
+                    if (error && (error.message?.includes('unique constraint') || error.message?.includes('duplicate key') || error.message?.includes('no unique'))) {
+                        console.warn('⚠️ [PUSH] Categories upsert failed (constraint missing?), using insert...');
+                        const { data: existing } = await supabase.from('categories')
+                            .select('name')
+                            .eq('user_id', currentUser.id);
+                        const existingNames = new Set((existing || []).map(c => c.name));
+                        const newCategories = categoriesData.filter(c => !existingNames.has(c.name));
+                        if (newCategories.length > 0) {
+                            const { error: insertError } = await supabase.from('categories').insert(newCategories);
+                            if (insertError) console.warn('⚠️ [PUSH] Categories insert error:', insertError.message);
+                            else console.log('✅ [PUSH] Categories synced (fallback):', newCategories.length, 'new records');
+                        } else {
+                            console.log('✅ [PUSH] Categories already synced (no new records)');
+                        }
+                    } else if (error) {
+                        console.warn('⚠️ [PUSH] Categories error:', error.message);
+                    } else {
+                        console.log('✅ [PUSH] Categories synced:', categoriesData.length);
+                    }
+                }
+
+                console.log('✅ [PUSH] All data pushed to cloud');
+            } catch (error) {
+                console.error('❌ [PUSH] Error pushing to cloud:', error);
+                throw error;
             }
         }
 
@@ -2814,347 +3306,84 @@
             }
         }
 
+        /**
+         * Background sync - silent sync without UI indicators
+         */
         async function syncInBackground() {
             if (!syncEnabled || !currentUser) return;
             
             // Prevent multiple background syncs from running simultaneously
             if (isSyncing) {
-                console.log('[Background] Sync already in progress, skipping...');
+                console.log('⏸️ [BG] Sync already in progress, skipping...');
                 return;
             }
 
             isSyncing = true;
             try {
-                // Silent background sync - no loading indicators
-                await clearAndPushAllData();
-                // Ensure data is persisted
-                saveData();
+                console.log('🔄 [BG] Starting background sync...');
+                
+                // Use new unified system but silently
+                const cloudData = await fetchCloudDataDirect();
+                const transformedCloud = transformCloudDataToLocal(cloudData);
+                mergeCloudDataIntoLocal(transformedCloud);
+                
                 calculateFloatBalances();
-                console.log('✅ Background sync complete');
+                saveData();
+                
+                // Push merged data back
+                await pushMergedDataToCloud();
+                
+                console.log('✅ [BG] Background sync complete');
             } catch (error) {
-                console.error('❌ Background sync error:', error);
+                console.error('❌ [BG] Background sync error:', error);
                 // Don't show error toast for background operations
                 // But still try to save data
                 try {
                     saveData();
                 } catch (saveErr) {
-                    console.error('Failed to save after background sync error:', saveErr);
+                    console.error('❌ [BG] Failed to save after error:', saveErr);
                 }
             } finally {
                 isSyncing = false;
             }
         }
 
+        /**
+         * Pull data from Supabase and merge with local (legacy function - now uses new system)
+         */
         async function pullDataFromSupabase() {
             if (!syncEnabled || !currentUser) return;
 
             try {
+                console.log('📥 [PULL] Starting pull from Supabase...');
                 showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                 
-                // Ensure state arrays exist before merging
-                if (!state.sales) state.sales = [];
-                if (!state.products) state.products = [];
-                if (!state.expenses) state.expenses = [];
-                if (!state.customers) state.customers = [];
-                if (!state.transactions) state.transactions = [];
-                if (!state.unpaidEntries) state.unpaidEntries = [];
-                if (!state.notes) state.notes = [];
-                if (!state.categories) state.categories = [];
+                // Use the new unified system
+                const cloudData = await fetchCloudDataDirect();
+                const transformedCloud = transformCloudDataToLocal(cloudData);
+                mergeCloudDataIntoLocal(transformedCloud);
                 
-                // SAFEGUARD: Check if we have local data that should be preserved
-                const hasLocalData = state.products.length > 0 || state.sales.length > 0 ||
-                    state.expenses.length > 0 || state.customers.length > 0;
-
-                // Quick check: count total records in cloud
-                if (hasLocalData) {
-                    const { count: cloudCount } = await supabase
-                        .from('products')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('user_id', currentUser.id);
-
-                    if (cloudCount === 0) {
-                        console.log('⚠️ Cloud data is empty, preserving local data');
-                        console.log('💡 Use "Push to Cloud" if you want to upload your local data');
-                        return; // Don't overwrite local data with empty cloud data
-                    }
-                }
-
-                console.log('📥 Pulling data from cloud...');
-
-                // Products
-                const { data: products } = await supabase
-                    .from('products')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (products && products.length > 0) {
-                    const cloudProducts = products.map(p => ({
-                        // Use stable ID derived from name to avoid duplicate IDs between offline and cloud
-                        id: `P-${(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
-                        name: p.name,
-                        category: p.category,
-                        cost: parseFloat(p.cost),
-                        price: parseFloat(p.price),
-                        hasStock: (p.has_stock === false) ? false : true
-                    }));
-                    // Merge with any existing local products and deduplicate by content
-                    state.products = deduplicateByContent([...state.products, ...cloudProducts], 'products');
-                }
-
-                // Sales
-                const { data: sales } = await supabase
-                    .from('sales')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .order('timestamp', { ascending: false });
-                if (sales && sales.length > 0) {
-                    state.sales = sales.map(s => ({
-                        id: `S-${s.timestamp}`,
-                        date: s.date,
-                        time: s.time,
-                        timestamp: s.timestamp,
-                        productName: s.product_name,
-                        customer: s.customer,
-                        quantity: s.quantity,
-                        costPerUnit: parseFloat(s.cost_per_unit),
-                        pricePerUnit: parseFloat(s.price_per_unit),
-                        totalCost: parseFloat(s.total_cost),
-                        totalPrice: parseFloat(s.total_price),
-                        profit: parseFloat(s.profit),
-                        payment: s.payment
-                    }));
-                }
-
-                // Categories
-                const { data: categories } = await supabase
-                    .from('categories')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (categories && categories.length > 0) {
-                    const cloudCategories = categories.map(c => c.name).filter(Boolean);
-                    // Merge cloud + local category names uniquely
-                    const mergedCats = Array.from(new Set([...(state.categories || []), ...cloudCategories]));
-                    state.categories = mergedCats;
-                }
-
-                // Expenses
-                const { data: expenses } = await supabase
-                    .from('expenses')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Expenses
-                if (expenses && expenses.length > 0) state.expenses = expenses.map(e => ({
-                    id: `E-${e.timestamp}`,
-                    date: e.date,
-                    time: e.time,
-                    timestamp: e.timestamp,
-                    description: e.description,
-                    category: e.category,
-                    amount: parseFloat(e.amount),
-                    payment: e.payment,
-                    comment: e.comment
-                }));
-
-                // Customers
-                const { data: customers } = await supabase
-                    .from('customers')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Customers
-                if (customers && customers.length > 0) state.customers = customers.map(c => ({
-                    id: `C-${c.name.replace(/\s+/g, '_')}_${Date.now()}`,
-                    name: c.name,
-                    email: c.email || '',
-                    phone: c.phone || '',
-                    address: c.address || '',
-                    totalPurchases: parseFloat(c.total_purchases || 0)
-                }));
-
-                // Invoices
-                const { data: invoices } = await supabase
-                    .from('invoices')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Invoices
-                if (invoices && invoices.length > 0) state.invoices = invoices.map(i => ({
-                    id: `INV-${i.number}`,
-                    number: i.number,
-                    customer: i.customer,
-                    date: i.date,
-                    dueDate: i.due_date,
-                    items: i.items,
-                    amount: parseFloat(i.amount),
-                    status: i.status
-                }));
-
-                // Receipts
-                const { data: receipts } = await supabase
-                    .from('receipts')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (receipts && receipts.length > 0) state.receipts = receipts.map(r => ({
-                    id: `RCPT-${r.timestamp}`,
-                    number: r.number,
-                    customer: r.customer,
-                    customerEmail: r.customer_email || '',
-                    date: r.date,
-                    time: r.time,
-                    timestamp: r.timestamp,
-                    description: r.description,
-                    amount: parseFloat(r.amount),
-                    paymentMethod: r.payment_method
-                }));
-
-                // Inventory
-                const { data: inventory } = await supabase
-                    .from('inventory')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (inventory && inventory.length > 0) {
-                    // Preserve existing inventory if not in cloud
-                    if (!state.inventory) {
-                        state.inventory = {};
-                    }
-                    inventory.forEach(item => {
-                        state.inventory[item.product_name] = {
-                            stock: parseInt(item.stock) || 0,
-                            minAlert: parseInt(item.min_alert) || 5
-                        };
-                    });
-                }
-
-                // Don't reset inventory if cloud has no data - keep local data
-                // Notes
-                const { data: notes } = await supabase
-                    .from('notes')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Notes
-                if (notes && notes.length > 0) state.notes = notes.map(n => ({
-                    id: `N-${n.timestamp}`,
-                    title: n.title || '',
-                    content: n.content,
-                    date: n.date,
-                    time: n.time,
-                    timestamp: n.timestamp
-                }));
-
-                // Transactions
-                const { data: transactions } = await supabase
-                    .from('transactions')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Transactions
-                if (transactions && transactions.length > 0) state.transactions = transactions.map(t => ({
-                    id: `T-${t.timestamp}`,
-                    channel: t.channel,
-                    customerName: t.customer_name,
-                    type: t.type,
-                    amount: parseFloat(t.amount),
-                    date: t.date,
-                    time: t.time,
-                    timestamp: t.timestamp
-                }));
-
-                // Unpaid entries
-                const { data: unpaidEntries } = await supabase
-                    .from('unpaid_entries')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                // Unpaid entries
-                if (unpaidEntries && unpaidEntries.length > 0) state.unpaidEntries = unpaidEntries.map(u => ({
-                    id: `U-${u.timestamp}`,
-                    name: u.name,
-                    type: u.type,
-                    amount: parseFloat(u.amount),
-                    date: u.date,
-                    time: u.time,
-                    timestamp: u.timestamp,
-                    paid: u.paid
-                }));
-
-                // Transaction floats
-                const { data: floats } = await supabase
-                    .from('transaction_floats')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (floats && floats.length > 0) {
-                    floats.forEach(f => {
-                        if (state.transactionFloats[f.channel]) {
-                            state.transactionFloats[f.channel].initial = parseFloat(f.initial_float);
-                        }
-                    });
-                }
-
-                // Settings
-                const { data: settings } = await supabase
-                    .from('settings')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .single();
-                if (settings) {
-                    state.dailyTarget = parseFloat(settings.daily_target || 0);
-                    state.monthlyTarget = parseFloat(settings.monthly_target || 0);
-                }
-
-                // Inventory purchase Periods (cycles)
-                const { data: cloudCycles, error: cyclesErr } = await supabase
-                    .from('inventory_purchase_periods')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (cyclesErr) console.warn('Pull periods error:', cyclesErr.message || cyclesErr);
-                if (cloudCycles && cloudCycles.length > 0) {
-                    state.inventoryPurchaseCycles = cloudCycles.map(c => ({
-                        id: generateID('invCycle'),
-                        number: c.period_number,
-                        title: c.title || '',
-                        startDate: c.start_date || '',
-                        endDate: c.end_date || '',
-                        notes: c.notes || ''
-                    }));
-                }
-
-                // Inventory purchases
-                const { data: cloudPurchases, error: purchasesPullErr } = await supabase
-                    .from('inventory_purchases')
-                    .select('*')
-                    .eq('user_id', currentUser.id);
-                if (purchasesPullErr) console.warn('Pull purchases error:', purchasesPullErr.message || purchasesPullErr);
-                if (cloudPurchases && cloudPurchases.length > 0) {
-                    state.inventoryPurchases = cloudPurchases.map(p => ({
-                        id: generateID('invPurchase'),
-                        cycleNumber: p.period_number,
-                        itemName: p.item_name,
-                        quantity: parseInt(p.quantity || 0, 10),
-                        unitCost: parseFloat(p.unit_cost || 0),
-                        totalCost: parseFloat(p.total_cost || 0),
-                        purchaseDate: p.purchase_date || '',
-                        supplierName: p.supplier_name || '',
-                        supplierPhone: p.supplier_phone || '',
-                        supplierAddress: p.supplier_address || '',
-                        notes: p.notes || '',
-                        timestamp: p.timestamp
-                    }));
-                }
-
                 calculateFloatBalances();
                 saveData();
-                setTimeout(() => {
-                    render();
-                }, 100);
+                
+                console.log('✅ [PULL] Data pulled and merged successfully');
+                setTimeout(() => render(), 100);
             } catch (error) {
-                console.error('Pull error:', error);
+                console.error('❌ [PULL] Pull error:', error);
                 const errorMessage = error?.message || error?.error_description || error?.details || 'Unknown error';
                 showToast('Cloud pull failed: ' + errorMessage, 'error');
                 
-                // Try to save any data that was successfully pulled, even if there was an error
+                // Try to save any data that was successfully pulled
                 try {
                     calculateFloatBalances();
                     saveData();
                 } catch (saveErr) {
-                    console.error('Failed to save data after pull error:', saveErr);
+                    console.error('❌ [PULL] Failed to save after error:', saveErr);
                 }
             }
         }
+
+        // OLD CODE REMOVED - Now using new unified sync system above
         async function pushToSupabase(table, data) {
             if (!syncEnabled || !currentUser) return;
             try {
@@ -4220,58 +4449,88 @@
                 try { autoSubmitLoginIfAutofilled(); } catch (e) { }
             }
         });
+        /**
+         * Pull from cloud - merges cloud data with local (doesn't replace)
+         */
         async function pullFromCloud() {
             if (!syncEnabled || !currentUser) {
-                return showToast('Not signed in', 'error');
+                return showToast('Please sign in to pull data', 'error');
             }
 
-            if (!confirm('This will replace ALL local data with cloud data. Continue?')) {
+            if (!confirm('This will merge cloud data with your local data. Continue?')) {
                 return;
             }
 
+            if (isSyncing) {
+                showToast('Sync already in progress...', 'info');
+                return;
+            }
+
+            isSyncing = true;
             updateSyncIndicator('syncing');
             showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
 
             try {
-                console.log('⬇️ Pulling data from cloud...');
-
-                // Clear local storage first
-                localStorage.removeItem('financeManagerData');
-
-                // Pull everything from cloud
-                await pullDataFromSupabase();
+                console.log('📥 [PULL] Pulling data from cloud...');
+                
+                // Use new unified system
+                const cloudData = await fetchCloudDataDirect();
+                const transformedCloud = transformCloudDataToLocal(cloudData);
+                mergeCloudDataIntoLocal(transformedCloud);
+                
+                calculateFloatBalances();
+                saveData();
 
                 updateSyncIndicator('synced');
-                showToast('Data pulled from cloud successfully!', 'success');
+                showToast('✅ Data pulled from cloud successfully!', 'success');
                 render();
             } catch (error) {
-                console.error('Pull error:', error);
-                showToast('Pull failed: ' + error.message, 'error');
+                console.error('❌ [PULL] Error:', error);
+                const errorMessage = error?.message || error?.error_description || error?.details || 'Unknown error';
+                showToast('Pull failed: ' + errorMessage, 'error');
                 updateSyncIndicator('synced');
+            } finally {
+                isSyncing = false;
             }
         }
 
+        /**
+         * Push to cloud - pushes local data to cloud using upsert (doesn't delete cloud data)
+         */
         async function pushToCloud() {
             if (!syncEnabled || !currentUser) {
-                return showToast('Not signed in', 'error');
+                return showToast('Please sign in to push data', 'error');
             }
 
-            if (!confirm('This will replace ALL cloud data with local data. Continue?')) {
+            if (!confirm('This will upload your local data to cloud (merges with existing cloud data). Continue?')) {
                 return;
             }
 
+            if (isSyncing) {
+                showToast('Sync already in progress...', 'info');
+                return;
+            }
+
+            isSyncing = true;
             updateSyncIndicator('syncing');
-            showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
+            showToast('Uploading Your Data, Please wait...', 'info', null, null, 8000);
 
             try {
-                console.log('⬆️ Pushing data to cloud...');
-                await clearAndPushAllData();
+                console.log('⬆️ [PUSH] Pushing data to cloud...');
+                await pushMergedDataToCloud();
+                
+                calculateFloatBalances();
+                saveData();
+                
                 updateSyncIndicator('synced');
-                showToast('Data pushed to cloud successfully!', 'success');
+                showToast('✅ Data pushed to cloud successfully!', 'success');
             } catch (error) {
-                console.error('Push error:', error);
-                showToast('Push failed: ' + error.message, 'error');
+                console.error('❌ [PUSH] Error:', error);
+                const errorMessage = error?.message || error?.error_description || error?.details || 'Unknown error';
+                showToast('Push failed: ' + errorMessage, 'error');
                 updateSyncIndicator('synced');
+            } finally {
+                isSyncing = false;
             }
         }
         // Removed in-app forceRefresh function
