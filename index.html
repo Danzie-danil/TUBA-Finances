@@ -3087,6 +3087,38 @@
                 console.error(`Error syncing to ${table}:`, error);
             }
         }
+        const conflictTargets = {
+            products: 'user_id,name,category',
+            categories: 'user_id,name',
+            sales: 'user_id,timestamp',
+            expenses: 'user_id,timestamp',
+            customers: 'user_id,name,email',
+            invoices: 'user_id,number',
+            receipts: 'user_id,timestamp',
+            inventory: 'user_id,product_name',
+            notes: 'user_id,timestamp',
+            transactions: 'user_id,timestamp',
+            unpaid_entries: 'user_id,timestamp',
+            transaction_floats: 'user_id,channel',
+            settings: 'user_id'
+        };
+        async function upsertOne(table, payload) {
+            if (!syncEnabled || !currentUser) return;
+            try {
+                const data = { ...payload, user_id: currentUser.id };
+                if (table === 'products') { data.category = data.category || ''; }
+                const conflict = conflictTargets[table];
+                if (conflict) {
+                    const { error } = await supabase.from(table).upsert(data, { onConflict: conflict });
+                    if (error) throw error;
+                } else {
+                    const { error } = await supabase.from(table).upsert(data);
+                    if (error) throw error;
+                }
+            } catch (error) {
+                console.error(`Upsert error on ${table}:`, error);
+            }
+        }
         let state = {
             activeTab: 'sales',
             activeTransactionChannel: 'mpesa',
@@ -3714,8 +3746,16 @@
             render();
             showToast('Daily target updated', 'success');
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                await upsertOne('products', { name, category, cost, price, has_stock: hasStock ? true : false });
+                if (hasStock) {
+                    await upsertOne('inventory', { product_name: name, stock: parseInt(stock) || 0, min_alert: 5 });
+                }
+                if (category) {
+                    await upsertOne('categories', { name: category });
+                }
+                syncInBackground();
+            }
         }
 
         async function setMonthlyTarget() {
@@ -4822,7 +4862,7 @@
             });
         }
 
-        function addSale(e) {
+        async function addSale(e) {
             e && e.preventDefault && e.preventDefault();
             const productIndex = document.getElementById('saleProduct')?.value;
             if (productIndex === null || productIndex === '' || productIndex === undefined) return showToast('Please select a product', 'error');
@@ -4899,8 +4939,37 @@
             // Friendly reminder to save a local backup (max 3 per day)
             maybeShowBackupReminder();
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                await upsertOne('sales', {
+                    date: sale.date,
+                    time: sale.time,
+                    timestamp: sale.timestamp,
+                    product_name: sale.productName,
+                    customer: sale.customer,
+                    quantity: sale.quantity,
+                    cost_per_unit: sale.costPerUnit,
+                    price_per_unit: sale.pricePerUnit,
+                    total_cost: sale.totalCost,
+                    total_price: sale.totalPrice,
+                    profit: sale.profit,
+                    payment: sale.payment
+                });
+                if (customer && customer.name !== 'WALK IN') {
+                    const cust = state.customers.find(c => c.name === customer.name) || customer;
+                    await upsertOne('customers', {
+                        name: cust.name,
+                        email: cust.email || '',
+                        phone: cust.phone || '',
+                        address: cust.address || '',
+                        total_purchases: cust.totalPurchases || 0
+                    });
+                }
+                if (product && product.hasStock !== false) {
+                    const inv = state.inventory[product.name] || { stock: 0, minAlert: 5 };
+                    await upsertOne('inventory', { product_name: product.name, stock: inv.stock || 0, min_alert: inv.minAlert || 5 });
+                }
+                syncInBackground();
+            }
         }
 
         function renderTransactions() {
@@ -10005,8 +10074,16 @@
 
             saveData();
 
-            // Sync in background if online
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                await upsertOne('products', { name, category, cost, price, has_stock: hasStock ? true : false });
+                if (hasStock) {
+                    await upsertOne('inventory', { product_name: name, stock: stock, min_alert: 5 });
+                }
+                if (category) {
+                    await upsertOne('categories', { name: category });
+                }
+                syncInBackground();
+            }
 
             // Auto-select the new product
             const productSelect = document.getElementById('saleProduct');
