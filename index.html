@@ -2833,14 +2833,14 @@
                     state.products = deduplicateByContent([...state.products, ...cloudProducts], 'products');
                 }
 
-                // Sales
+                // Sales (merge + dedup)
                 const { data: sales } = await supabase
                     .from('sales')
                     .select('*')
                     .eq('user_id', currentUser.id)
                     .order('timestamp', { ascending: false });
                 if (sales && sales.length > 0) {
-                    state.sales = sales.map(s => ({
+                    const cloudSales = sales.map(s => ({
                         id: `S-${s.timestamp}`,
                         date: s.date,
                         time: s.time,
@@ -2855,6 +2855,7 @@
                         profit: parseFloat(s.profit),
                         payment: s.payment
                     }));
+                    state.sales = deduplicateByContent([...state.sales, ...cloudSales], 'sales');
                 }
 
                 // Categories
@@ -2869,73 +2870,82 @@
                     state.categories = mergedCats;
                 }
 
-                // Expenses
+                // Expenses (merge + dedup)
                 const { data: expenses } = await supabase
                     .from('expenses')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Expenses
-                if (expenses && expenses.length > 0) state.expenses = expenses.map(e => ({
-                    id: `E-${e.timestamp}`,
-                    date: e.date,
-                    time: e.time,
-                    timestamp: e.timestamp,
-                    description: e.description,
-                    category: e.category,
-                    amount: parseFloat(e.amount),
-                    payment: e.payment,
-                    comment: e.comment
-                }));
+                if (expenses && expenses.length > 0) {
+                    const cloudExpenses = expenses.map(e => ({
+                        id: `E-${e.timestamp}`,
+                        date: e.date,
+                        time: e.time,
+                        timestamp: e.timestamp,
+                        description: e.description,
+                        category: e.category,
+                        amount: parseFloat(e.amount),
+                        payment: e.payment,
+                        comment: e.comment
+                    }));
+                    state.expenses = deduplicateByContent([...state.expenses, ...cloudExpenses], 'expenses');
+                }
 
-                // Customers
+                // Customers (merge + dedup)
                 const { data: customers } = await supabase
                     .from('customers')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Customers
-                if (customers && customers.length > 0) state.customers = customers.map(c => ({
-                    id: `C-${c.name.replace(/\s+/g, '_')}_${Date.now()}`,
-                    name: c.name,
-                    email: c.email || '',
-                    phone: c.phone || '',
-                    address: c.address || '',
-                    totalPurchases: parseFloat(c.total_purchases || 0)
-                }));
+                if (customers && customers.length > 0) {
+                    const cloudCustomers = customers.map(c => ({
+                        id: `C-${c.name.replace(/\s+/g, '_')}_${Date.now()}`,
+                        name: c.name,
+                        email: c.email || '',
+                        phone: c.phone || '',
+                        address: c.address || '',
+                        totalPurchases: parseFloat(c.total_purchases || 0)
+                    }));
+                    state.customers = deduplicateByContent([...state.customers, ...cloudCustomers], 'customers');
+                }
 
-                // Invoices
+                // Invoices (merge + dedup)
                 const { data: invoices } = await supabase
                     .from('invoices')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Invoices
-                if (invoices && invoices.length > 0) state.invoices = invoices.map(i => ({
-                    id: `INV-${i.number}`,
-                    number: i.number,
-                    customer: i.customer,
-                    date: i.date,
-                    dueDate: i.due_date,
-                    items: i.items,
-                    amount: parseFloat(i.amount),
-                    status: i.status
-                }));
+                if (invoices && invoices.length > 0) {
+                    const cloudInvoices = invoices.map(i => ({
+                        id: `INV-${i.number}`,
+                        number: i.number,
+                        customer: i.customer,
+                        date: i.date,
+                        dueDate: i.due_date,
+                        items: i.items,
+                        amount: parseFloat(i.amount),
+                        status: i.status
+                    }));
+                    state.invoices = deduplicateByContent([...(state.invoices || []), ...cloudInvoices], 'invoices');
+                }
 
-                // Receipts
+                // Receipts (merge + dedup)
                 const { data: receipts } = await supabase
                     .from('receipts')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                if (receipts && receipts.length > 0) state.receipts = receipts.map(r => ({
-                    id: `RCPT-${r.timestamp}`,
-                    number: r.number,
-                    customer: r.customer,
-                    customerEmail: r.customer_email || '',
-                    date: r.date,
-                    time: r.time,
-                    timestamp: r.timestamp,
-                    description: r.description,
-                    amount: parseFloat(r.amount),
-                    paymentMethod: r.payment_method
-                }));
+                if (receipts && receipts.length > 0) {
+                    const cloudReceipts = receipts.map(r => ({
+                        id: `RCPT-${r.timestamp}`,
+                        number: r.number,
+                        customer: r.customer,
+                        customerEmail: r.customer_email || '',
+                        date: r.date,
+                        time: r.time,
+                        timestamp: r.timestamp,
+                        description: r.description,
+                        amount: parseFloat(r.amount),
+                        paymentMethod: r.payment_method
+                    }));
+                    state.receipts = deduplicateByContent([...(state.receipts || []), ...cloudReceipts], 'receipts');
+                }
 
                 // Inventory
                 const { data: inventory } = await supabase
@@ -2943,67 +2953,80 @@
                     .select('*')
                     .eq('user_id', currentUser.id);
                 if (inventory && inventory.length > 0) {
-                    // Preserve existing inventory if not in cloud
                     if (!state.inventory) {
                         state.inventory = {};
                     }
                     inventory.forEach(item => {
-                        state.inventory[item.product_name] = {
-                            stock: parseInt(item.stock) || 0,
-                            minAlert: parseInt(item.min_alert) || 5
-                        };
+                        const name = item.product_name;
+                        if (!(name in state.inventory)) {
+                            state.inventory[name] = {
+                                stock: parseInt(item.stock) || 0,
+                                minAlert: parseInt(item.min_alert) || 5
+                            };
+                        } else {
+                            // Do not overwrite local offline changes; only fill missing fields
+                            const existing = state.inventory[name];
+                            if (existing.stock == null) existing.stock = parseInt(item.stock) || 0;
+                            if (existing.minAlert == null) existing.minAlert = parseInt(item.min_alert) || 5;
+                        }
                     });
                 }
 
                 // Don't reset inventory if cloud has no data - keep local data
-                // Notes
+                // Notes (merge + dedup)
                 const { data: notes } = await supabase
                     .from('notes')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Notes
-                if (notes && notes.length > 0) state.notes = notes.map(n => ({
-                    id: `N-${n.timestamp}`,
-                    title: n.title || '',
-                    content: n.content,
-                    date: n.date,
-                    time: n.time,
-                    timestamp: n.timestamp
-                }));
+                if (notes && notes.length > 0) {
+                    const cloudNotes = notes.map(n => ({
+                        id: `N-${n.timestamp}`,
+                        title: n.title || '',
+                        content: n.content,
+                        date: n.date,
+                        time: n.time,
+                        timestamp: n.timestamp
+                    }));
+                    state.notes = deduplicateByContent([...(state.notes || []), ...cloudNotes], 'notes');
+                }
 
-                // Transactions
+                // Transactions (merge + dedup)
                 const { data: transactions } = await supabase
                     .from('transactions')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Transactions
-                if (transactions && transactions.length > 0) state.transactions = transactions.map(t => ({
-                    id: `T-${t.timestamp}`,
-                    channel: t.channel,
-                    customerName: t.customer_name,
-                    type: t.type,
-                    amount: parseFloat(t.amount),
-                    date: t.date,
-                    time: t.time,
-                    timestamp: t.timestamp
-                }));
+                if (transactions && transactions.length > 0) {
+                    const cloudTransactions = transactions.map(t => ({
+                        id: `T-${t.timestamp}`,
+                        channel: t.channel,
+                        customerName: t.customer_name,
+                        type: t.type,
+                        amount: parseFloat(t.amount),
+                        date: t.date,
+                        time: t.time,
+                        timestamp: t.timestamp
+                    }));
+                    state.transactions = deduplicateByContent([...(state.transactions || []), ...cloudTransactions], 'transactions');
+                }
 
-                // Unpaid entries
+                // Unpaid entries (merge + dedup)
                 const { data: unpaidEntries } = await supabase
                     .from('unpaid_entries')
                     .select('*')
                     .eq('user_id', currentUser.id);
-                // Unpaid entries
-                if (unpaidEntries && unpaidEntries.length > 0) state.unpaidEntries = unpaidEntries.map(u => ({
-                    id: `U-${u.timestamp}`,
-                    name: u.name,
-                    type: u.type,
-                    amount: parseFloat(u.amount),
-                    date: u.date,
-                    time: u.time,
-                    timestamp: u.timestamp,
-                    paid: u.paid
-                }));
+                if (unpaidEntries && unpaidEntries.length > 0) {
+                    const cloudUnpaid = unpaidEntries.map(u => ({
+                        id: `U-${u.timestamp}`,
+                        name: u.name,
+                        type: u.type,
+                        amount: parseFloat(u.amount),
+                        date: u.date,
+                        time: u.time,
+                        timestamp: u.timestamp,
+                        paid: u.paid
+                    }));
+                    state.unpaidEntries = deduplicateByContent([...(state.unpaidEntries || []), ...cloudUnpaid], 'unpaid');
+                }
 
                 // Transaction floats
                 const { data: floats } = await supabase
@@ -9342,27 +9365,57 @@
                 const file = e.target.files[0];
                 if (!file) return;
                 const reader = new FileReader();
-                reader.onload = (event) => {
+                reader.onload = async (event) => {
                     try {
                         const data = JSON.parse(event.target.result);
-                        if (confirm('This will replace all current data. Continue?')) {
-                            state.products = data.products || [];
-                            state.sales = data.sales || [];
-                            state.expenses = data.expenses || [];
-                            state.customers = data.customers || [];
-                            state.invoices = data.invoices || [];
-                            state.categories = data.categories || [];
-                            state.inventory = data.inventory || {};
-                            state.notes = data.notes || [];
-                            state.transactions = data.transactions || [];
-                            state.unpaidEntries = data.unpaidEntries || [];
-                            state.transactionFloats = data.transactionFloats || state.transactionFloats;
-                            state.dailyTarget = data.dailyTarget || 0;
-                            state.monthlyTarget = data.monthlyTarget || 0;
+                        if (confirm('Import will MERGE with existing data (no overwrite). Continue?')) {
+                            // Merge arrays and deduplicate
+                            state.products = deduplicateByContent([...(state.products || []), ...(data.products || [])], 'products');
+                            state.sales = deduplicateByContent([...(state.sales || []), ...(data.sales || [])], 'sales');
+                            state.expenses = deduplicateByContent([...(state.expenses || []), ...(data.expenses || [])], 'expenses');
+                            state.customers = deduplicateByContent([...(state.customers || []), ...(data.customers || [])], 'customers');
+                            state.invoices = deduplicateByContent([...(state.invoices || []), ...(data.invoices || [])], 'invoices');
+                            state.notes = deduplicateByContent([...(state.notes || []), ...(data.notes || [])], 'notes');
+                            state.transactions = deduplicateByContent([...(state.transactions || []), ...(data.transactions || [])], 'transactions');
+                            state.unpaidEntries = deduplicateByContent([...(state.unpaidEntries || []), ...(data.unpaidEntries || [])], 'unpaid');
+
+                            // Merge categories (set-based)
+                            state.categories = Array.from(new Set([...(state.categories || []), ...((data.categories || []))]));
+
+                            // Merge inventory by product name without overwriting local values
+                            state.inventory = state.inventory || {};
+                            const importedInventory = data.inventory || {};
+                            Object.keys(importedInventory).forEach(name => {
+                                if (!(name in state.inventory)) {
+                                    state.inventory[name] = {
+                                        stock: parseInt(importedInventory[name].stock) || 0,
+                                        minAlert: parseInt(importedInventory[name].minAlert) || 5
+                                    };
+                                }
+                            });
+
+                            // Floats: merge per channel without overwriting
+                            state.transactionFloats = state.transactionFloats || {};
+                            const importedFloats = data.transactionFloats || {};
+                            Object.keys(importedFloats).forEach(ch => {
+                                if (!(ch in state.transactionFloats)) {
+                                    state.transactionFloats[ch] = { initial: parseFloat(importedFloats[ch].initial) || 0, current: 0 };
+                                }
+                            });
+
+                            // Targets: keep existing unless missing
+                            if (state.dailyTarget == null) state.dailyTarget = data.dailyTarget || 0;
+                            if (state.monthlyTarget == null) state.monthlyTarget = data.monthlyTarget || 0;
+
                             calculateFloatBalances();
                             saveData();
                             render();
-                            showToast('Data imported successfully!', 'success');
+                            showToast('Data imported and merged successfully!', 'success');
+
+                            // If signed-in, upsert merged data to cloud in background
+                            if (syncEnabled && currentUser) {
+                                try { await clearAndPushAllData(); } catch (e) { /* no-op */ }
+                            }
                         }
                     } catch (error) {
                         showToast('Error importing file. Please check the file format.', 'error');
@@ -11285,6 +11338,10 @@
                                             reg.sync.register('background-sync').catch(() => { });
                                         }
                                     });
+                                }
+                                // Trigger a background sync merge immediately when online
+                                if (syncEnabled && currentUser) {
+                                    try { syncInBackground(); } catch (e) { /* no-op */ }
                                 }
                             } catch (e) { /* no-op */ }
                         });
