@@ -1873,17 +1873,22 @@
                     if (event === 'SIGNED_IN' && session) {
                         currentUser = session.user;
                         syncEnabled = true;
+                        // Ensure fresh cloud pull/merge for new session
+                        autoCloudPullDone = false;
                         updateSyncIndicator('synced');
                         await maybeAutoPullCloudData();
                     } else if (event === 'SIGNED_OUT') {
                         currentUser = null;
                         syncEnabled = false;
+                        // Reset auto-pull flag for next sign-in
+                        autoCloudPullDone = false;
                         updateSyncIndicator('offline');
                         render();
                     } else if (event === 'TOKEN_REFRESHED' && session) {
                         console.log('✅ Token refreshed');
                         currentUser = session.user;
                         syncEnabled = true;
+                        autoCloudPullDone = false;
                         await maybeAutoPullCloudData();
                     }
                 });
@@ -2409,7 +2414,9 @@
                     transactions: transactions || [],
                     unpaidEntries: unpaidEntries || [],
                     notes: notes || [],
-                    categories: (categories || []).map(c => c.name).filter(Boolean)
+                    categories: (categories || [])
+                        .map(c => (c.name || '').trim())
+                        .filter(Boolean)
                 };
             } catch (error) {
                 console.error('Error fetching cloud data:', error);
@@ -5383,7 +5390,8 @@
         async function addProduct(e) {
             e.preventDefault();
             const name = document.getElementById('productName').value.trim();
-            const category = document.getElementById('productCategory').value;
+            let category = document.getElementById('productCategory').value;
+            if (typeof category === 'string') category = category.trim();
             const cost = parseFloat(document.getElementById('productCost').value);
             const price = parseFloat(document.getElementById('productPrice').value);
             const stock = parseInt(document.getElementById('productStock').value) || 0;
@@ -5605,7 +5613,10 @@
             showToast("Category added", "success");
 
             // Sync in background
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                await upsertOne('categories', { name });
+                syncInBackground();
+            }
         }
 
         function editCategoryIndex(i) {
@@ -10050,7 +10061,8 @@
         // New function: Save new product from sales form
         window.saveNewProductFromSales = async function () {
             const name = document.getElementById('newProductName').value.trim();
-            const categorySelect = document.getElementById('newProductCategory').value;
+            let categorySelect = document.getElementById('newProductCategory').value;
+            if (typeof categorySelect === 'string') categorySelect = categorySelect.trim();
             const newCategoryName = document.getElementById('newCategoryName').value.trim();
             const cost = parseFloat(document.getElementById('newProductCost').value);
             const price = parseFloat(document.getElementById('newProductPrice').value);
@@ -10251,7 +10263,7 @@
                         contentKey = `${item.productName}|${item.customer}|${item.date}|${item.time}|${item.quantity}|${item.totalPrice}`;
                         break;
                     case 'products':
-                        contentKey = `${item.name}|${item.category}`;
+                        contentKey = `${(item.name || '').trim()}|${(item.category || '').trim()}`;
                         break;
                     case 'expenses':
                         contentKey = `${item.description}|${item.date}|${item.time}|${item.amount}`;
