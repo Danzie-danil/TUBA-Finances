@@ -1,7 +1,7 @@
 // sw.js - Service Worker for TUBA Mobile App
 const CACHE_NAME = 'tuba-mobile-v1.0';
-const STATIC_CACHE = 'tuba-static-v1.1';
-const DYNAMIC_CACHE = 'tuba-dynamic-v1.1';
+const STATIC_CACHE = 'tuba-static-v1.2';
+const DYNAMIC_CACHE = 'tuba-dynamic-v1.2';
 // Ensure paths work under subdirectories (e.g., GitHub Pages project sites)
 const BASE_PATH = new URL(self.registration.scope).pathname; // e.g. '/repo/'
 
@@ -74,6 +74,17 @@ self.addEventListener('fetch', event => {
   }
 
   event.respondWith((async () => {
+    // Always bypass caching for Supabase API requests to avoid stale data
+    const isSupabase = url.hostname.endsWith('supabase.co');
+    if (isSupabase) {
+      try {
+        const fresh = await fetch(request, { cache: 'no-store' });
+        return fresh;
+      } catch (error) {
+        console.warn('[SW] Supabase request failed, not cached:', request.url, error);
+        return new Response('', { status: 503, statusText: 'Offline' });
+      }
+    }
     // App-shell navigation fallback
     if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
       try {
@@ -90,7 +101,7 @@ self.addEventListener('fetch', event => {
       }
     }
 
-    // Cache-first for all other requests (same-origin and cross-origin)
+    // Cache-first for all other requests (same-origin and allowed cross-origin)
     const cached = await caches.match(request);
     if (cached) {
       return cached;
@@ -98,8 +109,9 @@ self.addEventListener('fetch', event => {
 
     try {
       const networkResponse = await fetch(request);
-      // Cache successful or CORS/opaque responses so they are available offline later
+      // Cache successful same-origin or allowed cross-origin responses
       if (networkResponse && (networkResponse.status === 200 || ['basic', 'cors', 'opaque'].includes(networkResponse.type))) {
+        // Do NOT cache Supabase requests
         const cache = await caches.open(DYNAMIC_CACHE);
         cache.put(request, networkResponse.clone());
       }
