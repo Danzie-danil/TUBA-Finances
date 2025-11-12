@@ -5290,15 +5290,14 @@
             showToast("Transaction recorded", "success");
 
             if (syncEnabled) {
-                await upsertOne('expenses', {
-                    date: expense.date,
-                    time: expense.time,
-                    timestamp: expense.timestamp,
-                    description: expense.description,
-                    category: expense.category,
-                    amount: expense.amount,
-                    payment: expense.payment,
-                    comment: expense.comment
+                await upsertOne('transactions', {
+                    channel: transaction.channel,
+                    customer_name: transaction.customerName,
+                    type: transaction.type,
+                    amount: transaction.amount,
+                    date: transaction.date,
+                    time: transaction.time,
+                    timestamp: transaction.timestamp
                 });
                 syncInBackground();
             }
