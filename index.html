@@ -3132,6 +3132,75 @@
             transaction_floats: 'user_id,channel',
             settings: 'user_id'
         };
+
+        // ============================================
+        // Offline Upsert Queue with Backoff
+        // ============================================
+        const UPSERT_QUEUE_KEY = 'tuba-upsert-queue-v1';
+        const upsertQueue = {
+            items: [],
+            load() {
+                try {
+                    const raw = localStorage.getItem(UPSERT_QUEUE_KEY);
+                    this.items = raw ? JSON.parse(raw) : [];
+                } catch { this.items = []; }
+            },
+            save() {
+                try { localStorage.setItem(UPSERT_QUEUE_KEY, JSON.stringify(this.items)); } catch { }
+            },
+            enqueue(table, payload) {
+                const conflict = conflictTargets[table] || null;
+                this.items.push({
+                    id: `${table}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    table,
+                    payload,
+                    conflict,
+                    attempts: 0,
+                    nextTryAt: Date.now() + 1000
+                });
+                this.save();
+                console.log('📦 Enqueued upsert', table, payload);
+            },
+            backoffDelay(attempts) {
+                // 1s, 2s, 5s, 10s, 30s, 60s
+                const schedule = [1000, 2000, 5000, 10000, 30000, 60000];
+                return schedule[Math.min(attempts, schedule.length - 1)];
+            },
+            async process() {
+                if (!navigator.onLine || !syncEnabled || !currentUser) return;
+                if (!Array.isArray(this.items) || this.items.length === 0) return;
+                const now = Date.now();
+                // Work on a shallow copy to avoid mutation issues
+                for (const item of [...this.items]) {
+                    if (item.nextTryAt && item.nextTryAt > now) continue;
+                    try {
+                        const data = { ...item.payload, user_id: currentUser.id };
+                        if (item.table === 'products') { data.category = data.category || ''; }
+                        if (item.conflict) {
+                            const { error } = await supabase.from(item.table).upsert(data, { onConflict: item.conflict });
+                            if (error) throw error;
+                        } else {
+                            const { error } = await supabase.from(item.table).upsert(data);
+                            if (error) throw error;
+                        }
+                        // Success: remove from queue
+                        this.items = this.items.filter(q => q.id !== item.id);
+                        this.save();
+                        console.log('✅ Upsert queue processed', item.table);
+                    } catch (err) {
+                        console.warn('⏳ Upsert retry scheduled', item.table, err?.message || err);
+                        item.attempts = (item.attempts || 0) + 1;
+                        item.nextTryAt = Date.now() + this.backoffDelay(item.attempts);
+                        // If too many attempts, keep but slow down; do not drop silently
+                        this.save();
+                    }
+                }
+            }
+        };
+        // Initialize queue and periodic processing
+        upsertQueue.load();
+        setInterval(() => { try { upsertQueue.process(); } catch { } }, 30000);
+        window.addEventListener('online', () => { try { upsertQueue.process(); } catch { } });
         async function upsertOne(table, payload) {
             if (!syncEnabled || !currentUser) return;
             try {
@@ -3147,6 +3216,8 @@
                 }
             } catch (error) {
                 console.error(`Upsert error on ${table}:`, error);
+                // If offline or error, enqueue for retry
+                try { upsertQueue.enqueue(table, payload); } catch { }
             }
         }
         let state = {
@@ -3795,8 +3866,21 @@
             render();
             showToast('Monthly target updated', 'success');
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            // Sync immediately and then background merge
+            if (syncEnabled) {
+                await upsertOne('transactions', {
+                    channel: transaction.channel,
+                    customer_name: transaction.customerName,
+                    type: transaction.type,
+                    amount: transaction.amount,
+                    date: transaction.date,
+                    time: transaction.time,
+                    timestamp: transaction.timestamp
+                });
+                const floatData = state.transactionFloats[transaction.channel] || { initial: 0 };
+                await upsertOne('transaction_floats', { channel: transaction.channel, initial_float: parseFloat(floatData.initial) || 0 });
+                syncInBackground();
+            }
         }
 
         function renderAccount() {
@@ -5171,8 +5255,11 @@
                     render();
                     showToast('Float updated', 'success');
 
-                    // Sync in background
-                    if (syncEnabled) syncInBackground();
+                    // Sync to cloud immediately and then background merge
+                    if (syncEnabled) {
+                        await upsertOne('transaction_floats', { channel, initial_float: val });
+                        syncInBackground();
+                    }
                 } else {
                     showToast('Invalid amount', 'error');
                 }
@@ -5211,11 +5298,22 @@
             render();
             showToast("Transaction recorded", "success");
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                await upsertOne('expenses', {
+                    date: expense.date,
+                    time: expense.time,
+                    timestamp: expense.timestamp,
+                    description: expense.description,
+                    category: expense.category,
+                    amount: expense.amount,
+                    payment: expense.payment,
+                    comment: expense.comment
+                });
+                syncInBackground();
+            }
         }
 
-        function editTransactionByTimestamp(ts) {
+        async function editTransactionByTimestamp(ts) {
             const idx = state.transactions.findIndex(t => t.timestamp === ts);
             if (idx === -1) return showToast("Transaction not found", "error");
             const t = state.transactions[idx];
@@ -5234,8 +5332,18 @@
                     render();
                     showToast("Transaction updated", "success");
 
-                    // Sync in background
-                    if (syncEnabled) syncInBackground();
+                    if (syncEnabled) {
+                        await upsertOne('transactions', {
+                            channel: t.channel,
+                            customer_name: t.customerName,
+                            type: t.type,
+                            amount: t.amount,
+                            date: t.date,
+                            time: t.time,
+                            timestamp: t.timestamp
+                        });
+                        syncInBackground();
+                    }
                 } else {
                     showToast("Invalid amount", "error");
                 }
@@ -5438,8 +5546,18 @@
             render();
             showToast("Product added successfully!", "success");
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                await upsertOne('unpaid_entries', {
+                    name: entry.name,
+                    type: entry.type,
+                    amount: entry.amount,
+                    date: entry.date,
+                    time: entry.time,
+                    timestamp: entry.timestamp,
+                    paid: entry.paid
+                });
+                syncInBackground();
+            }
         }
 
         function editProductIndex(i) {
@@ -5839,11 +5957,19 @@
             render();
             showToast("Expense added", "success");
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                await upsertOne('notes', {
+                    title: note.title,
+                    content: note.content,
+                    date: note.date,
+                    time: note.time,
+                    timestamp: note.timestamp
+                });
+                syncInBackground();
+            }
         }
 
-        function editExpenseIndex(i) {
+        async function editExpenseIndex(i) {
             const e = state.expenses[i];
             if (!e) return showToast("Expense not found", "error");
             const desc = prompt("Description:", e.description);
@@ -5858,8 +5984,19 @@
                     render();
                     showToast("Expense updated", "success");
 
-                    // Sync in background
-                    if (syncEnabled) syncInBackground();
+                    if (syncEnabled) {
+                        await upsertOne('expenses', {
+                            date: e.date,
+                            time: e.time,
+                            timestamp: e.timestamp,
+                            description: e.description,
+                            category: e.category,
+                            amount: e.amount,
+                            payment: e.payment,
+                            comment: e.comment
+                        });
+                        syncInBackground();
+                    }
                 } else {
                     showToast("Invalid amount", "error");
                 }
@@ -6161,6 +6298,16 @@
                 notes: ''
             };
             state.inventoryPurchaseCycles.push(cycle);
+            // Persist new period immediately when online
+            if (syncEnabled && currentUser) {
+                upsertOne('inventory_purchase_periods', {
+                    period_number: nextNumber,
+                    title,
+                    start_date: purchaseDate,
+                    end_date: '',
+                    notes: ''
+                });
+            }
             return nextNumber;
         }
 
@@ -6230,8 +6377,37 @@
             closeInventoryModal();
             render();
             showToast('Inventory purchase saved', 'success');
-
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                // Upsert purchase
+                await upsertOne('inventory_purchases', {
+                    period_number: record.cycleNumber,
+                    item_name: record.itemName,
+                    quantity: record.quantity,
+                    unit_cost: record.unitCost,
+                    total_cost: record.totalCost,
+                    purchase_date: record.purchaseDate,
+                    supplier_name: record.supplierName,
+                    supplier_phone: record.supplierPhone,
+                    supplier_address: record.supplierAddress,
+                    notes: record.notes,
+                    timestamp: record.timestamp
+                });
+                // Upsert related expense
+                await upsertOne('expenses', {
+                    date: expense.date,
+                    time: expense.time,
+                    timestamp: expense.timestamp,
+                    description: expense.description,
+                    category: expense.category,
+                    amount: expense.amount,
+                    payment: expense.payment,
+                    comment: expense.comment
+                });
+                // Upsert inventory stock snapshot
+                const inv = state.inventory[productName] || { stock: 0, minAlert: 5 };
+                await upsertOne('inventory', { product_name: productName, stock: inv.stock || 0, min_alert: inv.minAlert || 5 });
+                syncInBackground();
+            }
         }
 
         function updateProductStock(productName, quantity) {
@@ -6524,7 +6700,7 @@
             }
         }
 
-        function adjustStock(productName, amount) {
+        async function adjustStock(productName, amount) {
             if (!state.inventory[productName]) {
                 state.inventory[productName] = { stock: 0, minAlert: 5 };
             }
@@ -6532,9 +6708,11 @@
             saveData();
             render();
             showToast(`Stock ${amount > 0 ? 'increased' : 'decreased'}`, 'success');
-
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                const inv = state.inventory[productName] || { stock: 0, minAlert: 5 };
+                await upsertOne('inventory', { product_name: productName, stock: inv.stock || 0, min_alert: inv.minAlert || 5 });
+                syncInBackground();
+            }
         }
 
         async function saveStockFor(productName) {
@@ -7772,8 +7950,18 @@
             saveData();
             render();
             showToast("Invoice created successfully!", "success");
-
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                await upsertOne('invoices', {
+                    number: invoice.number,
+                    customer: invoice.customer,
+                    date: invoice.date,
+                    due_date: invoice.dueDate,
+                    items: invoice.items,
+                    amount: invoice.amount,
+                    status: invoice.status
+                });
+                syncInBackground();
+            }
         }
 
         async function downloadInvoicePDF(i) {
@@ -8349,7 +8537,7 @@
             if (syncEnabled) syncInBackground();
         }
 
-        function markAsPaid(timestamp) {
+        async function markAsPaid(timestamp) {
             const entry = state.unpaidEntries.find(e => e.timestamp === timestamp);
             if (!entry) return showToast("Entry not found", "error");
 
@@ -8495,7 +8683,7 @@
             render();
         }
 
-        function saveNoteEdit(index) {
+        async function saveNoteEdit(index) {
             const titleInput = document.getElementById(`editNoteTitle_${index}`);
             const contentInput = document.getElementById(`editNoteContent_${index}`);
 
@@ -8510,8 +8698,17 @@
             saveData();
             render();
             showToast('Note updated successfully', 'success');
-
-            if (syncEnabled) syncInBackground();
+            if (syncEnabled) {
+                const n = state.notes[index];
+                await upsertOne('notes', {
+                    title: n.title || '',
+                    content: n.content,
+                    date: n.date,
+                    time: n.time,
+                    timestamp: n.timestamp
+                });
+                syncInBackground();
+            }
         }
 
         function searchNotes(Period) {
