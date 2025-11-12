@@ -11434,33 +11434,53 @@
 
 
 
+            // Offline banner: ensure element exists and update immediately and on connectivity changes
+            (function () {
+                const getOfflineBannerEl = () => {
+                    let el = document.getElementById('offlineBanner');
+                    if (!el) {
+                        el = document.createElement('div');
+                        el.id = 'offlineBanner';
+                        el.className = 'offline-banner';
+                        el.setAttribute('role', 'status');
+                        el.setAttribute('aria-live', 'polite');
+                        el.setAttribute('aria-atomic', 'true');
+                        const headerEl = document.querySelector('.header');
+                        if (headerEl && headerEl.parentNode) {
+                            headerEl.parentNode.insertBefore(el, headerEl.nextSibling);
+                        } else if (document.body) {
+                            document.body.insertBefore(el, document.body.firstChild);
+                        }
+                    }
+                    return el;
+                };
+
+                const updateOfflineBanner = () => {
+                    const offlineBannerEl = getOfflineBannerEl();
+                    if (!offlineBannerEl) return;
+                    if (navigator.onLine) {
+                        offlineBannerEl.style.display = 'none';
+                        offlineBannerEl.textContent = '';
+                        offlineBannerEl.onclick = null;
+                        offlineBannerEl.classList.remove('clickable');
+                    } else {
+                        offlineBannerEl.innerHTML = "You’re offline — Changes are saved locally <span style='opacity:0.9'>(Click for Info)</span>";
+                        offlineBannerEl.style.display = 'block';
+                        offlineBannerEl.onclick = () => { try { openOfflineInfoModal(); } catch (e) { } };
+                        offlineBannerEl.classList.add('clickable');
+                    }
+                };
+
+                updateOfflineBanner();
+                window.addEventListener('online', updateOfflineBanner);
+                window.addEventListener('offline', updateOfflineBanner);
+
+                window.updateOfflineBanner = updateOfflineBanner;
+            })();
+
             // Service Worker Registration and Capacitor Initialization
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', async () => {
-                    const offlineBannerEl = document.getElementById('offlineBanner');
-                    const updateOfflineBanner = () => {
-                        if (!offlineBannerEl) return;
-                        if (navigator.onLine) {
-                            offlineBannerEl.style.display = 'none';
-                            offlineBannerEl.textContent = '';
-                            offlineBannerEl.onclick = null;
-                            offlineBannerEl.classList.remove('clickable');
-                        } else {
-                            offlineBannerEl.innerHTML = "You’re offline — Changes are saved locally <span style='opacity:0.9'>(Click for Info)</span>";
-                            offlineBannerEl.style.display = 'block';
-                            offlineBannerEl.onclick = () => { try { openOfflineInfoModal(); } catch (e) { } };
-                            offlineBannerEl.classList.add('clickable');
-                        }
-                    };
-                    updateOfflineBanner();
-                    window.addEventListener('online', () => {
-                        updateOfflineBanner();
-                        window.updateAuthBanner && window.updateAuthBanner();
-                    });
-                    window.addEventListener('offline', () => {
-                        updateOfflineBanner();
-                        window.updateAuthBanner && window.updateAuthBanner();
-                    });
                     try {
                         // Initialize Capacitor plugins if available
                         if (window.Capacitor) {
@@ -11512,7 +11532,6 @@
                         };
 
                         // Initial state and event listeners
-
                         window.updateAuthBanner && window.updateAuthBanner();
                         // Periodic auth heartbeat to keep UI in sync
                         async function refreshAuthState() {
