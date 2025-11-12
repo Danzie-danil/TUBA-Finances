@@ -98,9 +98,6 @@
             font-weight: 600;
             padding: 6px 12px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-            position: sticky;
-            top: 0;
-            z-index: 50;
         }
 
         .offline-banner.clickable {
@@ -111,9 +108,6 @@
         .auth-banner {
             background: linear-gradient(145deg, #1976d2, #0d47a1);
             cursor: pointer;
-            position: sticky;
-            top: 0;
-            z-index: 50;
         }
 
         /* FAB (Floating Action Button) and radial tabs */
@@ -11455,6 +11449,51 @@
                     return el;
                 };
 
+                const getAuthBannerEl = () => document.getElementById('authBanner');
+
+                const positionBanners = () => {
+                    const headerEl = document.querySelector('.header');
+                    const offlineBannerEl = getOfflineBannerEl();
+                    const authBannerEl = getAuthBannerEl();
+                    const appEl = document.getElementById('app');
+                    const headerHeight = headerEl ? headerEl.offsetHeight : 0;
+
+                    let y = headerHeight;
+                    let total = 0;
+
+                    if (offlineBannerEl && offlineBannerEl.style.display !== 'none') {
+                        offlineBannerEl.style.position = 'fixed';
+                        offlineBannerEl.style.top = y + 'px';
+                        offlineBannerEl.style.left = '0';
+                        offlineBannerEl.style.right = '0';
+                        const h = offlineBannerEl.offsetHeight;
+                        y += h;
+                        total += h;
+                    } else if (offlineBannerEl) {
+                        offlineBannerEl.style.position = '';
+                        offlineBannerEl.style.top = '';
+                        offlineBannerEl.style.left = '';
+                        offlineBannerEl.style.right = '';
+                    }
+
+                    if (authBannerEl && authBannerEl.style.display !== 'none') {
+                        authBannerEl.style.position = 'fixed';
+                        authBannerEl.style.top = y + 'px';
+                        authBannerEl.style.left = '0';
+                        authBannerEl.style.right = '0';
+                        const h = authBannerEl.offsetHeight;
+                        y += h;
+                        total += h;
+                    } else if (authBannerEl) {
+                        authBannerEl.style.position = '';
+                        authBannerEl.style.top = '';
+                        authBannerEl.style.left = '';
+                        authBannerEl.style.right = '';
+                    }
+
+                    if (appEl) appEl.style.marginTop = total ? (total + 'px') : '';
+                };
+
                 const updateOfflineBanner = () => {
                     const offlineBannerEl = getOfflineBannerEl();
                     if (!offlineBannerEl) return;
@@ -11469,13 +11508,17 @@
                         offlineBannerEl.onclick = () => { try { openOfflineInfoModal(); } catch (e) { } };
                         offlineBannerEl.classList.add('clickable');
                     }
+                    positionBanners();
                 };
 
                 updateOfflineBanner();
                 window.addEventListener('online', updateOfflineBanner);
                 window.addEventListener('offline', updateOfflineBanner);
+                window.addEventListener('resize', positionBanners);
+                window.addEventListener('orientationchange', positionBanners);
 
                 window.updateOfflineBanner = updateOfflineBanner;
+                window.positionBanners = positionBanners;
             })();
 
             // Service Worker Registration and Capacitor Initialization
@@ -11529,6 +11572,7 @@
                                     } catch (e) { /* no-op */ }
                                 };
                             }
+                            try { window.positionBanners && window.positionBanners(); } catch (e) { }
                         };
 
                         // Initial state and event listeners
