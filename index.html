@@ -11522,76 +11522,6 @@
                 window.updateOfflineBanner = updateOfflineBanner;
             })();
 
-            // Auth banner: show sign-in prompt when not logged in, avoid stuck "Restoring session"
-            (function () {
-                let isAuthRestoring = true;
-                const authBannerEl = document.getElementById('authBanner');
-                window.updateAuthBanner = () => {
-                    if (!authBannerEl) return;
-                    if (!navigator.onLine) {
-                        authBannerEl.style.display = 'none';
-                        authBannerEl.textContent = '';
-                        authBannerEl.onclick = null;
-                        return;
-                    }
-                    if (currentUser && syncEnabled) {
-                        authBannerEl.style.display = 'none';
-                        authBannerEl.textContent = '';
-                        authBannerEl.onclick = null;
-                        return;
-                    }
-                    if (isAuthRestoring) {
-                        authBannerEl.innerHTML = "Restoring session…";
-                        authBannerEl.style.display = 'block';
-                        authBannerEl.onclick = null;
-                    } else {
-                        authBannerEl.innerHTML = "You’re not signed in — tap to sign in and sync.";
-                        authBannerEl.style.display = 'block';
-                        authBannerEl.onclick = () => {
-                            try {
-                                switchTab('account');
-                                setTimeout(() => {
-                                    try { switchAuthTab('login'); } catch (e) { }
-                                    const lf = document.getElementById('loginForm');
-                                    lf && lf.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                }, 50);
-                            } catch (e) { }
-                        };
-                    }
-                };
-
-                window.refreshAuthState = async function () {
-                    try {
-                        const { data: { session } } = await supabase.auth.getSession();
-                        if (session && session.user) {
-                            currentUser = session.user;
-                            syncEnabled = true;
-                        } else {
-                            currentUser = null;
-                            syncEnabled = false;
-                        }
-                    } catch { }
-                    isAuthRestoring = false;
-                    try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { }
-                    try { updateSideNavAuthButton && updateSideNavAuthButton(); } catch (e) { }
-                };
-
-                // Initial update and fallback to avoid indefinite restoring state
-                try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { }
-                try { window.refreshAuthState && window.refreshAuthState(); } catch (e) { }
-                setTimeout(() => { isAuthRestoring = false; try { window.updateAuthBanner && window.updateAuthBanner(); } catch (e) { } }, 2500);
-
-                window.addEventListener('online', () => { try { window.refreshAuthState(); } catch (e) { } });
-                document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { window.refreshAuthState(); } catch (e) { } } });
-                window.addEventListener('storage', (e) => {
-                    const k = e.key || '';
-                    if (k.includes('tuba-auth-token') || k.includes('sb-')) {
-                        try { window.refreshAuthState(); } catch (e) { }
-                    }
-                });
-                setInterval(() => { try { window.refreshAuthState(); } catch (e) { } }, 60000);
-            })();
-
             // Service Worker Registration and Capacitor Initialization
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', async () => {
@@ -11610,9 +11540,73 @@
                         const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
                         console.log('SW registered: ', registration);
 
-                        // Initial state update
+
+
+                        // Not signed-in banner — mirrors offline style and is clickable
+                        let isAuthRestoring = true;
+                        const authBannerEl = document.getElementById('authBanner');
+                        window.updateAuthBanner = () => {
+                            if (!authBannerEl) return;
+                            if (!navigator.onLine) {
+                                authBannerEl.style.display = 'none';
+                                authBannerEl.textContent = '';
+                                authBannerEl.onclick = null;
+                            } else if (isAuthRestoring) {
+                                authBannerEl.innerHTML = "Restoring session…";
+                                authBannerEl.style.display = 'block';
+                                authBannerEl.onclick = null;
+                            } else if (currentUser && syncEnabled) {
+                                authBannerEl.style.display = 'none';
+                                authBannerEl.textContent = '';
+                                authBannerEl.onclick = null;
+                            } else {
+                                authBannerEl.innerHTML = "You’re not signed in — tap to sign in and sync.";
+                                authBannerEl.style.display = 'block';
+                                authBannerEl.onclick = () => {
+                                    try {
+                                        switchTab('account');
+                                        setTimeout(() => {
+                                            try { switchAuthTab('login'); } catch (e) { }
+                                            const lf = document.getElementById('loginForm');
+                                            lf && lf.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }, 50);
+                                    } catch (e) { /* no-op */ }
+                                };
+                            }
+                        };
+
+                        // Initial state and event listeners
                         window.updateAuthBanner && window.updateAuthBanner();
-                        try { window.refreshAuthState && window.refreshAuthState(); } catch (e) { }
+                        // Periodic auth heartbeat to keep UI in sync
+                        async function refreshAuthState() {
+                            try {
+                                const { data: { session } } = await supabase.auth.getSession();
+                                if (session && session.user) {
+                                    currentUser = session.user;
+                                    syncEnabled = true;
+                                } else {
+                                    currentUser = null;
+                                    syncEnabled = false;
+                                }
+                            } catch { }
+                            isAuthRestoring = false;
+                            window.updateAuthBanner && window.updateAuthBanner();
+                            updateSideNavAuthButton && updateSideNavAuthButton();
+                        }
+                        // On load, after SW ready, reconcile auth state
+                        refreshAuthState();
+                        // Also reconcile on online and visibility changes
+                        window.addEventListener('online', refreshAuthState);
+                        document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAuthState(); });
+                        // Cross-tab sync via storage events
+                        window.addEventListener('storage', (e) => {
+                            const k = e.key || '';
+                            if (k.includes('tuba-auth-token') || k.includes('sb-')) {
+                                refreshAuthState();
+                            }
+                        });
+                        // Periodic heartbeat
+                        setInterval(refreshAuthState, 60000);
                         window.addEventListener('online', () => {
                             window.updateAuthBanner && window.updateAuthBanner();
                             try {
