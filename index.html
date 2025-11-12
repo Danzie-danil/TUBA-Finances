@@ -757,6 +757,23 @@
             box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
+        @keyframes autofillDetection {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        input:-webkit-autofill {
+            animation-name: autofillDetection;
+            animation-duration: 0.001s;
+            animation-iteration-count: 1;
+            animation-timing-function: ease;
+        }
+
         .info-row {
             display: flex;
             justify-content: space-between;
@@ -3933,11 +3950,11 @@
                 <div id="loginForm">
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" id="loginEmail" placeholder="your@email.com">
+                        <input type="email" id="loginEmail" placeholder="your@email.com" name="username" autocomplete="username" autocapitalize="none" autocorrect="off">
                     </div>
                     <div class="form-group">
                         <label>Password</label>
-                        <input type="password" id="loginPassword" placeholder="••••••••">
+                        <input type="password" id="loginPassword" placeholder="••••••••" name="current-password" autocomplete="current-password">
                     </div>
                     <button onclick="handleSignIn()">Sign In</button>
                 </div>
@@ -4178,8 +4195,13 @@
                 document.getElementById('signupForm').style.display = 'none';
                 document.getElementById('loginTab').classList.add('active');
                 document.getElementById('signupTab').classList.remove('active');
-                // Attempt auto submit if autofill has already populated fields
-                try { autoSubmitLoginIfAutofilled(); } catch (e) { /* no-op */ }
+                try { autoSubmitLoginIfAutofilled(); } catch (e) { }
+                try {
+                    if (typeof isIOSSafari === 'function' && isIOSSafari()) {
+                        const emailEl = document.getElementById('loginEmail');
+                        emailEl && emailEl.focus();
+                    }
+                } catch (e) { }
             } else {
                 document.getElementById('loginForm').style.display = 'none';
                 document.getElementById('signupForm').style.display = 'block';
@@ -4239,10 +4261,33 @@
 
         // Also trigger detection on visibility change and when inputs receive focus
         document.addEventListener('visibilitychange', function () {
-            if (document.visibilityState === 'visible' && state.activeTab === 'account' && !currentUser) {
-                try { autoSubmitLoginIfAutofilled(); } catch (e) { }
+            if (document.visibilityState === 'visible' && !currentUser) {
+                try { attemptSilentCredentialSignIn(); } catch (e) { }
+                if (!currentUser && (typeof isIOSSafari === 'function' && isIOSSafari())) {
+                    try { switchTab('account'); } catch (e) { }
+                    try { autoSubmitLoginIfAutofilled(); } catch (e) { }
+                } else if (state.activeTab === 'account') {
+                    try { autoSubmitLoginIfAutofilled(); } catch (e) { }
+                }
             }
         });
+        async function attemptSilentCredentialSignIn() {
+            if (!window.isSecureContext) return false;
+            if (!navigator.credentials) return false;
+            try {
+                const cred = await navigator.credentials.get({ password: true, mediation: 'silent' });
+                if (cred && cred.type === 'password' && cred.id && cred.password) {
+                    try {
+                        const { data, error } = await supabase.auth.signInWithPassword({ email: cred.id, password: cred.password });
+                        if (!error && data && data.user) {
+                            try { refreshAuthState(); } catch (e) { }
+                            return true;
+                        }
+                    } catch (e) { }
+                }
+            } catch (e) { }
+            return false;
+        }
         async function pullFromCloud() {
             if (!syncEnabled || !currentUser) {
                 return showToast('Not signed in', 'error');
@@ -11277,6 +11322,12 @@
                         showToast('Signed in but sync failed. Try manual sync.', 'error');
                     }
 
+                    try {
+                        if (window.isSecureContext && navigator.credentials && window.PasswordCredential) {
+                            const c = new PasswordCredential({ id: email.trim(), password: password });
+                            try { navigator.credentials.store(c); } catch (e) { }
+                        }
+                    } catch (e) { }
                     return data;
                 } catch (error) {
                     console.error('Sign in exception:', error);
@@ -11626,20 +11677,19 @@
             // Initialize mobile features
             document.addEventListener('DOMContentLoaded', function () {
                 addTouchFeedback();
+                try { attemptSilentCredentialSignIn(); } catch (e) { }
+                if (!currentUser) {
+                    try { autoSubmitLoginIfAutofilled(); } catch (e) { }
+                }
 
-                // Removed in-app pull-to-refresh event listeners
-
-                // Handle orientation changes
                 window.addEventListener('orientationchange', function () {
                     setTimeout(() => {
                         window.scrollTo(0, 1);
                     }, 500);
                 });
 
-                // Handle app state changes
                 document.addEventListener('visibilitychange', function () {
                     if (document.visibilityState === 'visible') {
-                        // App became visible - could refresh data here
                         console.log('App became visible');
                     }
                 });
