@@ -1859,6 +1859,7 @@
                         persistSession: true,
                         autoRefreshToken: true,
                         detectSessionInUrl: true,
+                        multiTab: true,
                         storageKey: 'tuba-auth-token',
                         storage: window.localStorage
                     }
@@ -10990,7 +10991,14 @@
 
         // Handle side nav auth button click
         async function handleSideNavAuth() {
-            if (currentUser && syncEnabled) {
+            // Double-check actual session to avoid UI desync
+            let effectiveUser = null;
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                effectiveUser = session?.user || null;
+            } catch { }
+
+            if (effectiveUser && syncEnabled) {
                 // User is logged in - logout
                 if (confirm('Are you sure you want to logout?')) {
                     await signOut();
@@ -11507,12 +11515,17 @@
                         };
 
                         // Not signed-in banner — mirrors offline style and is clickable
+                        let isAuthRestoring = true;
                         const authBannerEl = document.getElementById('authBanner');
                         window.updateAuthBanner = () => {
                             if (!authBannerEl) return;
                             if (!navigator.onLine) {
                                 authBannerEl.style.display = 'none';
                                 authBannerEl.textContent = '';
+                                authBannerEl.onclick = null;
+                            } else if (isAuthRestoring) {
+                                authBannerEl.innerHTML = "Restoring session…";
+                                authBannerEl.style.display = 'block';
                                 authBannerEl.onclick = null;
                             } else if (currentUser && syncEnabled) {
                                 authBannerEl.style.display = 'none';
@@ -11537,6 +11550,36 @@
                         // Initial state and event listeners
                         updateOfflineBanner();
                         window.updateAuthBanner && window.updateAuthBanner();
+                        // Periodic auth heartbeat to keep UI in sync
+                        async function refreshAuthState() {
+                            try {
+                                const { data: { session } } = await supabase.auth.getSession();
+                                if (session && session.user) {
+                                    currentUser = session.user;
+                                    syncEnabled = true;
+                                } else {
+                                    currentUser = null;
+                                    syncEnabled = false;
+                                }
+                            } catch { }
+                            isAuthRestoring = false;
+                            window.updateAuthBanner && window.updateAuthBanner();
+                            updateSideNavAuthButton && updateSideNavAuthButton();
+                        }
+                        // On load, after SW ready, reconcile auth state
+                        refreshAuthState();
+                        // Also reconcile on online and visibility changes
+                        window.addEventListener('online', refreshAuthState);
+                        document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAuthState(); });
+                        // Cross-tab sync via storage events
+                        window.addEventListener('storage', (e) => {
+                            const k = e.key || '';
+                            if (k.includes('tuba-auth-token') || k.includes('sb-')) {
+                                refreshAuthState();
+                            }
+                        });
+                        // Periodic heartbeat
+                        setInterval(refreshAuthState, 60000);
                         window.addEventListener('online', () => {
                             updateOfflineBanner();
                             window.updateAuthBanner && window.updateAuthBanner();
