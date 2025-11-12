@@ -1917,12 +1917,13 @@
                     // Load user profile
                     await loadUserProfile();
 
-                    // Auto-pull cloud data when local data is empty
-                    await maybeAutoPullCloudData();
-
-                    // REMOVED: Automatic data pull on refresh that was clearing local data
-                    // Users can manually sync using the sync button if needed
-                    // await pullDataFromSupabase();
+                    // Always pull and merge cloud data after session restore
+                    // This is safe because pullDataFromSupabase merges and deduplicates
+                    try {
+                        await pullDataFromSupabase();
+                    } catch (e) {
+                        console.warn('Cloud pull after restore failed:', e);
+                    }
 
                     console.log('✅ Session restored successfully (local data preserved)');
                     return true;
@@ -3203,7 +3204,10 @@
         setInterval(() => { try { upsertQueue.process(); } catch { } }, 30000);
         window.addEventListener('online', () => { try { upsertQueue.process(); } catch { } });
         async function upsertOne(table, payload) {
-            if (!syncEnabled || !currentUser) return;
+            if (!syncEnabled || !currentUser) {
+                try { upsertQueue.enqueue(table, payload); } catch { }
+                return;
+            }
             try {
                 const data = { ...payload, user_id: currentUser.id };
                 if (table === 'products') { data.category = data.category || ''; }
@@ -5958,16 +5962,18 @@
             render();
             showToast("Expense added", "success");
 
-            if (syncEnabled) {
-                await upsertOne('notes', {
-                    title: note.title,
-                    content: note.content,
-                    date: note.date,
-                    time: note.time,
-                    timestamp: note.timestamp
-                });
-                syncInBackground();
-            }
+            // Always attempt to upsert the expense; it will be queued if not authenticated
+            await upsertOne('expenses', {
+                date: expense.date,
+                time: expense.time,
+                timestamp: expense.timestamp,
+                description: expense.description,
+                category: expense.category,
+                amount: expense.amount,
+                payment: expense.payment,
+                comment: expense.comment
+            });
+            if (syncEnabled) syncInBackground();
         }
 
         async function editExpenseIndex(i) {
