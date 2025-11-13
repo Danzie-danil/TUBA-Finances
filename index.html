@@ -2256,12 +2256,10 @@
                 try {
                     if (localHasData) {
                         // Smart merge - combine unique items by ID
-                        showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                         await smartMergeData();
                         showToast('Local and cloud data merged successfully', 'success');
                     } else {
                         // No local data, just pull from cloud
-                        showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
                         await pullDataFromSupabase();
                         showToast('Cloud data loaded', 'success');
                     }
@@ -3768,6 +3766,15 @@
 
             const t = document.createElement('div');
             t.className = 'toast toast-' + type;
+            const key = (type + ':' + message).toLowerCase();
+            t.setAttribute('data-key', key);
+            try {
+                const existing = Array.from(bar.querySelectorAll('.toast')).find(el => el.getAttribute('data-key') === key);
+                if (existing) {
+                    existing.classList.remove('show');
+                    setTimeout(() => existing.remove(), 0);
+                }
+            } catch { }
             const span = document.createElement('span');
             span.textContent = message;
             t.appendChild(span);
