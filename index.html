@@ -3093,6 +3093,110 @@
             settings: 'user_id'
         };
 
+
+        const DELETE_QUEUE_KEY = 'tuba-delete-queue-v1';
+        const deleteQueue = {
+            items: [],
+            load() {
+                try {
+                    const raw = localStorage.getItem(DELETE_QUEUE_KEY);
+                    this.items = raw ? JSON.parse(raw) : [];
+                } catch { this.items = []; }
+            },
+            save() {
+                try { localStorage.setItem(DELETE_QUEUE_KEY, JSON.stringify(this.items)); } catch { }
+            },
+            enqueue(table, keySource) {
+                this.items.push({
+                    id: `${table}-del-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    table,
+                    keySource,
+                    attempts: 0,
+                    nextTryAt: Date.now() + 1000
+                });
+                this.save();
+                console.log('🗑️ Enqueued delete', table, keySource);
+            },
+            backoffDelay(attempts) {
+                const schedule = [1000, 2000, 5000, 10000, 30000, 60000];
+                return schedule[Math.min(attempts, schedule.length - 1)];
+            },
+            buildDeleteKeys(table, src) {
+                const k = {};
+                switch (table) {
+                    case 'sales':
+                    case 'expenses':
+                    case 'notes':
+                    case 'transactions':
+                    case 'receipts':
+                    case 'unpaid_entries':
+                        k.timestamp = src.timestamp;
+                        break;
+                    case 'invoices':
+                        k.number = src.number;
+                        break;
+                    case 'customers':
+                        k.name = src.name;
+                        k.email = src.email || '';
+                        break;
+                    case 'products':
+                        k.name = src.name;
+                        k.category = src.category || '';
+                        break;
+                    case 'categories':
+                        k.name = typeof src === 'string' ? src : (src.name || src);
+                        break;
+                    default:
+                        if (src.timestamp) k.timestamp = src.timestamp;
+                        break;
+                }
+                return k;
+            },
+            async process() {
+                if (!navigator.onLine || !syncEnabled || !currentUser) return;
+                if (!Array.isArray(this.items) || this.items.length === 0) return;
+                const now = Date.now();
+                for (const item of [...this.items]) {
+                    if (item.nextTryAt && item.nextTryAt > now) continue;
+                    try {
+                        const keys = this.buildDeleteKeys(item.table, item.keySource);
+                        const { error } = await supabase.from(item.table)
+                            .delete()
+                            .match({ user_id: currentUser.id, ...keys });
+                        if (error) throw error;
+                        this.items = this.items.filter(q => q.id !== item.id);
+                        this.save();
+                        console.log('✅ Delete queue processed', item.table);
+                    } catch (err) {
+                        console.warn('⏳ Delete retry scheduled', item.table, err?.message || err);
+                        item.attempts = (item.attempts || 0) + 1;
+                        item.nextTryAt = Date.now() + this.backoffDelay(item.attempts);
+                        this.save();
+                    }
+                }
+            }
+        };
+        deleteQueue.load();
+        setInterval(() => { try { deleteQueue.process(); } catch { } }, 30000);
+        window.addEventListener('online', () => { try { deleteQueue.process(); } catch { } });
+
+        async function deleteOne(table, keySource) {
+            if (!syncEnabled || !currentUser) {
+                try { deleteQueue.enqueue(table, keySource); } catch { }
+                return;
+            }
+            try {
+                const keys = deleteQueue.buildDeleteKeys(table, keySource);
+                const { error } = await supabase.from(table)
+                    .delete()
+                    .match({ user_id: currentUser.id, ...keys });
+                if (error) throw error;
+            } catch (error) {
+                console.error(`Delete error on ${table}:`, error);
+                try { deleteQueue.enqueue(table, keySource); } catch { }
+            }
+        }
+
         // ============================================
         // Offline Upsert Queue with Backoff
         // ============================================
@@ -4790,6 +4894,40 @@
 
             showConfirm(`Delete ${selected.length} selected items?`, async function () {
                 const items = type === 'unpaidEntries' ? state.unpaidEntries : state[type];
+                // Issue cloud deletes for each selected item
+                if (syncEnabled) {
+                    try {
+                        selected.forEach(selId => {
+                            const it = items.find(x => x.id === selId);
+                            if (!it) return;
+                            switch (type) {
+                                case 'sales':
+                                    deleteOne('sales', { timestamp: it.timestamp });
+                                    break;
+                                case 'expenses':
+                                    deleteOne('expenses', { timestamp: it.timestamp });
+                                    break;
+                                case 'customers':
+                                    deleteOne('customers', { name: it.name, email: it.email || '' });
+                                    break;
+                                case 'products':
+                                    deleteOne('products', { name: it.name, category: it.category || '' });
+                                    break;
+                                case 'transactions':
+                                    deleteOne('transactions', { timestamp: it.timestamp });
+                                    break;
+                                case 'unpaidEntries':
+                                    deleteOne('unpaid_entries', { timestamp: it.timestamp });
+                                    break;
+                                case 'notes':
+                                    deleteOne('notes', { timestamp: it.timestamp });
+                                    break;
+                                default:
+                                    break;
+                            }
+                        });
+                    } catch { }
+                }
                 const filtered = items.filter(item => !selected.includes(item.id));
 
                 if (type === 'unpaidEntries') {
@@ -4897,6 +5035,17 @@
                     state.inventory[sale.productName].stock += sale.quantity;
                 }
 
+                if (sale) {
+                    try {
+                        if (navigator.onLine && syncEnabled && currentUser) {
+                            await deleteOne('sales', { timestamp: sale.timestamp });
+                            showToast('Deleted from cloud', 'success');
+                        } else {
+                            await deleteOne('sales', { timestamp: sale.timestamp });
+                            showToast('Will delete from cloud when online', 'info');
+                        }
+                    } catch { }
+                }
                 state.sales.splice(idx, 1);
                 saveData();
                 render();
@@ -5344,6 +5493,18 @@
             showConfirm("Delete this transaction?", async function () {
                 const idx = state.transactions.findIndex(t => t.timestamp === ts);
                 if (idx === -1) return showToast("Transaction not found", "error");
+                const t = state.transactions[idx];
+                if (t) {
+                    try {
+                        if (navigator.onLine && syncEnabled && currentUser) {
+                            await deleteOne('transactions', { timestamp: t.timestamp });
+                            showToast('Deleted from cloud', 'success');
+                        } else {
+                            await deleteOne('transactions', { timestamp: t.timestamp });
+                            showToast('Will delete from cloud when online', 'info');
+                        }
+                    } catch { }
+                }
                 state.transactions.splice(idx, 1);
                 calculateFloatBalances();
                 saveData();
@@ -5590,6 +5751,17 @@
             showConfirm("Delete this item?", async function () {
                 const p = state.products[i];
                 if (p && p.name && state.inventory && state.inventory[p.name]) delete state.inventory[p.name];
+                if (p) {
+                    try {
+                        if (navigator.onLine && syncEnabled && currentUser) {
+                            await deleteOne('products', { name: p.name, category: p.category || '' });
+                            showToast('Deleted from cloud', 'success');
+                        } else {
+                            await deleteOne('products', { name: p.name, category: p.category || '' });
+                            showToast('Will delete from cloud when online', 'info');
+                        }
+                    } catch { }
+                }
                 state.products.splice(i, 1);
                 saveData();
                 render();
@@ -5698,6 +5870,8 @@
             showConfirm(`Delete ${selected.length} selected categories?`, async function () {
                 // Sort in reverse to delete from end first
                 selected.sort((a, b) => b - a).forEach(i => {
+                    const name = state.categories[i];
+                    if (syncEnabled && name) { try { deleteOne('categories', { name }); } catch { } }
                     state.categories.splice(i, 1);
                 });
 
@@ -5997,6 +6171,18 @@
 
         function deleteExpenseIndex(i) {
             showConfirm("Delete this expense?", async function () {
+                const e = state.expenses[i];
+                if (e) {
+                    try {
+                        if (navigator.onLine && syncEnabled && currentUser) {
+                            await deleteOne('expenses', { timestamp: e.timestamp });
+                            showToast('Deleted from cloud', 'success');
+                        } else {
+                            await deleteOne('expenses', { timestamp: e.timestamp });
+                            showToast('Will delete from cloud when online', 'info');
+                        }
+                    } catch { }
+                }
                 state.expenses.splice(i, 1);
                 saveData();
                 render();
@@ -6918,6 +7104,18 @@
 
         function deleteCustomerIndex(i) {
             showConfirm("Delete this customer?", async function () {
+                const c = state.customers[i];
+                if (c) {
+                    try {
+                        if (navigator.onLine && syncEnabled && currentUser) {
+                            await deleteOne('customers', { name: c.name, email: c.email || '' });
+                            showToast('Deleted from cloud', 'success');
+                        } else {
+                            await deleteOne('customers', { name: c.name, email: c.email || '' });
+                            showToast('Will delete from cloud when online', 'info');
+                        }
+                    } catch { }
+                }
                 state.customers.splice(i, 1);
                 saveData();
                 render();
@@ -7296,6 +7494,8 @@
 
             showConfirm(`Delete ${selected.length} selected invoices?`, async function () {
                 selected.sort((a, b) => b - a).forEach(i => {
+                    const inv = state.invoices[i];
+                    if (syncEnabled && inv) { try { deleteOne('invoices', { number: inv.number }); } catch { } }
                     state.invoices.splice(i, 1);
                 });
 
@@ -7356,6 +7556,8 @@
 
             showConfirm(`Delete ${selected.length} selected invoices?`, async function () {
                 selected.sort((a, b) => b - a).forEach(i => {
+                    const inv = state.invoices[i];
+                    if (syncEnabled && inv) { try { deleteOne('invoices', { number: inv.number }); } catch { } }
                     state.invoices.splice(i, 1);
                 });
 
@@ -7370,6 +7572,18 @@
 
         function deleteInvoice(index) {
             showConfirm("Delete this invoice?", async function () {
+                const inv = state.invoices[index];
+                if (inv) {
+                    try {
+                        if (navigator.onLine && syncEnabled && currentUser) {
+                            await deleteOne('invoices', { number: inv.number });
+                            showToast('Deleted from cloud', 'success');
+                        } else {
+                            await deleteOne('invoices', { number: inv.number });
+                            showToast('Will delete from cloud when online', 'info');
+                        }
+                    } catch { }
+                }
                 state.invoices.splice(index, 1);
                 saveData();
                 render();
@@ -7780,6 +7994,18 @@
         }
         function deleteReceipt(idx) {
             showConfirm("Delete this receipt?", async function () {
+                const r = state.receipts[idx];
+                if (r) {
+                    try {
+                        if (navigator.onLine && syncEnabled && currentUser) {
+                            await deleteOne('receipts', { timestamp: r.timestamp });
+                            showToast('Deleted from cloud', 'success');
+                        } else {
+                            await deleteOne('receipts', { timestamp: r.timestamp });
+                            showToast('Will delete from cloud when online', 'info');
+                        }
+                    } catch { }
+                }
                 state.receipts.splice(idx, 1);
                 saveData();
                 render();
@@ -7832,6 +8058,8 @@
 
             showConfirm(`Delete ${selected.length} selected receipts?`, async function () {
                 selected.sort((a, b) => b - a).forEach(i => {
+                    const r = state.receipts[i];
+                    if (syncEnabled && r) { try { deleteOne('receipts', { timestamp: r.timestamp }); } catch { } }
                     state.receipts.splice(i, 1);
                 });
 
@@ -8568,6 +8796,20 @@
             showConfirm("Delete this unpaid entry?", function () {
                 const idx = state.unpaidEntries.findIndex(e => e.timestamp === timestamp);
                 if (idx !== -1) {
+                    const entry = state.unpaidEntries[idx];
+                    if (entry) {
+                        (async () => {
+                            try {
+                                if (navigator.onLine && syncEnabled && currentUser) {
+                                    await deleteOne('unpaid_entries', { timestamp: entry.timestamp });
+                                    showToast('Deleted from cloud', 'success');
+                                } else {
+                                    await deleteOne('unpaid_entries', { timestamp: entry.timestamp });
+                                    showToast('Will delete from cloud when online', 'info');
+                                }
+                            } catch { }
+                        })();
+                    }
                     state.unpaidEntries.splice(idx, 1);
                     saveData();
                     render();
@@ -8772,7 +9014,19 @@
 
         function deleteNoteFromModal() {
             if (state.currentNoteIndex === null) return;
-            showConfirm("Delete this note?", function () {
+            showConfirm("Delete this note?", async function () {
+                const note = state.notes[state.currentNoteIndex];
+                if (note) {
+                    try {
+                        if (navigator.onLine && syncEnabled && currentUser) {
+                            await deleteOne('notes', { timestamp: note.timestamp });
+                            showToast('Deleted from cloud', 'success');
+                        } else {
+                            await deleteOne('notes', { timestamp: note.timestamp });
+                            showToast('Will delete from cloud when online', 'info');
+                        }
+                    } catch { }
+                }
                 state.notes.splice(state.currentNoteIndex, 1);
                 saveData();
                 closeNoteModal();
@@ -8804,7 +9058,19 @@
 
         function deleteNoteFromModal() {
             if (state.currentNoteIndex === null) return;
-            showConfirm("Delete this note?", function () {
+            showConfirm("Delete this note?", async function () {
+                const note = state.notes[state.currentNoteIndex];
+                if (note) {
+                    try {
+                        if (navigator.onLine && syncEnabled && currentUser) {
+                            await deleteOne('notes', { timestamp: note.timestamp });
+                            showToast('Deleted from cloud', 'success');
+                        } else {
+                            await deleteOne('notes', { timestamp: note.timestamp });
+                            showToast('Will delete from cloud when online', 'info');
+                        }
+                    } catch { }
+                }
                 state.notes.splice(state.currentNoteIndex, 1);
                 saveData();
                 closeNoteModal();
@@ -8818,7 +9084,19 @@
 
 
         function deleteNoteByIndex(index) {
-            showConfirm("Delete this note?", function () {
+            showConfirm("Delete this note?", async function () {
+                const note = state.notes[index];
+                if (note) {
+                    try {
+                        if (navigator.onLine && syncEnabled && currentUser) {
+                            await deleteOne('notes', { timestamp: note.timestamp });
+                            showToast('Deleted from cloud', 'success');
+                        } else {
+                            await deleteOne('notes', { timestamp: note.timestamp });
+                            showToast('Will delete from cloud when online', 'info');
+                        }
+                    } catch { }
+                }
                 state.notes.splice(index, 1);
                 saveData();
                 render();
@@ -11522,6 +11800,69 @@
                 window.updateOfflineBanner = updateOfflineBanner;
             })();
 
+            (function () {
+                let isAuthRestoring = true;
+                const getAuthBannerEl = () => {
+                    let el = document.getElementById('authBanner');
+                    if (!el) {
+                        el = document.createElement('div');
+                        el.id = 'authBanner';
+                        el.className = 'offline-banner auth-banner';
+                        el.setAttribute('role', 'status');
+                        el.setAttribute('aria-live', 'polite');
+                        el.setAttribute('aria-atomic', 'true');
+                        const headerEl = document.querySelector('.header');
+                        if (headerEl && headerEl.parentNode) {
+                            headerEl.parentNode.insertBefore(el, headerEl.nextSibling.nextSibling);
+                        } else if (document.body) {
+                            document.body.insertBefore(el, document.body.firstChild);
+                        }
+                    }
+                    return el;
+                };
+                window.updateAuthBanner = () => {
+                    const el = getAuthBannerEl();
+                    if (!el) return;
+                    if (!navigator.onLine) {
+                        el.style.display = 'none';
+                        el.textContent = '';
+                        el.onclick = null;
+                    } else if (isAuthRestoring) {
+                        el.innerHTML = "Restoring session…";
+                        el.style.display = 'block';
+                        el.onclick = null;
+                    } else if (currentUser && syncEnabled) {
+                        el.style.display = 'none';
+                        el.textContent = '';
+                        el.onclick = null;
+                    } else {
+                        el.innerHTML = "You’re not signed in — tap to sign in and sync.";
+                        el.style.display = 'block';
+                        el.onclick = () => {
+                            try {
+                                switchTab('account');
+                                setTimeout(() => {
+                                    try { switchAuthTab('login'); } catch (e) { }
+                                    const lf = document.getElementById('loginForm');
+                                    lf && lf.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }, 50);
+                            } catch (e) { }
+                        };
+                    }
+                };
+                window.updateAuthBanner();
+                window.addEventListener('online', () => {
+                    try { window.updateAuthBanner(); } catch { }
+                    try {
+                        if (!currentUser) {
+                            showToast('Back online — sign in to sync your data', 'info');
+                        }
+                    } catch { }
+                });
+                window.addEventListener('offline', () => { try { window.updateAuthBanner(); } catch { } });
+                window.setAuthRestoring = (v) => { isAuthRestoring = !!v; };
+            })();
+
             // Service Worker Registration and Capacitor Initialization
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', async () => {
@@ -11542,38 +11883,7 @@
 
 
 
-                        // Not signed-in banner — mirrors offline style and is clickable
-                        let isAuthRestoring = true;
-                        const authBannerEl = document.getElementById('authBanner');
-                        window.updateAuthBanner = () => {
-                            if (!authBannerEl) return;
-                            if (!navigator.onLine) {
-                                authBannerEl.style.display = 'none';
-                                authBannerEl.textContent = '';
-                                authBannerEl.onclick = null;
-                            } else if (isAuthRestoring) {
-                                authBannerEl.innerHTML = "Restoring session…";
-                                authBannerEl.style.display = 'block';
-                                authBannerEl.onclick = null;
-                            } else if (currentUser && syncEnabled) {
-                                authBannerEl.style.display = 'none';
-                                authBannerEl.textContent = '';
-                                authBannerEl.onclick = null;
-                            } else {
-                                authBannerEl.innerHTML = "You’re not signed in — tap to sign in and sync.";
-                                authBannerEl.style.display = 'block';
-                                authBannerEl.onclick = () => {
-                                    try {
-                                        switchTab('account');
-                                        setTimeout(() => {
-                                            try { switchAuthTab('login'); } catch (e) { }
-                                            const lf = document.getElementById('loginForm');
-                                            lf && lf.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                        }, 50);
-                                    } catch (e) { /* no-op */ }
-                                };
-                            }
-                        };
+
 
                         // Initial state and event listeners
                         window.updateAuthBanner && window.updateAuthBanner();
@@ -11589,7 +11899,7 @@
                                     syncEnabled = false;
                                 }
                             } catch { }
-                            isAuthRestoring = false;
+                            try { window.setAuthRestoring(false); } catch { }
                             window.updateAuthBanner && window.updateAuthBanner();
                             updateSideNavAuthButton && updateSideNavAuthButton();
                         }
