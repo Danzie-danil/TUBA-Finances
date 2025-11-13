@@ -839,6 +839,7 @@
             left: 50%;
             transform: translateX(-50%);
             display: flex;
+            flex-direction: column;
             gap: 8px;
             align-items: center;
             z-index: 9999;
@@ -858,7 +859,6 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
             text-align: center;
             pointer-events: auto;
-            order: 1;
         }
 
         .toast.show {
@@ -866,9 +866,7 @@
             transform: translateY(0);
         }
 
-        .toast-cloud {
-            order: 2;
-        }
+        .toast-cloud {}
 
         .toast-success {
             background: linear-gradient(145deg, #2e7d32, #1b5e20);
@@ -3788,9 +3786,7 @@
             if (typeof onClickHandler === 'function') {
                 t.onclick = () => { try { onClickHandler(); } finally { t.classList.remove('show'); setTimeout(() => t.remove(), 150); } };
             }
-            const isCloud = /Deleted from cloud|Will delete from cloud when online/i.test(message);
-            if (isCloud) t.classList.add('toast-cloud');
-            bar.appendChild(t);
+            bar.prepend(t);
             requestAnimationFrame(() => t.classList.add('show'));
             setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, Math.max(1000, durationMs || 3000));
         }
