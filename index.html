@@ -303,14 +303,6 @@
             margin-bottom: 12px;
         }
 
-        .dashboard-top-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 40px;
-            margin-bottom: 12px;
-            position: relative;
-        }
-
         input[readonly] {
             background: rgba(0, 0, 0, 0.05);
             cursor: not-allowed;
@@ -3469,50 +3461,24 @@
             const abs = Math.abs(n);
             return sign + String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
-        function formatMoney(num, decimals = 2) {
-            if (num === null || num === undefined || isNaN(num)) return '0';
-            const sign = num < 0 ? '-' : '';
-            const abs = Math.abs(parseFloat(num));
-            const [intPart, decPart] = abs.toFixed(decimals).split('.');
-            const grouped = String(intPart).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            return decPart ? `${sign}${grouped}.${decPart}` : `${sign}${grouped}`;
-        }
+        function formatMoney(num) { return formatNumber(num); }
         function parseMoney(str) {
             if (typeof str === 'number') return str;
             if (!str) return 0;
-            const cleaned = String(str).replace(/,/g, '').replace(/[^0-9.\-]/g, '');
-            // keep only first '.' and leading '-'
-            let s = cleaned;
-            const minus = s[0] === '-' ? '-' : '';
-            s = s.replace(/-/g, '');
-            const dotIndex = s.indexOf('.');
-            if (dotIndex !== -1) {
-                s = s.slice(0, dotIndex + 1) + s.slice(dotIndex + 1).replace(/\./g, '');
-            }
-            const numStr = minus + s;
-            const n = parseFloat(numStr);
+            const cleaned = String(str).replace(/[^0-9\-]/g, '');
+            const n = parseInt(cleaned || '0', 10);
             return isNaN(n) ? 0 : n;
         }
-        function formatCurrencyText(str, decimals = 2) {
-            const n = parseMoney(str);
-            // Do not round while typing more than decimals; limit to given decimals
-            const sign = n < 0 ? '-' : '';
-            const parts = String(Math.abs(n).toFixed(decimals)).split('.');
-            const grouped = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            return parts[1] ? `${sign}${grouped}.${parts[1]}` : `${sign}${grouped}`;
-        }
-        function attachMoneyFormatter(el, { max = 999999999999, min = -999999999999, decimals = 2 } = {}) {
+        function attachMoneyFormatter(el, { max = 999999999, min = 0 } = {}) {
             if (!el) return;
-            const clamp = (v) => Math.max(min, Math.min(max, v));
+            const fmt = (v) => formatMoney(Math.max(min, Math.min(max, v)));
             const handle = () => {
-                const val = clamp(parseMoney(el.value));
+                const val = parseMoney(el.value);
                 el.dataset.numeric = String(val);
-                el.value = formatCurrencyText(String(val), decimals);
+                el.value = fmt(val);
             };
             el.addEventListener('input', handle);
             el.addEventListener('blur', handle);
-            el.setAttribute('inputmode', 'decimal');
-            el.setAttribute('aria-live', 'polite');
             // Initialize
             handle();
         }
@@ -3982,11 +3948,11 @@
             const monthlyProgress = state.monthlyTarget > 0 ? (stats.monthProfit / state.monthlyTarget * 100) : 0;
 
             return `
-    <div class="privacy-container" aria-live="polite">
-        <div class="dashboard-top-grid">
-            <button class="privacy-toggle-btn show" id="dashboardPrivacyToggleBtn" onclick="toggleDashboardPrivacy()" aria-pressed="${state.dashboardPrivacyBlurred ? 'true' : 'false'}" title="Toggle privacy" aria-label="Toggle privacy">
-                ${state.dashboardPrivacyBlurred ? '🔒' : '🔓'}
-            </button>
+    <div class="privacy-container">
+        <button class="privacy-toggle-btn show" id="dashboardPrivacyToggleBtn" onclick="toggleDashboardPrivacy()" aria-pressed="${state.dashboardPrivacyBlurred ? 'true' : 'false'}" title="Toggle privacy" aria-label="Toggle privacy">
+            ${state.dashboardPrivacyBlurred ? '🔒' : '🔓'}
+        </button>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
         <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('sales')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">TODAY'S PROFIT</div>
             <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.todayProfit)} Tsh</div>
@@ -3998,9 +3964,7 @@
                 <div class="stat-subvalue" style="font-size: 10px; margin-top: 4px;">${dailyProgress.toFixed(0)}% of target</div>
             ` : ''}
         </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
+        
         <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('sales')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">YESTERDAY'S PROFIT</div>
             <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.yesterdayProfit)} Tsh</div>
@@ -4009,7 +3973,7 @@
                     stats.todayProfit < stats.yesterdayProfit ? '📉 Lower' : '➡️ Same'}
             </div>
         </div>
- 
+
         <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('analytics')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">MONTH PROFIT</div>
             <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.monthProfit)} Tsh</div>
@@ -4027,7 +3991,7 @@
             <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.monthNetProfit)} Tsh</div>
             <div class="stat-subvalue" style="font-size: 10px;">Expenses: ${formatMoney(stats.monthExpenses)} Tsh</div>
         </div>
-        
+
         <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('unpaid')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">UNPAID ENTRIES</div>
             <div class="stat-value" style="font-size: 18px;">${unpaidCount}</div>
@@ -5417,7 +5381,7 @@
                 <div class="info-box">
                     <div class="info-row"><span>Cost/unit:</span><span>💱 ${formatNumber(product.cost)} Tsh</span></div>
                     <div class="info-row"><span>Price/unit:</span>
-                        <input type="text" id="manualPrice" class="money-input" value="${formatMoney(product.price)}" style="width:120px;text-align:right;padding:6px;border-radius:6px;border:1px solid #ddd;">
+                        <input type="number" id="manualPrice" value="${product.price.toFixed(2)}" step="0.01" style="width:120px;text-align:right;padding:6px;border-radius:6px;border:1px solid #ddd;">
                     </div>
                     ${isService ? `<div class=\"info-row\"><span>Item Type:</span><span>Service (no stock)</span></div>` : `<div class=\"info-row\"><span>Available Stock:</span><span>${availableStock} units</span></div>`}
                     <div class="info-row" style="font-weight:700;"><span>Total Cost:</span><span id="totalCost">💱 ${formatNumber(totalCost)} Tsh</span></div>
@@ -5459,7 +5423,7 @@
             const quantity = parseInt(document.getElementById('saleQuantity')?.value) || 1;
             const payment = document.getElementById('salePayment')?.value || 'Cash';
             const manualPriceInput = document.getElementById('manualPrice');
-            const pricePerUnit = manualPriceInput ? parseMoney(manualPriceInput.value) : product.price;
+            const pricePerUnit = manualPriceInput ? parseFloat(manualPriceInput.value) : product.price;
 
             // Check stock only for stock-tracked products
             if (!isService) {
@@ -6034,9 +5998,9 @@
             const name = prompt("Product name:", p.name);
             const cost = prompt("Cost:", p.cost);
             const price = prompt("Price:", p.price);
-            if (name && cost && price && !isNaN(cost) && !isNaN(price)) {
-                const costNum = parseFloat(cost);
-                const priceNum = parseFloat(price);
+            if (name && cost && price) {
+                const costNum = parseMoney(cost);
+                const priceNum = parseMoney(price);
 
                 if (costNum < 0 || priceNum < 0) {
                     return showToast('Cost and price must be positive', 'error');
@@ -10356,8 +10320,33 @@
                 const mt = document.getElementById('monthlyTarget');
                 dt && dt.addEventListener('blur', () => { try { setDailyTarget(); } catch { } });
                 mt && mt.addEventListener('blur', () => { try { setMonthlyTarget(); } catch { } });
+                if (state.activeTab === 'dashboard') {
+                    setTimeout(() => { try { positionDashboardPrivacyButton(); } catch { } }, 0);
+                }
             } catch { }
         }
+
+        function positionDashboardPrivacyButton() {
+            const btn = document.getElementById('dashboardPrivacyToggleBtn');
+            if (!btn || !btn.parentElement) return;
+            const cards = btn.parentElement.querySelectorAll('div > .stat-card');
+            if (!cards || cards.length < 4) return;
+            const r1 = cards[0].getBoundingClientRect();
+            const r2 = cards[1].getBoundingClientRect();
+            const r3 = cards[2].getBoundingClientRect();
+            const r4 = cards[3].getBoundingClientRect();
+            const topRowBottom = Math.max(r1.bottom, r2.bottom);
+            const secondRowTop = Math.min(r3.top, r4.top);
+            const y = (topRowBottom + secondRowTop) / 2;
+            const leftColRight = Math.max(r1.right, r3.right);
+            const rightColLeft = Math.min(r2.left, r4.left);
+            const x = (leftColRight + rightColLeft) / 2;
+            const containerRect = btn.parentElement.getBoundingClientRect();
+            btn.style.top = (y - containerRect.top) + 'px';
+            btn.style.left = (x - containerRect.left) + 'px';
+            btn.style.transform = 'translate(-50%, -50%)';
+        }
+        window.addEventListener('resize', () => { if (state.activeTab === 'dashboard') { try { positionDashboardPrivacyButton(); } catch { } } });
 
         function runFormattingTests() {
             const cases = [1000, 999999, 999999999, 0, -12345];
