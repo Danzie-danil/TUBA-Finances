@@ -766,6 +766,25 @@
             box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
+        .tsh-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background-color: #222;
+            border: 2px solid #fff;
+            outline: 1px solid #222;
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.5px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
 
         @keyframes autofillDetection {
             from {
@@ -2171,8 +2190,27 @@
 
                     if (error) throw error;
 
+                    // Verify cloud persistence
+                    let verified = false;
+                    try {
+                        const { data: verifyData, error: verifyErr } = await supabase
+                            .from('user_profiles')
+                            .select('business_name,email,phone,address,logo_url')
+                            .eq('user_id', currentUser.id)
+                            .single();
+                        if (!verifyErr && verifyData) {
+                            const v = verifyData;
+                            verified = (
+                                String(v.business_name || '') === profileData.businessName &&
+                                String(v.email || '') === profileData.email &&
+                                String(v.phone || '') === profileData.phone &&
+                                String(v.address || '') === profileData.address
+                            );
+                        }
+                    } catch { }
+
                     updateSyncIndicator('synced');
-                    console.log('✅ Profile saved to cloud');
+                    showToast(verified ? 'Profile saved to cloud' : 'Profile saved; cloud verification pending', verified ? 'success' : 'info');
                 } catch (error) {
                     console.error('Save profile to cloud error:', error);
                     updateSyncIndicator('synced');
@@ -5278,7 +5316,8 @@
 
         function updateSaleTotal() {
             const productIndex = document.getElementById('saleProduct')?.value;
-            const quantity = parseMoney(document.getElementById('saleQuantity')?.value) || 1;
+            let quantity = parseMoney(document.getElementById('saleQuantity')?.value) || 1;
+            if (quantity < 1) { showToast('Quantity must be at least 1', 'error'); return; }
             const infoDiv = document.getElementById('saleInfo');
             if (!infoDiv) return;
             if (!productIndex && productIndex !== '0') { infoDiv.innerHTML = ''; return; }
@@ -5350,7 +5389,8 @@
             const quantity = parseMoney(document.getElementById('saleQuantity')?.value) || 1;
             const payment = document.getElementById('salePayment')?.value || 'Cash';
             const manualPriceInput = document.getElementById('manualPrice');
-            const pricePerUnit = manualPriceInput ? parseFloat(manualPriceInput.value) : product.price;
+            const pricePerUnit = manualPriceInput ? (parseMoney(manualPriceInput.value) || product.price) : product.price;
+            if (pricePerUnit < 0) return showToast('Price cannot be negative', 'error');
 
             // Check stock only for stock-tracked products
             if (!isService) {
