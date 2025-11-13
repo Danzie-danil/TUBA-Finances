@@ -4406,21 +4406,7 @@
         </div>
         </div>
 
-        <div class="card" style="margin-top: 12px;">
-            <h2>🗑️ Delete Account</h2>
-            <p style="margin-bottom: 16px; color: #666;">Enter your credentials to delete your account and erase your cloud data.</p>
-            <div id="deleteAccountForm">
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="deleteEmail" placeholder="your@email.com" name="username" autocomplete="username" autocapitalize="none" autocorrect="off">
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="deletePassword" placeholder="••••••••" name="current-password" autocomplete="current-password">
-                </div>
-                <button onclick="handleDeleteAccount()">Delete Account</button>
-            </div>
-        </div>
+        
     `;
         }
 
@@ -4472,87 +4458,23 @@
             }
         }
 
+        /*
         async function handleDeleteAccount() {
-            try {
-                if (!navigator.onLine) { showToast('Go online to delete your account', 'error'); return; }
-                if (!currentUser) { showToast('Not signed in', 'error'); return; }
-                const email = (document.getElementById('deleteEmail')?.value || '').trim();
-                const password = (document.getElementById('deletePassword')?.value || '').trim();
-                if (!email || !password) { showToast('Provide email and password', 'error'); return; }
-                if (email.toLowerCase() !== String(currentUser.email || '').toLowerCase()) { showToast('Email does not match signed-in account', 'error'); return; }
-                const deleteForm = document.getElementById('deleteAccountForm');
-                const btn = deleteForm ? deleteForm.querySelector('button') : null;
-                if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; }
-                showToast('Verifying credentials…', 'info', null, null, 3000);
-                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-                if (error) { showToast('Invalid email or password', 'error'); if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; } return; }
-                await deleteUserDataAndSignOut();
-            } catch (err) { showToast('Delete failed. Try again.', 'error'); } finally {
-                const deleteForm = document.getElementById('deleteAccountForm');
-                const btn = deleteForm ? deleteForm.querySelector('button') : null;
-                if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
-            }
+            // commented out by request
         }
+        */
 
+        /*
         async function deleteUserDataAndSignOut() {
-            try {
-                showToast('Deleting your cloud data…', 'info', null, null, 5000);
-                const uid = currentUser?.id;
-                const tables = [
-                    'products', 'categories', 'sales', 'expenses', 'customers', 'invoices', 'receipts', 'inventory', 'notes', 'transactions', 'unpaid_entries', 'transaction_floats', 'settings', 'inventory_purchase_periods', 'inventory_purchases', 'user_profiles'
-                ];
-                for (const t of tables) { try { await supabase.from(t).delete().eq('user_id', uid); } catch { } }
-                try { await deleteAuthUserServerSide(uid); } catch { }
-                state.products = [];
-                state.sales = [];
-                state.expenses = [];
-                state.customers = [];
-                state.invoices = [];
-                state.receipts = [];
-                state.categories = [];
-                state.inventory = {};
-                state.notes = [];
-                state.transactions = [];
-                state.unpaidEntries = [];
-                state.userProfile = { businessName: '', email: '', phone: '', address: '' };
-                localStorage.removeItem('financeManagerData');
-                localStorage.removeItem('tuba-upsert-queue-v1');
-                localStorage.removeItem('tuba-delete-queue-v1');
-                saveData();
-                await supabase.auth.signOut();
-                currentUser = null;
-                syncEnabled = false;
-                try { if (navigator.credentials && navigator.credentials.preventSilentAccess) { await navigator.credentials.preventSilentAccess(); } } catch { }
-                showToast('Your cloud data has been erased', 'success');
-                render();
-                window.updateAuthBanner && window.updateAuthBanner();
-            } catch (e) { showToast('Delete failed. Please try again.', 'error'); }
+            // commented out by request
         }
+        */
 
+        /*
         async function deleteAuthUserServerSide(uid) {
-            if (!uid) return false;
-            try {
-                if (supabase && supabase.functions && typeof supabase.functions.invoke === 'function') {
-                    const { data, error } = await supabase.functions.invoke('delete-auth-user', { body: { uid } });
-                    if (!error) { showToast('Auth user erased', 'success'); return true; }
-                }
-            } catch { }
-            try {
-                const ep = window.SUPABASE_DELETE_USER_URL || null;
-                if (ep) {
-                    let accessToken = null;
-                    try { const s = await supabase.auth.getSession(); accessToken = s?.data?.session?.access_token || null; } catch { }
-                    const res = await fetch(ep, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(accessToken ? { 'Authorization': 'Bearer ' + accessToken } : {}) },
-                        body: JSON.stringify({ uid })
-                    });
-                    if (res.ok) { showToast('Auth user erased', 'success'); return true; }
-                }
-            } catch { }
-            showToast('Auth delete not configured. Set Edge Function delete-auth-user.', 'info');
-            return false;
+            // commented out by request
         }
+        */
 
         async function updateUserProfile(e) {
             e.preventDefault();
@@ -4879,7 +4801,7 @@
                 </div>
                 <div class="form-group">
                     <label>Quantity</label>
-                    <input type="number" id="saleQuantity" value="1" min="1" onchange="updateSaleTotal()" required>
+                    <input type="text" id="saleQuantity" class="money-input" value="1" onchange="updateSaleTotal()" required>
                 </div>
                 <div class="form-group">
                     <label>Payment Method</label>
@@ -5351,7 +5273,7 @@
 
         function updateSaleTotal() {
             const productIndex = document.getElementById('saleProduct')?.value;
-            const quantity = parseInt(document.getElementById('saleQuantity')?.value) || 1;
+            const quantity = parseMoney(document.getElementById('saleQuantity')?.value) || 1;
             const infoDiv = document.getElementById('saleInfo');
             if (!infoDiv) return;
             if (!productIndex && productIndex !== '0') { infoDiv.innerHTML = ''; return; }
@@ -5381,7 +5303,7 @@
                 <div class="info-box">
                     <div class="info-row"><span>Cost/unit:</span><span>💱 ${formatNumber(product.cost)} Tsh</span></div>
                     <div class="info-row"><span>Price/unit:</span>
-                        <input type="number" id="manualPrice" value="${product.price.toFixed(2)}" step="0.01" style="width:120px;text-align:right;padding:6px;border-radius:6px;border:1px solid #ddd;">
+                        <input type="text" id="manualPrice" class="money-input" value="${formatMoney(product.price)}" style="width:120px;text-align:right;padding:6px;border-radius:6px;border:1px solid #ddd;">
                     </div>
                     ${isService ? `<div class=\"info-row\"><span>Item Type:</span><span>Service (no stock)</span></div>` : `<div class=\"info-row\"><span>Available Stock:</span><span>${availableStock} units</span></div>`}
                     <div class="info-row" style="font-weight:700;"><span>Total Cost:</span><span id="totalCost">💱 ${formatNumber(totalCost)} Tsh</span></div>
@@ -5391,7 +5313,7 @@
             `;
             const manual = document.getElementById('manualPrice');
             manual && manual.addEventListener('input', function () {
-                const p = parseFloat(this.value) || 0;
+                const p = parseMoney(this.value) || 0;
                 document.getElementById('totalPrice').textContent = `💱 ${formatNumber(p * quantity)} Tsh`;
                 document.getElementById('totalProfit').textContent = `💱 ${formatNumber((p - product.cost) * quantity)} Tsh`;
             });
@@ -5420,7 +5342,7 @@
                 customer = { name: 'WALK IN' };
             }
 
-            const quantity = parseInt(document.getElementById('saleQuantity')?.value) || 1;
+            const quantity = parseMoney(document.getElementById('saleQuantity')?.value) || 1;
             const payment = document.getElementById('salePayment')?.value || 'Cash';
             const manualPriceInput = document.getElementById('manualPrice');
             const pricePerUnit = manualPriceInput ? parseFloat(manualPriceInput.value) : product.price;
@@ -5833,7 +5755,7 @@
                         </div>
                         <div class="form-group" id="initialStockGroup">
                             <label>Initial Stock</label>
-                            <input type="number" id="productStock" placeholder="0" min="0" value="0">
+                            <input type="text" id="productStock" class="money-input" placeholder="0" value="0">
                         </div>
                         <button type="submit">Add Product</button>
                     </form>
@@ -5934,7 +5856,7 @@
             if (typeof category === 'string') category = category.trim();
             const cost = parseMoney(document.getElementById('productCost').value);
             const price = parseMoney(document.getElementById('productPrice').value);
-            const stock = parseInt(document.getElementById('productStock').value) || 0;
+            const stock = parseMoney(document.getElementById('productStock').value) || 0;
             const hasStock = (document.getElementById('productHasStock')?.value !== 'no');
 
             if (cost < 0 || price < 0) {
@@ -6577,6 +6499,7 @@
                                 </div>
                                 <div class="item-subtitle">
                                     Unit: ${formatNumber(p.unitCost || p.buyingPrice)} Tsh | Total: ${formatNumber(p.totalCost || (p.buyingPrice || 0))} Tsh<br>
+                                    ${p.discount ? `Discount: ${formatNumber(p.discount)} Tsh<br>` : ''}
                                     Supplier: ${p.supplierName || ''} ${p.supplierPhone ? '(' + p.supplierPhone + ')' : ''}<br>
                                     ${p.supplierAddress || ''}
                                     ${p.notes ? `<br>Notes: ${p.notes}` : ''}
@@ -6650,7 +6573,7 @@
                 ? products
                     .slice()
                     .sort((a, b) => String(a.name).localeCompare(String(b.name)))
-                    .map(p => `<option value="${p.name}">${p.name}</option>`).join('')
+                    .map(p => `<option value="${p.name}">${p.name}</option>`).join('') + `<option value="new" style="background:#fff3e0;font-weight:600;">+ Add New Product</option>`
                 : '<option value="">No products found</option>';
             const cycles = state.inventoryPurchaseCycles || [];
             const nextPeriodNumber = (cycles?.length || 0) + 1;
@@ -6658,22 +6581,69 @@
             const cycleOptions = cycles.map(c => `<option value="${c.number}">Period ${c.number} ${c.title ? '– ' + c.title : ''}</option>`).join('');
 
             content.innerHTML = `
+                <div id="invNewProductFields" style="display:none; margin-bottom:12px;">
+                    <div class="card">
+                        <h3>New Product</h3>
+                        <div class="grid-2" style="gap:8px;">
+                            <div>
+                                <label>Name</label>
+                                <input type="text" id="invNewProductName" placeholder="Enter product name">
+                            </div>
+                            <div>
+                                <label>Category</label>
+                                <select id="invNewProductCategory" onchange="invHandleCategorySelection()">
+                                    <option value="">-- Select Category --</option>
+                                    ${state.categories.slice().sort((a, b) => String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join('')}
+                                    <option value="new" style="background:#fff3e0;font-weight:600;">+ Add New Category</option>
+                                </select>
+                            </div>
+                            <div id="invNewCategoryField" class="grid-span-2" style="display:none;">
+                                <label>New Category Name</label>
+                                <input type="text" id="invNewCategoryName" placeholder="Enter category name">
+                            </div>
+                            <div class="grid-span-2" style="display:flex;align-items:center;gap:8px;">
+                                <label style="margin:0;">Track stock</label>
+                                <input type="checkbox" id="invNewProductHasStock" checked onchange="invToggleNewProductHasStock()">
+                            </div>
+                            <div>
+                                <label>Cost (Capital)</label>
+                                <input type="text" id="invNewProductCost" class="money-input" placeholder="0">
+                            </div>
+                            <div>
+                                <label>Price (Selling)</label>
+                                <input type="text" id="invNewProductPrice" class="money-input" placeholder="0">
+                            </div>
+                            <div id="invNewProductStockGroup" class="grid-span-2">
+                                <label>Initial Stock</label>
+                                <input type="text" id="invNewProductStock" class="money-input" placeholder="0" value="0">
+                            </div>
+                        </div>
+                        <div class="flex-gap" style="margin-top:8px;">
+                            <button class="btn-success" type="button" onclick="invSaveNewProductFromInventory()">✅ Save New Product</button>
+                            <button class="btn-secondary" type="button" onclick="invCancelNewProduct()">✖ Cancel</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="grid-2" style="gap:12px;">
                     <div>
                         <label>Product</label>
-                        <select id="invProductSelect">${productOptions}</select>
+                        <select id="invProductSelect" onchange="invHandleProductSelection()">${productOptions}</select>
                     </div>
                     <div>
                         <label>Quantity</label>
-                        <input id="invQuantity" type="number" min="1" step="1" value="1">
+                        <input id="invQuantity" type="text" class="money-input" value="1">
                     </div>
                     <div>
                         <label>Unit Cost (Tsh)</label>
-                        <input id="invUnitCost" type="number" min="0" step="0.01" placeholder="0.00">
+                        <input id="invUnitCost" type="text" class="money-input" placeholder="0">
                     </div>
                     <div>
                         <label>Total Cost (auto)</label>
-                        <input id="invTotalCost" type="number" min="0" step="0.01" placeholder="0.00" disabled>
+                        <input id="invTotalCost" type="text" placeholder="0" disabled>
+                    </div>
+                    <div>
+                        <label>Discount (Tsh)</label>
+                        <input id="invDiscount" type="text" class="money-input" placeholder="0">
                     </div>
                     <div>
                         <label>Supplier Name</label>
@@ -6701,6 +6671,50 @@
                     </div>
                 </div>
 
+                <div id="invNewProductFields" style="display:none; margin-top:12px;">
+                    <div class="card">
+                        <h3>New Product</h3>
+                        <div class="grid-2" style="gap:8px;">
+                            <div>
+                                <label>Name</label>
+                                <input type="text" id="invNewProductName" placeholder="Enter product name">
+                            </div>
+                            <div>
+                                <label>Category</label>
+                                <select id="invNewProductCategory" onchange="invHandleCategorySelection()">
+                                    <option value="">-- Select Category --</option>
+                                    ${state.categories.slice().sort((a, b) => String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join('')}
+                                    <option value="new" style="background:#fff3e0;font-weight:600;">+ Add New Category</option>
+                                </select>
+                            </div>
+                            <div id="invNewCategoryField" class="grid-span-2" style="display:none;">
+                                <label>New Category Name</label>
+                                <input type="text" id="invNewCategoryName" placeholder="Enter category name">
+                            </div>
+                            <div class="grid-span-2" style="display:flex;align-items:center;gap:8px;">
+                                <label style="margin:0;">Track stock</label>
+                                <input type="checkbox" id="invNewProductHasStock" checked onchange="invToggleNewProductHasStock()">
+                            </div>
+                            <div>
+                                <label>Cost (Capital)</label>
+                                <input type="text" id="invNewProductCost" class="money-input" placeholder="0">
+                            </div>
+                            <div>
+                                <label>Price (Selling)</label>
+                                <input type="text" id="invNewProductPrice" class="money-input" placeholder="0">
+                            </div>
+                            <div id="invNewProductStockGroup" class="grid-span-2">
+                                <label>Initial Stock</label>
+                                <input type="text" id="invNewProductStock" class="money-input" placeholder="0" value="0">
+                            </div>
+                        </div>
+                        <div class="flex-gap" style="margin-top:8px;">
+                            <button class="btn-success" type="button" onclick="invSaveNewProductFromInventory()">✅ Save New Product</button>
+                            <button class="btn-secondary" type="button" onclick="invCancelNewProduct()">✖ Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
                     <div class="card" style="margin-top:12px;">
                         <h3>Period</h3>
                         <div class="flex-gap">
@@ -6720,24 +6734,124 @@
                     </div>
                 `;
 
+            // Attach money formatters in modal
+            try {
+                ['invQuantity', 'invUnitCost', 'invDiscount', 'invNewProductCost', 'invNewProductPrice', 'invNewProductStock'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) attachMoneyFormatter(el);
+                });
+            } catch { }
+
             // Auto-update total cost
             setTimeout(() => {
                 const qtyEl = document.getElementById('invQuantity');
                 const unitEl = document.getElementById('invUnitCost');
                 const totalEl = document.getElementById('invTotalCost');
+                const discEl = document.getElementById('invDiscount');
                 function updateTotal() {
-                    const q = parseFloat(qtyEl.value || '0');
-                    const u = parseFloat(unitEl.value || '0');
-                    const t = (!isNaN(q) && !isNaN(u)) ? (q * u) : 0;
-                    totalEl.value = t.toFixed(2);
+                    const q = parseMoney(qtyEl.value || '0');
+                    const u = parseMoney(unitEl.value || '0');
+                    const d = parseMoney(discEl.value || '0');
+                    const t = Math.max(0, (q * u) - d);
+                    totalEl.value = formatMoney(t);
                 }
                 qtyEl?.addEventListener('input', updateTotal);
                 unitEl?.addEventListener('input', updateTotal);
+                discEl?.addEventListener('input', updateTotal);
                 updateTotal();
             }, 0);
 
             modal.classList.add('show');
         }
+
+        window.invHandleProductSelection = function () {
+            const select = document.getElementById('invProductSelect');
+            const newFields = document.getElementById('invNewProductFields');
+            if (select && newFields) {
+                if (select.value === 'new') {
+                    newFields.style.display = 'block';
+                    document.getElementById('invNewProductName').value = '';
+                    document.getElementById('invNewProductCategory').value = '';
+                    document.getElementById('invNewCategoryName').value = '';
+                    document.getElementById('invNewProductCost').value = '';
+                    document.getElementById('invNewProductPrice').value = '';
+                    document.getElementById('invNewProductStock').value = '0';
+                    document.getElementById('invNewCategoryField').style.display = 'none';
+                    const hasStockEl = document.getElementById('invNewProductHasStock');
+                    const stockGroup = document.getElementById('invNewProductStockGroup');
+                    if (hasStockEl && stockGroup) { hasStockEl.checked = true; stockGroup.style.display = 'block'; }
+                } else {
+                    newFields.style.display = 'none';
+                }
+            }
+        };
+        window.invHandleCategorySelection = function () {
+            const select = document.getElementById('invNewProductCategory');
+            const newCategoryField = document.getElementById('invNewCategoryField');
+            if (select && newCategoryField) {
+                newCategoryField.style.display = (select.value === 'new') ? 'block' : 'none';
+                if (select.value !== 'new') document.getElementById('invNewCategoryName').value = '';
+            }
+        };
+        window.invToggleNewProductHasStock = function () {
+            const hasStockEl = document.getElementById('invNewProductHasStock');
+            const stockGroup = document.getElementById('invNewProductStockGroup');
+            if (hasStockEl && stockGroup) stockGroup.style.display = hasStockEl.checked ? 'block' : 'none';
+        };
+        window.invSaveNewProductFromInventory = async function () {
+            const name = document.getElementById('invNewProductName').value.trim();
+            let categorySelect = document.getElementById('invNewProductCategory').value;
+            if (typeof categorySelect === 'string') categorySelect = categorySelect.trim();
+            const newCategoryName = document.getElementById('invNewCategoryName').value.trim();
+            const cost = parseMoney(document.getElementById('invNewProductCost').value);
+            const price = parseMoney(document.getElementById('invNewProductPrice').value);
+            const hasStock = document.getElementById('invNewProductHasStock')?.checked !== false;
+            const stock = hasStock ? (parseMoney(document.getElementById('invNewProductStock').value) || 0) : 0;
+
+            if (!name) return showToast('Please enter product name', 'error');
+            let category;
+            if (categorySelect === 'new') {
+                if (!newCategoryName) return showToast('Please enter category name', 'error');
+                if (!state.categories.includes(newCategoryName)) state.categories.push(newCategoryName);
+                category = newCategoryName;
+            } else {
+                if (!categorySelect) return showToast('Please select or create a category', 'error');
+                category = categorySelect;
+            }
+            if (isNaN(cost) || cost < 0) return showToast('Please enter a valid cost', 'error');
+            if (isNaN(price) || price < 0) return showToast('Please enter a valid price', 'error');
+            if (price < cost && !confirm('Warning: Selling price is less than cost. Continue?')) return;
+            if (state.products.some(p => p.name.toLowerCase() === name.toLowerCase())) return showToast('Product already exists', 'error');
+
+            const product = { id: generateID('products'), name, category, cost, price, hasStock: hasStock ? true : false };
+            state.products.push(product);
+            state.inventory = state.inventory || {};
+            if (hasStock) state.inventory[name] = { stock, minAlert: 5 };
+            saveData();
+
+            if (syncEnabled) {
+                await upsertOne('products', { name, category, cost, price, has_stock: hasStock ? true : false });
+                if (hasStock) await upsertOne('inventory', { product_name: name, stock: stock, min_alert: 5 });
+                if (category) await upsertOne('categories', { name: category });
+                syncInBackground();
+            }
+
+            const select = document.getElementById('invProductSelect');
+            if (select) {
+                // rebuild options minimally
+                select.insertAdjacentHTML('afterbegin', `<option value="${name}">${name}</option>`);
+                select.value = name;
+            }
+            showToast('✅ Product added!', 'success');
+            const newFields = document.getElementById('invNewProductFields');
+            if (newFields) newFields.style.display = 'none';
+        };
+        window.invCancelNewProduct = function () {
+            const newFields = document.getElementById('invNewProductFields');
+            const select = document.getElementById('invProductSelect');
+            if (newFields) newFields.style.display = 'none';
+            if (select) select.value = '';
+        };
 
         function closeInventoryModal() {
             const modal = document.getElementById('inventoryModal');
@@ -6772,9 +6886,10 @@
 
         async function addInventoryRecord() {
             const productName = (document.getElementById('invProductSelect')?.value || '').trim();
-            const quantity = parseInt(document.getElementById('invQuantity')?.value || '0', 10);
-            const unitCost = parseFloat(document.getElementById('invUnitCost')?.value || '0');
-            const totalCost = parseFloat(document.getElementById('invTotalCost')?.value || '0');
+            const quantity = parseMoney(document.getElementById('invQuantity')?.value || '0');
+            const unitCost = parseMoney(document.getElementById('invUnitCost')?.value || '0');
+            const discount = parseMoney(document.getElementById('invDiscount')?.value || '0');
+            const totalCost = parseMoney(document.getElementById('invTotalCost')?.value || '0');
             const supplierName = (document.getElementById('invSupplierName')?.value || '').trim();
             const supplierPhone = (document.getElementById('invSupplierPhone')?.value || '').trim();
             const supplierAddress = (document.getElementById('invSupplierAddress')?.value || '').trim();
@@ -6788,6 +6903,7 @@
             if (!productName) return showToast('Select a product', 'error');
             if (!quantity || quantity <= 0) return showToast('Enter a valid quantity', 'error');
             if (isNaN(unitCost) || unitCost <= 0) return showToast('Enter unit cost', 'error');
+            if (discount < 0) return showToast('Discount cannot be negative', 'error');
 
             // DePeriodine Period number
             let cycleNumber = selectedPeriod ? parseInt(selectedPeriod, 10) : null;
@@ -6802,13 +6918,14 @@
                 itemName: productName,
                 quantity,
                 unitCost,
-                totalCost: (isNaN(totalCost) || totalCost === 0) ? (quantity * unitCost) : totalCost,
+                discount,
+                totalCost: (isNaN(totalCost) || totalCost === 0) ? Math.max(0, (quantity * unitCost) - discount) : totalCost,
                 supplierName,
                 supplierPhone,
                 supplierAddress,
                 purchaseDate,
                 time,
-                notes,
+                notes: notes ? `${notes}${discount ? ' | Discount: ' + formatMoney(discount) + ' Tsh' : ''}` : (discount ? `Discount: ${formatMoney(discount)} Tsh` : ''),
                 timestamp
             };
 
@@ -10759,7 +10876,7 @@
                     </div>
                     <div class="form-group" id="newProductInitialStockGroup">
                         <label>Initial Stock</label>
-                        <input type="number" id="newProductStock" placeholder="0" min="0" value="0">
+                        <input type="text" id="newProductStock" class="money-input" placeholder="0" value="0">
                     </div>
                     <button type="button" class="btn-success" onclick="saveNewProductFromSales()" style="margin-bottom: 12px;">
                         ✅ Save New Product
@@ -10789,7 +10906,7 @@
                 </div>
                 <div class="form-group">
                     <label>Quantity</label>
-                    <input type="number" id="saleQuantity" value="1" min="1" onchange="updateSaleTotal()" required>
+                    <input type="text" id="saleQuantity" class="money-input" value="1" onchange="updateSaleTotal()" required>
                 </div>
                 <div class="form-group">
                     <label>Payment Method</label>
@@ -10940,7 +11057,7 @@
             const cost = parseMoney(document.getElementById('newProductCost').value);
             const price = parseMoney(document.getElementById('newProductPrice').value);
             const hasStock = document.getElementById('newProductHasStock')?.checked !== false;
-            const stock = hasStock ? (parseInt(document.getElementById('newProductStock').value) || 0) : 0;
+            const stock = hasStock ? (parseMoney(document.getElementById('newProductStock').value) || 0) : 0;
 
             // Validation
             if (!name) {
