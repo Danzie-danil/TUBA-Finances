@@ -4471,6 +4471,7 @@
                     'products', 'categories', 'sales', 'expenses', 'customers', 'invoices', 'receipts', 'inventory', 'notes', 'transactions', 'unpaid_entries', 'transaction_floats', 'settings', 'inventory_purchase_periods', 'inventory_purchases', 'user_profiles'
                 ];
                 for (const t of tables) { try { await supabase.from(t).delete().eq('user_id', uid); } catch { } }
+                try { await deleteAuthUserServerSide(uid); } catch { }
                 state.products = [];
                 state.sales = [];
                 state.expenses = [];
@@ -4490,10 +4491,36 @@
                 await supabase.auth.signOut();
                 currentUser = null;
                 syncEnabled = false;
+                try { if (navigator.credentials && navigator.credentials.preventSilentAccess) { await navigator.credentials.preventSilentAccess(); } } catch { }
                 showToast('Your cloud data has been erased', 'success');
                 render();
                 window.updateAuthBanner && window.updateAuthBanner();
             } catch (e) { showToast('Delete failed. Please try again.', 'error'); }
+        }
+
+        async function deleteAuthUserServerSide(uid) {
+            if (!uid) return false;
+            try {
+                if (supabase && supabase.functions && typeof supabase.functions.invoke === 'function') {
+                    const { data, error } = await supabase.functions.invoke('delete-auth-user', { body: { uid } });
+                    if (!error) { showToast('Auth user erased', 'success'); return true; }
+                }
+            } catch { }
+            try {
+                const ep = window.SUPABASE_DELETE_USER_URL || null;
+                if (ep) {
+                    let accessToken = null;
+                    try { const s = await supabase.auth.getSession(); accessToken = s?.data?.session?.access_token || null; } catch { }
+                    const res = await fetch(ep, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...(accessToken ? { 'Authorization': 'Bearer ' + accessToken } : {}) },
+                        body: JSON.stringify({ uid })
+                    });
+                    if (res.ok) { showToast('Auth user erased', 'success'); return true; }
+                }
+            } catch { }
+            showToast('Auth delete not configured. Set Edge Function delete-auth-user.', 'info');
+            return false;
         }
 
         async function updateUserProfile(e) {
