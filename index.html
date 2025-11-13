@@ -3319,6 +3319,7 @@
         let state = {
             activeTab: 'sales',
             activeTransactionChannel: 'mpesa',
+            dashboardPrivacyBlurred: true,
             products: [],
             sales: [],
             expenses: [],
@@ -3787,6 +3788,9 @@
             if (tabId !== 'sales') {
                 state.privacyBlurred = true;
             }
+            if (tabId !== 'dashboard') {
+                state.dashboardPrivacyBlurred = true;
+            }
             render();
         }
 
@@ -3944,10 +3948,14 @@
             const monthlyProgress = state.monthlyTarget > 0 ? (stats.monthProfit / state.monthlyTarget * 100) : 0;
 
             return `
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
-        <div class="stat-card" onclick="switchTab('sales')" style="padding: 12px;">
+    <div class="privacy-container">
+        <button class="privacy-toggle-btn show" id="dashboardPrivacyToggleBtn" onclick="toggleDashboardPrivacy()" aria-pressed="${state.dashboardPrivacyBlurred ? 'true' : 'false'}" title="Toggle privacy" aria-label="Toggle privacy">
+            ${state.dashboardPrivacyBlurred ? '🔒' : '🔓'}
+        </button>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
+        <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('sales')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">TODAY'S PROFIT</div>
-            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.todayProfit)} Tsh</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.todayProfit)} Tsh</div>
             <div class="stat-subvalue" style="font-size: 11px;">${stats.todaySalesCount} sales today</div>
             ${state.dailyTarget > 0 ? `
                 <div class="progress-bar" style="height: 6px; margin-top: 6px;">
@@ -3957,19 +3965,19 @@
             ` : ''}
         </div>
         
-        <div class="stat-card" onclick="switchTab('sales')" style="padding: 12px;">
+        <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('sales')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">YESTERDAY'S PROFIT</div>
-            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.yesterdayProfit)} Tsh</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.yesterdayProfit)} Tsh</div>
             <div class="stat-subvalue" style="font-size: 10px;">
                 ${stats.todayProfit > stats.yesterdayProfit ? '📈 Better!' :
                     stats.todayProfit < stats.yesterdayProfit ? '📉 Lower' : '➡️ Same'}
             </div>
         </div>
 
-        <div class="stat-card" onclick="switchTab('analytics')" style="padding: 12px;">
+        <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('analytics')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">MONTH PROFIT</div>
-            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.monthProfit)} Tsh</div>
-            <div class="stat-subvalue" style="font-size: 10px;">Revenue: ${formatNumber(stats.monthRevenue)} Tsh</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.monthProfit)} Tsh</div>
+            <div class="stat-subvalue" style="font-size: 10px;">Revenue: ${formatMoney(stats.monthRevenue)} Tsh</div>
             ${state.monthlyTarget > 0 ? `
                 <div class="progress-bar" style="height: 6px; margin-top: 6px;">
                     <div class="progress-fill" style="width: ${Math.min(monthlyProgress, 100)}%"></div>
@@ -3978,23 +3986,24 @@
             ` : ''}
         </div>
 
-        <div class="stat-card" onclick="switchTab('analytics')" style="background: ${stats.monthNetProfit >= 0 ? '#2e7d32' : '#d32f2f'}; padding: 12px;">
+        <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('analytics')" style="background: ${stats.monthNetProfit >= 0 ? '#2e7d32' : '#d32f2f'}; padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">NET PROFIT (MONTH)</div>
-            <div class="stat-value" style="font-size: 16px;">💰 ${formatNumber(stats.monthNetProfit)} Tsh</div>
-            <div class="stat-subvalue" style="font-size: 10px;">Expenses: ${formatNumber(stats.monthExpenses)} Tsh</div>
+            <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.monthNetProfit)} Tsh</div>
+            <div class="stat-subvalue" style="font-size: 10px;">Expenses: ${formatMoney(stats.monthExpenses)} Tsh</div>
         </div>
 
-        <div class="stat-card" onclick="switchTab('unpaid')" style="padding: 12px;">
+        <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('unpaid')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">UNPAID ENTRIES</div>
             <div class="stat-value" style="font-size: 18px;">${unpaidCount}</div>
-            <div class="stat-subvalue" style="font-size: 10px;">Total: ${formatNumber(unpaidAmount)} Tsh</div>
+            <div class="stat-subvalue" style="font-size: 10px;">Total: ${formatMoney(unpaidAmount)} Tsh</div>
         </div>
 
-        <div class="stat-card" onclick="switchTab('inventory')" style="padding: 12px;">
+        <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('inventory')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">LOW STOCK ALERT</div>
             <div class="stat-value" style="font-size: 18px;">${lowStockProducts.length}</div>
             <div class="stat-subvalue" style="font-size: 10px;">${lowStockProducts.length > 0 ? '⚠️ Check inventory' : '✅ All good'}</div>
         </div>
+    </div>
     </div>
 
                 ${lowStockProducts.length > 0 ? `
@@ -9383,6 +9392,12 @@
 
         function togglePrivacy() {
             state.privacyBlurred = !state.privacyBlurred;
+            saveData();
+            render();
+        }
+
+        function toggleDashboardPrivacy() {
+            state.dashboardPrivacyBlurred = !state.dashboardPrivacyBlurred;
             saveData();
             render();
         }
