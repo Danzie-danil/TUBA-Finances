@@ -7,6 +7,10 @@
     <link rel="icon" type="image/png" sizes="32x32" href="tuba-icon.png">
     <link rel="icon" type="image/png" sizes="16x16" href="tuba-icon.png">
     <link rel="apple-touch-icon" sizes="180x180" href="tuba-icon.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="tuba-icon.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="tuba-icon.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="tuba-icon.png">
+    <link rel="apple-touch-icon-precomposed" href="tuba-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="tuba-icon.png">
     <link rel="icon" type="image/png" sizes="512x512" href="tuba-icon.png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -829,11 +833,19 @@
             text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
         }
 
-        .toast {
+        .toast-bar {
             position: fixed;
             bottom: 70px;
             left: 50%;
             transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        .toast {
             background: rgba(0, 0, 0, 0.9);
             backdrop-filter: blur(10px);
             color: #fff;
@@ -841,15 +853,21 @@
             border-radius: 12px;
             font-size: 11px;
             opacity: 0;
-            transition: opacity 0.3s, bottom 0.3s;
-            z-index: 9999;
+            transform: translateY(10px);
+            transition: opacity 0.2s, transform 0.2s;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
             text-align: center;
+            pointer-events: auto;
+            order: 1;
         }
 
         .toast.show {
             opacity: 1;
-            bottom: 75px;
+            transform: translateY(0);
+        }
+
+        .toast-cloud {
+            order: 2;
         }
 
         .toast-success {
@@ -3740,6 +3758,14 @@
         // FAB features removed; bottom tabs restored
 
         function showToast(message, type = "info", actionText = null, actionHandler = null, durationMs = 3000, onClickHandler = null) {
+            let bar = document.getElementById('toastBar');
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'toastBar';
+                bar.className = 'toast-bar';
+                document.body.appendChild(bar);
+            }
+
             const t = document.createElement('div');
             t.className = 'toast toast-' + type;
             const span = document.createElement('span');
@@ -3755,7 +3781,9 @@
             if (typeof onClickHandler === 'function') {
                 t.onclick = () => { try { onClickHandler(); } finally { t.classList.remove('show'); setTimeout(() => t.remove(), 150); } };
             }
-            document.body.appendChild(t);
+            const isCloud = /Deleted from cloud|Will delete from cloud when online/i.test(message);
+            if (isCloud) t.classList.add('toast-cloud');
+            bar.appendChild(t);
             requestAnimationFrame(() => t.classList.add('show'));
             setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, Math.max(1000, durationMs || 3000));
         }
@@ -11990,6 +12018,17 @@
                 if (!currentUser) {
                     try { autoSubmitLoginIfAutofilled(); } catch (e) { }
                 }
+
+                // Ensure apple-touch-icon hrefs are absolute for iOS launchers
+                try {
+                    const origin = window.location.origin || '';
+                    document.querySelectorAll('link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]').forEach(link => {
+                        const href = link.getAttribute('href') || '';
+                        if (href && !href.startsWith('http') && origin) {
+                            link.setAttribute('href', origin.replace(/\/$/, '') + '/' + href.replace(/^\//, ''));
+                        }
+                    });
+                } catch { }
 
                 window.addEventListener('orientationchange', function () {
                     setTimeout(() => {
