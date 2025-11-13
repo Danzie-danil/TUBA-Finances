@@ -761,6 +761,7 @@
             box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
+
         @keyframes autofillDetection {
             from {
                 opacity: 1;
@@ -4369,8 +4370,24 @@
                 </div>
             </form>
             
-            <div class="alert-info" style="margin-top: 16px;">
-                <strong>📝 Note:</strong> This information will be used in invoices, reports, and other documents throughout the app.
+        <div class="alert-info" style="margin-top: 16px;">
+            <strong>📝 Note:</strong> This information will be used in invoices, reports, and other documents throughout the app.
+        </div>
+        </div>
+
+        <div class="card" style="margin-top: 12px;">
+            <h2>🗑️ Delete Account</h2>
+            <p style="margin-bottom: 16px; color: #666;">Enter your credentials to delete your account and erase your cloud data.</p>
+            <div id="deleteAccountForm">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="deleteEmail" placeholder="your@email.com" name="username" autocomplete="username" autocapitalize="none" autocorrect="off">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="deletePassword" placeholder="••••••••" name="current-password" autocomplete="current-password">
+                </div>
+                <button onclick="handleDeleteAccount()">Delete Account</button>
             </div>
         </div>
     `;
@@ -4400,6 +4417,83 @@
             state.profileEditMode = true;
             saveData();
             render();
+        }
+
+        async function submitDeleteAccount(e) {
+            e.preventDefault();
+            try {
+                if (!navigator.onLine) { showToast('Go online to delete your account', 'error'); return; }
+                if (!currentUser) { showToast('Not signed in', 'error'); return; }
+                const email = (document.getElementById('deleteEmail')?.value || '').trim();
+                const password = (document.getElementById('deletePassword')?.value || '').trim();
+                if (!email || !password) { showToast('Provide email and password', 'error'); return; }
+                if (email.toLowerCase() !== String(currentUser.email || '').toLowerCase()) { showToast('Email does not match signed-in account', 'error'); return; }
+                const formEl = e.target;
+                const btn = formEl.querySelector('.submit');
+                if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; }
+                showToast('Verifying credentials…', 'info', null, null, 3000);
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) { showToast('Invalid email or password', 'error'); if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; } return; }
+                await deleteUserDataAndSignOut();
+            } catch (err) { showToast('Delete failed. Try again.', 'error'); } finally {
+                const btn = document.querySelector('.form .submit');
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+            }
+        }
+
+        async function handleDeleteAccount() {
+            try {
+                if (!navigator.onLine) { showToast('Go online to delete your account', 'error'); return; }
+                if (!currentUser) { showToast('Not signed in', 'error'); return; }
+                const email = (document.getElementById('deleteEmail')?.value || '').trim();
+                const password = (document.getElementById('deletePassword')?.value || '').trim();
+                if (!email || !password) { showToast('Provide email and password', 'error'); return; }
+                if (email.toLowerCase() !== String(currentUser.email || '').toLowerCase()) { showToast('Email does not match signed-in account', 'error'); return; }
+                const deleteForm = document.getElementById('deleteAccountForm');
+                const btn = deleteForm ? deleteForm.querySelector('button') : null;
+                if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; }
+                showToast('Verifying credentials…', 'info', null, null, 3000);
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) { showToast('Invalid email or password', 'error'); if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; } return; }
+                await deleteUserDataAndSignOut();
+            } catch (err) { showToast('Delete failed. Try again.', 'error'); } finally {
+                const deleteForm = document.getElementById('deleteAccountForm');
+                const btn = deleteForm ? deleteForm.querySelector('button') : null;
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+            }
+        }
+
+        async function deleteUserDataAndSignOut() {
+            try {
+                showToast('Deleting your cloud data…', 'info', null, null, 5000);
+                const uid = currentUser?.id;
+                const tables = [
+                    'products', 'categories', 'sales', 'expenses', 'customers', 'invoices', 'receipts', 'inventory', 'notes', 'transactions', 'unpaid_entries', 'transaction_floats', 'settings', 'inventory_purchase_periods', 'inventory_purchases', 'user_profiles'
+                ];
+                for (const t of tables) { try { await supabase.from(t).delete().eq('user_id', uid); } catch { } }
+                state.products = [];
+                state.sales = [];
+                state.expenses = [];
+                state.customers = [];
+                state.invoices = [];
+                state.receipts = [];
+                state.categories = [];
+                state.inventory = {};
+                state.notes = [];
+                state.transactions = [];
+                state.unpaidEntries = [];
+                state.userProfile = { businessName: '', email: '', phone: '', address: '' };
+                localStorage.removeItem('financeManagerData');
+                localStorage.removeItem('tuba-upsert-queue-v1');
+                localStorage.removeItem('tuba-delete-queue-v1');
+                saveData();
+                await supabase.auth.signOut();
+                currentUser = null;
+                syncEnabled = false;
+                showToast('Your cloud data has been erased', 'success');
+                render();
+                window.updateAuthBanner && window.updateAuthBanner();
+            } catch (e) { showToast('Delete failed. Please try again.', 'error'); }
         }
 
         async function updateUserProfile(e) {
@@ -8642,9 +8736,12 @@
             // Item Details Header
             doc.setFontSize(8);
             doc.setFont(undefined, 'bold');
+            const pageWidth = 226.77;
+            const priceX = pageWidth - margin; // Right aligned at content edge
+            const qtyX = priceX - 60; // Leave 60pt gap from price
             doc.text('ITEM/DESCRIPTION', margin, y);
-            doc.text('QTY', 120, y);
-            doc.text('PRICE', 160, y, { align: 'right' });
+            doc.text('QTY', qtyX, y);
+            doc.text('PRICE', priceX, y, { align: 'right' });
             y += 12;
 
             doc.setFont(undefined, 'normal');
@@ -8652,8 +8749,8 @@
             // Item Details
             doc.text(sale.productName, margin, y);
             y += 12;
-            doc.text(`${sale.quantity}`, 120, y);
-            doc.text(`${formatNumber(sale.pricePerUnit)}`, 160, y, { align: 'right' });
+            doc.text(`${sale.quantity}`, qtyX, y);
+            doc.text(`${formatNumber(sale.pricePerUnit)}`, priceX, y, { align: 'right' });
             y += 18;
 
             // Separator line
@@ -9627,14 +9724,15 @@
                 const colWidth = usableWidth / colCount;
                 const rowHeight = 22;
                 if (y + rowHeight > 750) { doc.addPage(); y = margin; }
-                doc.setFillColor(230, 230, 230);
-                doc.roundedRect(margin, y, usableWidth, rowHeight, 2, 2, 'F');
+                doc.setFillColor(245, 245, 245);
+                doc.setDrawColor(180, 180, 180);
+                doc.setLineWidth(0.75);
+                doc.roundedRect(margin, y, usableWidth, rowHeight, 2, 2, 'FD');
                 doc.setTextColor(40, 40, 40);
                 doc.setFont(undefined, 'bold');
                 doc.setFontSize(10);
                 doc.text('Totals', margin + 2 * colWidth + 8, y + 15);
                 doc.text(String(totalQty), margin + 3 * colWidth + 8, y + 15);
-                doc.text(formatNumber(totalPrice) + ' Tsh', margin + 4 * colWidth + 8, y + 15);
                 doc.text(formatNumber(totalProfit) + ' Tsh', margin + 5 * colWidth + 8, y + 15);
                 y += rowHeight + 20;
             }
@@ -9656,8 +9754,10 @@
                 const colWidthE = usableWidth / colCountE;
                 const rowHeightE = 22;
                 if (y + rowHeightE > 750) { doc.addPage(); y = margin; }
-                doc.setFillColor(230, 230, 230);
-                doc.roundedRect(margin, y, usableWidth, rowHeightE, 2, 2, 'F');
+                doc.setFillColor(245, 245, 245);
+                doc.setDrawColor(180, 180, 180);
+                doc.setLineWidth(0.75);
+                doc.roundedRect(margin, y, usableWidth, rowHeightE, 2, 2, 'FD');
                 doc.setTextColor(40, 40, 40);
                 doc.setFont(undefined, 'bold');
                 doc.setFontSize(10);
@@ -9849,14 +9949,15 @@
                 const colWidth = usableWidth / colCount;
                 const rowHeight = 22;
                 if (y + rowHeight > 750) { doc.addPage(); y = margin; }
-                doc.setFillColor(230, 230, 230);
-                doc.roundedRect(margin, y, usableWidth, rowHeight, 2, 2, 'F');
+                doc.setFillColor(245, 245, 245);
+                doc.setDrawColor(180, 180, 180);
+                doc.setLineWidth(0.75);
+                doc.roundedRect(margin, y, usableWidth, rowHeight, 2, 2, 'FD');
                 doc.setTextColor(40, 40, 40);
                 doc.setFont(undefined, 'bold');
                 doc.setFontSize(10);
                 doc.text('Totals', margin + 2 * colWidth + 8, y + 15);
                 doc.text(String(totalQty), margin + 3 * colWidth + 8, y + 15);
-                doc.text(formatNumber(totalPrice) + ' Tsh', margin + 4 * colWidth + 8, y + 15);
                 doc.text(formatNumber(totalProfit) + ' Tsh', margin + 5 * colWidth + 8, y + 15);
                 y += rowHeight + 20;
             }
@@ -9878,8 +9979,10 @@
                 const colWidthE = usableWidth / colCountE;
                 const rowHeightE = 22;
                 if (y + rowHeightE > 750) { doc.addPage(); y = margin; }
-                doc.setFillColor(230, 230, 230);
-                doc.roundedRect(margin, y, usableWidth, rowHeightE, 2, 2, 'F');
+                doc.setFillColor(245, 245, 245);
+                doc.setDrawColor(180, 180, 180);
+                doc.setLineWidth(0.75);
+                doc.roundedRect(margin, y, usableWidth, rowHeightE, 2, 2, 'FD');
                 doc.setTextColor(40, 40, 40);
                 doc.setFont(undefined, 'bold');
                 doc.setFontSize(10);
