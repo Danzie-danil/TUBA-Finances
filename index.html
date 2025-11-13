@@ -3454,8 +3454,32 @@
         }
 
         function formatNumber(num) {
-            if (num === null || num === undefined || isNaN(num)) return '0.00';
-            return parseFloat(num).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            if (num === null || num === undefined || isNaN(num)) return '0';
+            const n = Math.round(parseFloat(num));
+            const sign = n < 0 ? '-' : '';
+            const abs = Math.abs(n);
+            return sign + String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        function formatMoney(num) { return formatNumber(num); }
+        function parseMoney(str) {
+            if (typeof str === 'number') return str;
+            if (!str) return 0;
+            const cleaned = String(str).replace(/[^0-9\-]/g, '');
+            const n = parseInt(cleaned || '0', 10);
+            return isNaN(n) ? 0 : n;
+        }
+        function attachMoneyFormatter(el, { max = 999999999, min = 0 } = {}) {
+            if (!el) return;
+            const fmt = (v) => formatMoney(Math.max(min, Math.min(max, v)));
+            const handle = () => {
+                const val = parseMoney(el.value);
+                el.dataset.numeric = String(val);
+                el.value = fmt(val);
+            };
+            el.addEventListener('input', handle);
+            el.addEventListener('blur', handle);
+            // Initialize
+            handle();
         }
 
         function loadData() {
@@ -4006,7 +4030,7 @@
                     <h2>Set Daily Target</h2>
                     <div class="form-group">
                         <label>Daily Profit Target (Tsh)</label>
-                        <input type="number" id="dailyTarget" value="${state.dailyTarget || 0}" step="1000">
+                        <input type="text" class="money-input" id="dailyTarget" value="${formatMoney(state.dailyTarget || 0)}">
                     </div>
                     <button onclick="setDailyTarget()">Save Target</button>
                 </div>
@@ -4015,7 +4039,7 @@
                     <h2>Set Monthly Target</h2>
                     <div class="form-group">
                         <label>Monthly Profit Target (Tsh)</label>
-                        <input type="number" id="monthlyTarget" value="${state.monthlyTarget || 0}" step="10000">
+                        <input type="text" class="money-input" id="monthlyTarget" value="${formatMoney(state.monthlyTarget || 0)}">
                     </div>
                     <button onclick="setMonthlyTarget()">Save Target</button>
                 </div>
@@ -4038,46 +4062,44 @@
         }
 
         async function setDailyTarget() {
-            const value = parseFloat(document.getElementById('dailyTarget').value) || 0;
+            const el = document.getElementById('dailyTarget');
+            const value = parseMoney(el?.value) || 0;
+            if (value < 0 || value > 999999999) return showToast('Enter amount between 0 and 999,999,999', 'error');
             state.dailyTarget = value;
             saveData();
-            render();
             showToast('Daily target updated', 'success');
-
             if (syncEnabled) {
-                await upsertOne('products', { name, category, cost, price, has_stock: hasStock ? true : false });
-                if (hasStock) {
-                    await upsertOne('inventory', { product_name: name, stock: parseInt(stock) || 0, min_alert: 5 });
-                }
-                if (category) {
-                    await upsertOne('categories', { name: category });
-                }
+                await upsertOne('settings', { daily_target: value });
+                const ok = await verifyCloudSettings('daily_target', value);
+                if (!ok) { showToast('Cloud verify failed; will retry', 'info'); }
                 syncInBackground();
             }
+            render();
         }
 
         async function setMonthlyTarget() {
-            const value = parseFloat(document.getElementById('monthlyTarget').value) || 0;
+            const el = document.getElementById('monthlyTarget');
+            const value = parseMoney(el?.value) || 0;
+            if (value < 0 || value > 999999999) return showToast('Enter amount between 0 and 999,999,999', 'error');
             state.monthlyTarget = value;
             saveData();
-            render();
             showToast('Monthly target updated', 'success');
-
-            // Sync immediately and then background merge
             if (syncEnabled) {
-                await upsertOne('transactions', {
-                    channel: transaction.channel,
-                    customer_name: transaction.customerName,
-                    type: transaction.type,
-                    amount: transaction.amount,
-                    date: transaction.date,
-                    time: transaction.time,
-                    timestamp: transaction.timestamp
-                });
-                const floatData = state.transactionFloats[transaction.channel] || { initial: 0 };
-                await upsertOne('transaction_floats', { channel: transaction.channel, initial_float: parseFloat(floatData.initial) || 0 });
+                await upsertOne('settings', { monthly_target: value });
+                const ok = await verifyCloudSettings('monthly_target', value);
+                if (!ok) { showToast('Cloud verify failed; will retry', 'info'); }
                 syncInBackground();
             }
+            render();
+        }
+
+        async function verifyCloudSettings(field, expected) {
+            try {
+                const { data, error } = await supabase.from('settings').select(field).eq('user_id', currentUser.id).single();
+                if (error) return false;
+                const val = parseFloat(data?.[field] || 0);
+                return Math.round(val) === Math.round(expected);
+            } catch { return false; }
         }
 
         function renderAccount() {
@@ -5549,7 +5571,7 @@
                         </div>
                         <div class="form-group">
                             <label>Amount</label>
-                            <input type="number" id="transactionAmount" placeholder="0.00" step="0.01" required>
+                            <input type="text" id="transactionAmount" class="money-input" placeholder="0" required>
                         </div>
                         <button type="submit">Save Transaction</button>
                     </form>
@@ -5663,7 +5685,7 @@
         async function addTransaction(e) {
             e.preventDefault();
             const now = new Date();
-            const amount = parseFloat(document.getElementById('transactionAmount').value);
+            const amount = parseMoney(document.getElementById('transactionAmount').value);
 
             if (isNaN(amount) || amount <= 0) {
                 return showToast('Please enter a valid amount', 'error');
@@ -6256,7 +6278,7 @@
                         </div>
                         <div class="form-group">
                             <label>Amount</label>
-                            <input type="number" id="expenseAmount" placeholder="0.00" step="0.01" required>
+                            <input type="text" id="expenseAmount" class="money-input" placeholder="0" required>
                         </div>
                         <div class="form-group">
                             <label>Payment Method</label>
@@ -6347,7 +6369,7 @@
 
         async function addExpense(e) {
             e.preventDefault();
-            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            const amount = parseMoney(document.getElementById('expenseAmount').value);
             if (isNaN(amount) || amount <= 0) {
                 return showToast('Please enter a valid amount', 'error');
             }
@@ -7447,7 +7469,7 @@
     <div id="invoiceItemsList">
         <div class="invoice-item-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
             <input type="text" class="item-description" placeholder="Item description" style="flex: 2;" required>
-            <input type="number" class="item-amount" placeholder="0.00" step="0.01" style="flex: 1;" required>
+            <input type="text" class="item-amount money-input" placeholder="0" style="flex: 1;" required>
             <button type="button" class="btn-small btn-danger" onclick="removeInvoiceItem(this)" style="width: auto; padding: 8px 12px;">✕</button>
         </div>
     </div>
@@ -7455,7 +7477,7 @@
 </div>
 <div class="form-group">
     <label>Subtotal (Auto-calculated)</label>
-    <input type="text" id="invoiceSubtotal" readonly value="0.00 Tsh" style="background: rgba(0,0,0,0.05);">
+    <input type="text" id="invoiceSubtotal" readonly value="0 Tsh" style="background: rgba(0,0,0,0.05);">
 </div>
                 <div class="form-group">
                     <label>Tax Rate (%)</label>
@@ -7507,7 +7529,7 @@
     </div>
                 <div class="form-group">
                     <label>Amount Paid</label>
-                    <input type="number" id="receiptAmount" placeholder="0.00" step="0.01" required>
+                    <input type="text" id="receiptAmount" class="money-input" placeholder="0" required>
                 </div>
                 <div class="form-group">
                     <label>Payment Method</label>
@@ -7880,7 +7902,7 @@
             newRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
             newRow.innerHTML = `
         <input type="text" class="item-description" placeholder="Item description" style="flex: 2;" required>
-        <input type="number" class="item-amount" placeholder="0.00" step="0.01" style="flex: 1;" required oninput="calculateInvoiceSubtotal()">
+        <input type="text" class="item-amount money-input" placeholder="0" style="flex: 1;" required oninput="calculateInvoiceSubtotal()">
         <button type="button" class="btn-small btn-danger" onclick="removeInvoiceItem(this)" style="width: auto; padding: 8px 12px;">✕</button>
     `;
             container.appendChild(newRow);
@@ -7951,14 +7973,14 @@
             let itemsDescription = '';
             if (Array.isArray(invoice.items)) {
                 itemsDescription = invoice.items.map(item =>
-                    `${item.description} (${formatNumber(item.amount)} Tsh)`
+                    `${item.description} (${formatMoney(item.amount)} Tsh)`
                 ).join(', ');
             } else {
                 itemsDescription = String(invoice.items);
             }
 
             descField.value = `Payment for ${itemsDescription} (Invoice ${invoice.number})`;
-            amountField.value = invoice.amount.toFixed(2);
+            amountField.value = formatMoney(invoice.amount);
         }
 
         function removeInvoiceItem(button) {
@@ -7975,13 +7997,13 @@
             const amounts = document.querySelectorAll('.item-amount');
             let subtotal = 0;
             amounts.forEach(input => {
-                const val = parseFloat(input.value) || 0;
+                const val = parseMoney(input.value) || 0;
                 subtotal += val;
             });
 
             const subtotalField = document.getElementById('invoiceSubtotal');
             if (subtotalField) {
-                subtotalField.value = formatNumber(subtotal) + ' Tsh';
+                subtotalField.value = formatMoney(subtotal) + ' Tsh';
             }
 
             // Update total with tax
@@ -8023,7 +8045,7 @@
                 customerEmail = customer.email || '';
             }
 
-            const amount = parseFloat(document.getElementById('receiptAmount').value);
+            const amount = parseMoney(document.getElementById('receiptAmount').value);
             if (isNaN(amount) || amount <= 0) {
                 return showToast('Please enter a valid amount', 'error');
             }
@@ -8883,7 +8905,7 @@
                         </div>
                         <div class="form-group">
                             <label>Amount</label>
-                            <input type="number" id="unpaidAmount" placeholder="0.00" step="0.01" required>
+                            <input type="text" id="unpaidAmount" class="money-input" placeholder="0" required>
                         </div>
                         <button type="submit">Add Unpaid Entry</button>
                     </form>
@@ -8956,7 +8978,7 @@
             if (productIndex !== null && productIndex !== '') {
                 const product = state.products[productIndex];
                 if (product) {
-                    document.getElementById('unpaidAmount').value = product.price.toFixed(2);
+                    document.getElementById('unpaidAmount').value = formatMoney(product.price);
                 }
             }
         }
@@ -8986,7 +9008,7 @@
                 return showToast("Please select product or enter transaction type", "error");
             }
 
-            const amount = parseFloat(document.getElementById('unpaidAmount').value);
+            const amount = parseMoney(document.getElementById('unpaidAmount').value);
             if (isNaN(amount) || amount <= 0) {
                 return showToast("Please enter a valid amount", "error");
             }
@@ -10277,6 +10299,31 @@
                 updateSelectAllCheckbox('transactions');
                 updateSelectAllCheckbox('unpaidEntries');
             }, 0);
+            try {
+                document.querySelectorAll('.money-input').forEach(el => attachMoneyFormatter(el));
+                const dt = document.getElementById('dailyTarget');
+                const mt = document.getElementById('monthlyTarget');
+                dt && dt.addEventListener('blur', () => { try { setDailyTarget(); } catch { } });
+                mt && mt.addEventListener('blur', () => { try { setMonthlyTarget(); } catch { } });
+            } catch { }
+        }
+
+        function runFormattingTests() {
+            const cases = [1000, 999999, 999999999, 0, -12345];
+            let passed = 0;
+            cases.forEach(n => {
+                const s = formatMoney(n);
+                const back = parseMoney(s);
+                if (Math.round(back) === Math.round(n)) passed++;
+            });
+            showToast(`Formatting tests: ${passed}/${cases.length} passed`, passed === cases.length ? 'success' : 'error');
+        }
+        async function runTargetSyncTests() {
+            if (!syncEnabled || !currentUser) { showToast('Sign in to run sync tests', 'info'); return; }
+            const val = Math.floor(Math.random() * 1000000);
+            await upsertOne('settings', { daily_target: val });
+            const ok = await verifyCloudSettings('daily_target', val);
+            showToast(`Cloud verify daily_target: ${ok ? 'OK' : 'FAIL'}`, ok ? 'success' : 'error');
         }
 
         // Side Navigation Functions
