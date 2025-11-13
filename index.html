@@ -303,6 +303,14 @@
             margin-bottom: 12px;
         }
 
+        .dashboard-top-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
         input[readonly] {
             background: rgba(0, 0, 0, 0.05);
             cursor: not-allowed;
@@ -3461,24 +3469,50 @@
             const abs = Math.abs(n);
             return sign + String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
-        function formatMoney(num) { return formatNumber(num); }
+        function formatMoney(num, decimals = 2) {
+            if (num === null || num === undefined || isNaN(num)) return '0';
+            const sign = num < 0 ? '-' : '';
+            const abs = Math.abs(parseFloat(num));
+            const [intPart, decPart] = abs.toFixed(decimals).split('.');
+            const grouped = String(intPart).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            return decPart ? `${sign}${grouped}.${decPart}` : `${sign}${grouped}`;
+        }
         function parseMoney(str) {
             if (typeof str === 'number') return str;
             if (!str) return 0;
-            const cleaned = String(str).replace(/[^0-9\-]/g, '');
-            const n = parseInt(cleaned || '0', 10);
+            const cleaned = String(str).replace(/,/g, '').replace(/[^0-9.\-]/g, '');
+            // keep only first '.' and leading '-'
+            let s = cleaned;
+            const minus = s[0] === '-' ? '-' : '';
+            s = s.replace(/-/g, '');
+            const dotIndex = s.indexOf('.');
+            if (dotIndex !== -1) {
+                s = s.slice(0, dotIndex + 1) + s.slice(dotIndex + 1).replace(/\./g, '');
+            }
+            const numStr = minus + s;
+            const n = parseFloat(numStr);
             return isNaN(n) ? 0 : n;
         }
-        function attachMoneyFormatter(el, { max = 999999999, min = 0 } = {}) {
+        function formatCurrencyText(str, decimals = 2) {
+            const n = parseMoney(str);
+            // Do not round while typing more than decimals; limit to given decimals
+            const sign = n < 0 ? '-' : '';
+            const parts = String(Math.abs(n).toFixed(decimals)).split('.');
+            const grouped = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            return parts[1] ? `${sign}${grouped}.${parts[1]}` : `${sign}${grouped}`;
+        }
+        function attachMoneyFormatter(el, { max = 999999999999, min = -999999999999, decimals = 2 } = {}) {
             if (!el) return;
-            const fmt = (v) => formatMoney(Math.max(min, Math.min(max, v)));
+            const clamp = (v) => Math.max(min, Math.min(max, v));
             const handle = () => {
-                const val = parseMoney(el.value);
+                const val = clamp(parseMoney(el.value));
                 el.dataset.numeric = String(val);
-                el.value = fmt(val);
+                el.value = formatCurrencyText(String(val), decimals);
             };
             el.addEventListener('input', handle);
             el.addEventListener('blur', handle);
+            el.setAttribute('inputmode', 'decimal');
+            el.setAttribute('aria-live', 'polite');
             // Initialize
             handle();
         }
@@ -3948,11 +3982,11 @@
             const monthlyProgress = state.monthlyTarget > 0 ? (stats.monthProfit / state.monthlyTarget * 100) : 0;
 
             return `
-    <div class="privacy-container">
-        <button class="privacy-toggle-btn show" id="dashboardPrivacyToggleBtn" onclick="toggleDashboardPrivacy()" aria-pressed="${state.dashboardPrivacyBlurred ? 'true' : 'false'}" title="Toggle privacy" aria-label="Toggle privacy">
-            ${state.dashboardPrivacyBlurred ? '🔒' : '🔓'}
-        </button>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
+    <div class="privacy-container" aria-live="polite">
+        <div class="dashboard-top-grid">
+            <button class="privacy-toggle-btn show" id="dashboardPrivacyToggleBtn" onclick="toggleDashboardPrivacy()" aria-pressed="${state.dashboardPrivacyBlurred ? 'true' : 'false'}" title="Toggle privacy" aria-label="Toggle privacy">
+                ${state.dashboardPrivacyBlurred ? '🔒' : '🔓'}
+            </button>
         <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('sales')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">TODAY'S PROFIT</div>
             <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.todayProfit)} Tsh</div>
@@ -3964,7 +3998,9 @@
                 <div class="stat-subvalue" style="font-size: 10px; margin-top: 4px;">${dailyProgress.toFixed(0)}% of target</div>
             ` : ''}
         </div>
-        
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
         <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('sales')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">YESTERDAY'S PROFIT</div>
             <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.yesterdayProfit)} Tsh</div>
@@ -3973,7 +4009,7 @@
                     stats.todayProfit < stats.yesterdayProfit ? '📉 Lower' : '➡️ Same'}
             </div>
         </div>
-
+ 
         <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('analytics')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">MONTH PROFIT</div>
             <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.monthProfit)} Tsh</div>
@@ -3991,7 +4027,7 @@
             <div class="stat-value" style="font-size: 16px;">💰 ${formatMoney(stats.monthNetProfit)} Tsh</div>
             <div class="stat-subvalue" style="font-size: 10px;">Expenses: ${formatMoney(stats.monthExpenses)} Tsh</div>
         </div>
-
+        
         <div class="stat-card ${state.dashboardPrivacyBlurred ? 'privacy-blur' : ''}" onclick="switchTab('unpaid')" style="padding: 12px;">
             <div class="stat-label" style="font-size: 10px;">UNPAID ENTRIES</div>
             <div class="stat-value" style="font-size: 18px;">${unpaidCount}</div>
@@ -5381,7 +5417,7 @@
                 <div class="info-box">
                     <div class="info-row"><span>Cost/unit:</span><span>💱 ${formatNumber(product.cost)} Tsh</span></div>
                     <div class="info-row"><span>Price/unit:</span>
-                        <input type="number" id="manualPrice" value="${product.price.toFixed(2)}" step="0.01" style="width:120px;text-align:right;padding:6px;border-radius:6px;border:1px solid #ddd;">
+                        <input type="text" id="manualPrice" class="money-input" value="${formatMoney(product.price)}" style="width:120px;text-align:right;padding:6px;border-radius:6px;border:1px solid #ddd;">
                     </div>
                     ${isService ? `<div class=\"info-row\"><span>Item Type:</span><span>Service (no stock)</span></div>` : `<div class=\"info-row\"><span>Available Stock:</span><span>${availableStock} units</span></div>`}
                     <div class="info-row" style="font-weight:700;"><span>Total Cost:</span><span id="totalCost">💱 ${formatNumber(totalCost)} Tsh</span></div>
@@ -5423,7 +5459,7 @@
             const quantity = parseInt(document.getElementById('saleQuantity')?.value) || 1;
             const payment = document.getElementById('salePayment')?.value || 'Cash';
             const manualPriceInput = document.getElementById('manualPrice');
-            const pricePerUnit = manualPriceInput ? parseFloat(manualPriceInput.value) : product.price;
+            const pricePerUnit = manualPriceInput ? parseMoney(manualPriceInput.value) : product.price;
 
             // Check stock only for stock-tracked products
             if (!isService) {
@@ -5818,11 +5854,11 @@
                         </div>
                         <div class="form-group">
                             <label>Cost (Capital)</label>
-                            <input type="number" id="productCost" placeholder="0.00" step="0.01" required>
+                            <input type="text" id="productCost" class="money-input" placeholder="0" required>
                         </div>
                         <div class="form-group">
                             <label>Price (Selling)</label>
-                            <input type="number" id="productPrice" placeholder="0.00" step="0.01" required>
+                            <input type="text" id="productPrice" class="money-input" placeholder="0" required>
                         </div>
                         <div class="form-group">
                             <label>Item Type</label>
@@ -5932,8 +5968,8 @@
             const name = document.getElementById('productName').value.trim();
             let category = document.getElementById('productCategory').value;
             if (typeof category === 'string') category = category.trim();
-            const cost = parseFloat(document.getElementById('productCost').value);
-            const price = parseFloat(document.getElementById('productPrice').value);
+            const cost = parseMoney(document.getElementById('productCost').value);
+            const price = parseMoney(document.getElementById('productPrice').value);
             const stock = parseInt(document.getElementById('productStock').value) || 0;
             const hasStock = (document.getElementById('productHasStock')?.value !== 'no');
 
@@ -10726,11 +10762,11 @@
                     
                     <div class="form-group" id="newProductStockGroup">
                         <label>Cost (Capital)</label>
-                        <input type="number" id="newProductCost" placeholder="0.00" step="0.01">
+                        <input type="text" id="newProductCost" class="money-input" placeholder="0">
                     </div>
                     <div class="form-group">
                         <label>Price (Selling)</label>
-                        <input type="number" id="newProductPrice" placeholder="0.00" step="0.01">
+                        <input type="text" id="newProductPrice" class="money-input" placeholder="0">
                     </div>
                     <div class="form-group" id="newProductInitialStockGroup">
                         <label>Initial Stock</label>
@@ -10912,8 +10948,8 @@
             let categorySelect = document.getElementById('newProductCategory').value;
             if (typeof categorySelect === 'string') categorySelect = categorySelect.trim();
             const newCategoryName = document.getElementById('newCategoryName').value.trim();
-            const cost = parseFloat(document.getElementById('newProductCost').value);
-            const price = parseFloat(document.getElementById('newProductPrice').value);
+            const cost = parseMoney(document.getElementById('newProductCost').value);
+            const price = parseMoney(document.getElementById('newProductPrice').value);
             const hasStock = document.getElementById('newProductHasStock')?.checked !== false;
             const stock = hasStock ? (parseInt(document.getElementById('newProductStock').value) || 0) : 0;
 
