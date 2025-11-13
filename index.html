@@ -1733,6 +1733,21 @@
         </div>
 
 
+        <div class="modal" id="pdfViewerModal">
+            <div class="modal-content"
+                style="width: 92%; max-width: 920px; height: 85vh; display: flex; flex-direction: column;">
+                <div class="modal-title" id="pdfViewerTitle">PDF Preview</div>
+                <div style="flex:1; border:1px solid rgba(0,0,0,0.12); border-radius:8px; overflow:hidden;">
+                    <iframe id="pdfIframe" style="width:100%; height:100%;"></iframe>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end;">
+                    <button class="btn-small" id="pdfDownloadBtn">Download</button>
+                    <button class="btn-small btn-secondary" onclick="closePdfViewer()">Close</button>
+                </div>
+            </div>
+        </div>
+
+
 
         <div class="side-nav-footer">
             <div class="side-nav-footer-text">Empowering Your Business</div>
@@ -3789,6 +3804,73 @@
             bar.prepend(t);
             requestAnimationFrame(() => t.classList.add('show'));
             setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, Math.max(1000, durationMs || 3000));
+        }
+
+        function downloadPDFSafe(doc, filename) {
+            try {
+                const ua = navigator.userAgent || navigator.vendor || window.opera;
+                const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                if (isIOS) {
+                    try {
+                        const dataUrl = doc.output('dataurlstring');
+                        openPdfViewer(dataUrl, filename);
+                        return;
+                    } catch { }
+                    try {
+                        const blob = doc.output('blob');
+                        const url = URL.createObjectURL(blob);
+                        openPdfViewer(url, filename);
+                        return;
+                    } catch { }
+                }
+                try {
+                    const blob = doc.output('blob');
+                    const url = URL.createObjectURL(blob);
+                    openPdfViewer(url, filename);
+                    return;
+                } catch { }
+                try { doc.save(filename); } catch { }
+            } catch { }
+        }
+
+        let __pdfViewerURL = null;
+        let __pdfFilename = 'document.pdf';
+        function openPdfViewer(url, filename) {
+            __pdfFilename = filename || 'document.pdf';
+            const modal = document.getElementById('pdfViewerModal');
+            const iframe = document.getElementById('pdfIframe');
+            const btn = document.getElementById('pdfDownloadBtn');
+            const titleEl = document.getElementById('pdfViewerTitle');
+            iframe.src = url;
+            modal.classList.add('show');
+            if (titleEl) {
+                try { titleEl.textContent = 'PDF Preview — ' + __pdfFilename; } catch { }
+            }
+            btn.onclick = function () {
+                try {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = __pdfFilename;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => { a.remove(); }, 100);
+                } catch { }
+            };
+            __pdfViewerURL = url;
+        }
+        function closePdfViewer() {
+            const modal = document.getElementById('pdfViewerModal');
+            const iframe = document.getElementById('pdfIframe');
+            const titleEl = document.getElementById('pdfViewerTitle');
+            modal.classList.remove('show');
+            iframe.src = '';
+            if (titleEl) {
+                try { titleEl.textContent = 'PDF Preview'; } catch { }
+            }
+            if (__pdfViewerURL && __pdfViewerURL.startsWith('blob:')) {
+                try { URL.revokeObjectURL(__pdfViewerURL); } catch { }
+            }
+            __pdfViewerURL = null;
         }
 
         function showConfirm(text, onYes) {
@@ -6792,7 +6874,7 @@
                     doc.text(`The Ultimate Business Architecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
                 }
 
-                doc.save(`Inventory_Purchases_${getTodayDateString()}.pdf`);
+                downloadPDFSafe(doc, `Inventory_Purchases_${getTodayDateString()}.pdf`);
                 showToast('Inventory report PDF downloaded', 'success');
             } catch (e) {
                 console.error('Inventory PDF error:', e);
@@ -6901,7 +6983,7 @@
                     doc.text(`The Ultimate Business Architecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
                 }
 
-                doc.save(`Inventory_Period_${cycleNumber}.pdf`);
+                downloadPDFSafe(doc, `Inventory_Period_${cycleNumber}.pdf`);
                 showToast('Period report PDF downloaded', 'success');
             } catch (e) {
                 console.error('Period PDF error:', e);
@@ -8020,7 +8102,7 @@
                 }
             }
 
-            doc.save(`${receipt.number}.pdf`);
+            downloadPDFSafe(doc, `${receipt.number}.pdf`);
             showToast("Receipt PDF downloaded", "success");
         }
         function deleteReceipt(idx) {
@@ -8440,7 +8522,7 @@
             doc.text('The Ultimate Business Architecture', pageWidth / 2, 792 - 28, { align: 'center' });
             doc.setFontSize(14);
             doc.text('- TUBA -', pageWidth / 2, 792 - 12, { align: 'center' });
-            doc.save(`${inv.number}.pdf`);
+            downloadPDFSafe(doc, `${inv.number}.pdf`);
             showToast("Invoice PDF downloaded", "success");
         }
 
@@ -8611,7 +8693,7 @@
             }
 
             // Save the PDF
-            doc.save(`Receipt_${sale.id || timestamp}.pdf`);
+            downloadPDFSafe(doc, `Receipt_${sale.id || timestamp}.pdf`);
             showToast("Receipt downloaded successfully!", "success");
         }
 
@@ -9575,7 +9657,7 @@
                 doc.text(`The Ultimate Business Achitecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
             }
 
-            doc.save(`Financial_Report_${getTodayDateString()}.pdf`);
+            downloadPDFSafe(doc, `Financial_Report_${getTodayDateString()}.pdf`);
             showToast("PDF downloaded successfully!", "success");
         }
 
@@ -9757,7 +9839,7 @@
                 doc.text(`The Ultimate Business Achitecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
             }
 
-            doc.save(`Daily_Report_${today}.pdf`);
+            downloadPDFSafe(doc, `Daily_Report_${today}.pdf`);
             showToast("Daily report downloaded successfully!", "success");
         }
 
