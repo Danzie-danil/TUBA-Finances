@@ -866,7 +866,6 @@
             transform: translateY(0);
         }
 
-        .toast-cloud {}
 
         .toast-success {
             background: linear-gradient(145deg, #2e7d32, #1b5e20);
@@ -1741,7 +1740,6 @@
                     <iframe id="pdfIframe" style="width:100%; height:100%;"></iframe>
                 </div>
                 <div style="display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end;">
-                    <button class="btn-small" id="pdfOpenTabBtn">Open in New Tab</button>
                     <button class="btn-small" id="pdfDownloadBtn">Download</button>
                     <button class="btn-small btn-secondary" onclick="closePdfViewer()">Close</button>
                 </div>
@@ -3841,15 +3839,11 @@
             const modal = document.getElementById('pdfViewerModal');
             const iframe = document.getElementById('pdfIframe');
             const btn = document.getElementById('pdfDownloadBtn');
-            const openBtn = document.getElementById('pdfOpenTabBtn');
             const titleEl = document.getElementById('pdfViewerTitle');
             iframe.src = url;
             modal.classList.add('show');
             if (titleEl) {
                 try { titleEl.textContent = 'PDF Preview — ' + __pdfFilename; } catch { }
-            }
-            if (openBtn) {
-                openBtn.onclick = function () { try { window.open(url, '_blank'); } catch { } };
             }
             btn.onclick = function () {
                 (async function () {
@@ -9626,6 +9620,23 @@
                 doc.text("Sales Records", margin, y);
                 y += 15;
                 y = drawTable(salesHeaders, salesRows, y);
+                const totalQty = (state.sales || []).reduce((sum, s) => sum + (s.quantity || 0), 0);
+                const totalPrice = (state.sales || []).reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+                const totalProfit = (state.sales || []).reduce((sum, s) => sum + (s.profit || 0), 0);
+                const colCount = salesHeaders.length;
+                const colWidth = usableWidth / colCount;
+                const rowHeight = 22;
+                if (y + rowHeight > 750) { doc.addPage(); y = margin; }
+                doc.setFillColor(230, 230, 230);
+                doc.roundedRect(margin, y, usableWidth, rowHeight, 2, 2, 'F');
+                doc.setTextColor(40, 40, 40);
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(10);
+                doc.text('Totals', margin + 2 * colWidth + 8, y + 15);
+                doc.text(String(totalQty), margin + 3 * colWidth + 8, y + 15);
+                doc.text(formatNumber(totalPrice) + ' Tsh', margin + 4 * colWidth + 8, y + 15);
+                doc.text(formatNumber(totalProfit) + ' Tsh', margin + 5 * colWidth + 8, y + 15);
+                y += rowHeight + 20;
             }
 
             // Expenses
@@ -9640,6 +9651,19 @@
                 doc.text("Expenses", margin, y);
                 y += 15;
                 y = drawTable(expHeaders, expRows, y);
+                const totalExp = (state.expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+                const colCountE = expHeaders.length;
+                const colWidthE = usableWidth / colCountE;
+                const rowHeightE = 22;
+                if (y + rowHeightE > 750) { doc.addPage(); y = margin; }
+                doc.setFillColor(230, 230, 230);
+                doc.roundedRect(margin, y, usableWidth, rowHeightE, 2, 2, 'F');
+                doc.setTextColor(40, 40, 40);
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(10);
+                doc.text('Total', margin + 2 * colWidthE + 8, y + 15);
+                doc.text(formatNumber(totalExp) + ' Tsh', margin + 3 * colWidthE + 8, y + 15);
+                y += rowHeightE + 20;
             }
 
             // Transactions
@@ -9818,6 +9842,23 @@
                     formatNumber(s.totalPrice) + ' Tsh', formatNumber(s.profit) + ' Tsh'
                 ]);
                 y = drawTable(salesHeaders, salesRows, y);
+                const totalQty = todaySales.reduce((sum, s) => sum + (s.quantity || 0), 0);
+                const totalPrice = todaySales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+                const totalProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0);
+                const colCount = salesHeaders.length;
+                const colWidth = usableWidth / colCount;
+                const rowHeight = 22;
+                if (y + rowHeight > 750) { doc.addPage(); y = margin; }
+                doc.setFillColor(230, 230, 230);
+                doc.roundedRect(margin, y, usableWidth, rowHeight, 2, 2, 'F');
+                doc.setTextColor(40, 40, 40);
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(10);
+                doc.text('Totals', margin + 2 * colWidth + 8, y + 15);
+                doc.text(String(totalQty), margin + 3 * colWidth + 8, y + 15);
+                doc.text(formatNumber(totalPrice) + ' Tsh', margin + 4 * colWidth + 8, y + 15);
+                doc.text(formatNumber(totalProfit) + ' Tsh', margin + 5 * colWidth + 8, y + 15);
+                y += rowHeight + 20;
             }
 
             // Today's Expenses
@@ -9832,6 +9873,19 @@
                     e.time, e.description, e.category, formatNumber(e.amount || 0) + ' Tsh'
                 ]);
                 y = drawTable(expHeaders, expRows, y);
+                const totalExp = todayExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+                const colCountE = expHeaders.length;
+                const colWidthE = usableWidth / colCountE;
+                const rowHeightE = 22;
+                if (y + rowHeightE > 750) { doc.addPage(); y = margin; }
+                doc.setFillColor(230, 230, 230);
+                doc.roundedRect(margin, y, usableWidth, rowHeightE, 2, 2, 'F');
+                doc.setTextColor(40, 40, 40);
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(10);
+                doc.text('Total', margin + 2 * colWidthE + 8, y + 15);
+                doc.text(formatNumber(totalExp) + ' Tsh', margin + 3 * colWidthE + 8, y + 15);
+                y += rowHeightE + 20;
             }
 
             // Today's Transactions
