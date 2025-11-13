@@ -1662,7 +1662,10 @@
     <div class="side-nav" id="sideNav">
         <div class="side-nav-header">
             <h2>💼 TUBA</h2>
-            <button class="side-nav-close" onclick="toggleSideNav()">×</button>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="side-nav-close" onclick="refreshApp()" title="Refresh" aria-label="Refresh">↻</button>
+                <button class="side-nav-close" onclick="toggleSideNav()" title="Close" aria-label="Close">×</button>
+            </div>
         </div>
 
         <div class="side-nav-content">
@@ -3835,6 +3838,10 @@
                 state.dashboardPrivacyBlurred = true;
             }
             render();
+        }
+
+        function refreshApp() {
+            try { window.location.reload(); } catch (e) { }
         }
 
         // FAB features removed; bottom tabs restored
