@@ -1741,6 +1741,7 @@
                     <iframe id="pdfIframe" style="width:100%; height:100%;"></iframe>
                 </div>
                 <div style="display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end;">
+                    <button class="btn-small" id="pdfOpenTabBtn">Open in New Tab</button>
                     <button class="btn-small" id="pdfDownloadBtn">Download</button>
                     <button class="btn-small btn-secondary" onclick="closePdfViewer()">Close</button>
                 </div>
@@ -3840,21 +3841,42 @@
             const modal = document.getElementById('pdfViewerModal');
             const iframe = document.getElementById('pdfIframe');
             const btn = document.getElementById('pdfDownloadBtn');
+            const openBtn = document.getElementById('pdfOpenTabBtn');
             const titleEl = document.getElementById('pdfViewerTitle');
             iframe.src = url;
             modal.classList.add('show');
             if (titleEl) {
                 try { titleEl.textContent = 'PDF Preview — ' + __pdfFilename; } catch { }
             }
+            if (openBtn) {
+                openBtn.onclick = function () { try { window.open(url, '_blank'); } catch { } };
+            }
             btn.onclick = function () {
-                try {
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = __pdfFilename;
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => { a.remove(); }, 100);
-                } catch { }
+                (async function () {
+                    try {
+                        const ua = navigator.userAgent || navigator.vendor || window.opera;
+                        const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                        if (isIOS && navigator.share && navigator.canShare) {
+                            let blob;
+                            try {
+                                const res = await fetch(url);
+                                blob = await res.blob();
+                            } catch { }
+                            if (blob) {
+                                const file = new File([blob], __pdfFilename, { type: 'application/pdf' });
+                                if (navigator.canShare({ files: [file] })) {
+                                    try { await navigator.share({ files: [file], title: __pdfFilename }); return; } catch { }
+                                }
+                            }
+                        }
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = __pdfFilename;
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => { a.remove(); }, 100);
+                    } catch { }
+                })();
             };
             __pdfViewerURL = url;
         }
@@ -6875,7 +6897,7 @@
                 }
 
                 downloadPDFSafe(doc, `Inventory_Purchases_${getTodayDateString()}.pdf`);
-                showToast('Inventory report PDF downloaded', 'success');
+                showToast('Inventory report PDF ready', 'success');
             } catch (e) {
                 console.error('Inventory PDF error:', e);
                 showToast('Failed to generate PDF', 'error');
@@ -6984,7 +7006,7 @@
                 }
 
                 downloadPDFSafe(doc, `Inventory_Period_${cycleNumber}.pdf`);
-                showToast('Period report PDF downloaded', 'success');
+                showToast('Period report PDF ready', 'success');
             } catch (e) {
                 console.error('Period PDF error:', e);
                 showToast('Failed to generate Period PDF', 'error');
@@ -8103,7 +8125,7 @@
             }
 
             downloadPDFSafe(doc, `${receipt.number}.pdf`);
-            showToast("Receipt PDF downloaded", "success");
+            showToast("Receipt PDF ready", "success");
         }
         function deleteReceipt(idx) {
             showConfirm("Delete this receipt?", async function () {
@@ -8523,7 +8545,7 @@
             doc.setFontSize(14);
             doc.text('- TUBA -', pageWidth / 2, 792 - 12, { align: 'center' });
             downloadPDFSafe(doc, `${inv.number}.pdf`);
-            showToast("Invoice PDF downloaded", "success");
+            showToast("Invoice PDF ready", "success");
         }
 
         async function downloadSaleReceiptPDF(timestamp) {
@@ -8694,7 +8716,7 @@
 
             // Save the PDF
             downloadPDFSafe(doc, `Receipt_${sale.id || timestamp}.pdf`);
-            showToast("Receipt downloaded successfully!", "success");
+            showToast("Receipt PDF ready", "success");
         }
 
         function renderUnpaid() {
@@ -9658,7 +9680,7 @@
             }
 
             downloadPDFSafe(doc, `Financial_Report_${getTodayDateString()}.pdf`);
-            showToast("PDF downloaded successfully!", "success");
+            showToast("PDF ready", "success");
         }
 
         async function downloadDailyReportPDF() {
@@ -9840,7 +9862,7 @@
             }
 
             downloadPDFSafe(doc, `Daily_Report_${today}.pdf`);
-            showToast("Daily report downloaded successfully!", "success");
+            showToast("Daily report PDF ready", "success");
         }
 
         function downloadSalesReportExcel() {
