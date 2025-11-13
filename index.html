@@ -282,7 +282,8 @@
             display: none;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            will-change: transform;
         }
 
         .privacy-toggle-btn.show {
@@ -295,7 +296,11 @@
         }
 
         .privacy-toggle-btn:active {
-            transform: translate(-50%, -50%) scale(0.95);
+            transform: translate(-50%, -50%) scale(0.98);
+        }
+
+        .privacy-toggle-btn.bounce {
+            animation: bounce 0.6s ease-in-out;
         }
 
         .privacy-container {
@@ -9510,12 +9515,20 @@
         function togglePrivacy() {
             state.privacyBlurred = !state.privacyBlurred;
             saveData();
+            try {
+                const btn = document.getElementById('privacyToggleBtn');
+                if (btn) { btn.classList.add('bounce'); setTimeout(() => btn.classList.remove('bounce'), 600); }
+            } catch { }
             render();
         }
 
         function toggleDashboardPrivacy() {
             state.dashboardPrivacyBlurred = !state.dashboardPrivacyBlurred;
             saveData();
+            try {
+                const btn = document.getElementById('dashboardPrivacyToggleBtn');
+                if (btn) { btn.classList.add('bounce'); setTimeout(() => btn.classList.remove('bounce'), 600); }
+            } catch { }
             render();
         }
 
