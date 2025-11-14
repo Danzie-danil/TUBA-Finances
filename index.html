@@ -1908,6 +1908,17 @@
 </head>
 
 <body>
+    <script>
+        try {
+            var raw = localStorage.getItem('financeManagerData');
+            if (raw) {
+                var parsed = JSON.parse(raw || '{}');
+                if (parsed && parsed.theme === 'dark') {
+                    document.body.classList.add('theme-dark');
+                }
+            }
+        } catch (e) { }
+    </script>
     <!-- Removed in-app pull-to-refresh indicator -->
 
     <!-- Side Navigation Drawer -->
@@ -12379,11 +12390,16 @@
             } catch (e) { }
         }
 
-        function toggleTheme() {
+        async function toggleTheme() {
             state.theme = (state.theme === 'dark') ? 'light' : 'dark';
             saveData();
             applyTheme();
             showToast(state.theme === 'dark' ? 'Dark mode enabled' : 'Light mode enabled', 'info');
+            try {
+                if (syncEnabled && currentUser && supabase && supabase.auth) {
+                    await supabase.auth.updateUser({ data: { theme: state.theme } });
+                }
+            } catch (e) { /* no-op */ }
         }
 
         function toggleSoundNotifications() {
@@ -13006,6 +13022,16 @@
                                 if (session && session.user) {
                                     currentUser = session.user;
                                     syncEnabled = true;
+                                    try {
+                                        const t = (session.user?.user_metadata?.theme || '').toLowerCase();
+                                        if (t === 'dark' || t === 'light') {
+                                            if (state.theme !== t) {
+                                                state.theme = t;
+                                                saveData();
+                                                applyTheme();
+                                            }
+                                        }
+                                    } catch (e) { }
                                 } else {
                                     currentUser = null;
                                     syncEnabled = false;
