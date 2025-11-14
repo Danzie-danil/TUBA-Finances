@@ -2538,6 +2538,7 @@
         }
 
         async function signOut() {
+            playTapSound();
             hapticShort();
             try {
                 // Set these first in case signOut fails
@@ -2829,6 +2830,7 @@
         }
 
         async function syncAllData() {
+            playTapSound();
             hapticShort();
             if (!syncEnabled || !currentUser) return;
             if (isSyncing) {
@@ -3906,6 +3908,45 @@
             try { n.vibrate(30); } catch (e) { }
         }
 
+        async function playTapSound() {
+            try {
+                let a = window.__tapSoundAudio;
+                if (a) {
+                    try { a.currentTime = 0; } catch (e) { }
+                    await a.play();
+                    return;
+                }
+                const srcs = ['button audio.mp3', 'tap.mp3', 'tap.wav'];
+                for (let i = 0; i < srcs.length; i++) {
+                    const url = encodeURI(srcs[i]);
+                    const candidate = new Audio(url);
+                    candidate.preload = 'auto';
+                    candidate.volume = 0.2;
+                    try { candidate.currentTime = 0; } catch (e) { }
+                    try {
+                        await candidate.play();
+                        window.__tapSoundAudio = candidate;
+                        return;
+                    } catch (e) { }
+                }
+            } catch (e) { }
+            try {
+                let ctx = window.__tapAudioContext;
+                if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+                window.__tapAudioContext = ctx;
+                try { await ctx.resume(); } catch (e) { }
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'square';
+                o.frequency.value = 600;
+                g.gain.value = 0.02;
+                o.connect(g);
+                g.connect(ctx.destination);
+                o.start();
+                setTimeout(() => { try { o.stop(); o.disconnect(); g.disconnect(); } catch (e) { } }, 60);
+            } catch (e) { }
+        }
+
         async function downloadPDFSafe(doc, filename) {
             try {
                 const ua = navigator.userAgent || navigator.vendor || window.opera;
@@ -4510,6 +4551,7 @@
 
         async function updateUserProfile(e) {
             e.preventDefault();
+            playTapSound();
             hapticShort();
 
             const profileData = {
@@ -4577,6 +4619,7 @@
 
         async function updateUserProfile(e) {
             e.preventDefault();
+            playTapSound();
             hapticShort();
 
             const profileData = {
@@ -4696,6 +4739,7 @@
             return false;
         }
         async function pullFromCloud() {
+            playTapSound();
             hapticShort();
             if (!syncEnabled || !currentUser) {
                 return showToast('Not signed in', 'error');
@@ -4728,6 +4772,7 @@
         }
 
         async function pushToCloud() {
+            playTapSound();
             hapticShort();
             if (!syncEnabled || !currentUser) {
                 return showToast('Not signed in', 'error');
@@ -4755,6 +4800,7 @@
 
 
         async function handleSignIn() {
+            playTapSound();
             hapticShort();
             const email = document.getElementById('loginEmail')?.value;
             const password = document.getElementById('loginPassword')?.value;
@@ -5425,6 +5471,7 @@
 
         async function addSale(e) {
             e && e.preventDefault && e.preventDefault();
+            playTapSound();
             hapticShort();
             const productIndex = document.getElementById('saleProduct')?.value;
             if (productIndex === null || productIndex === '' || productIndex === undefined) return showToast('Please select a product', 'error');
@@ -5721,6 +5768,7 @@
 
         async function addTransaction(e) {
             e.preventDefault();
+            playTapSound();
             hapticShort();
             const now = new Date();
             const amount = parseMoney(document.getElementById('transactionAmount').value);
@@ -9426,6 +9474,7 @@
         }
 
         async function saveNoteEdit(index) {
+            playTapSound();
             hapticShort();
             const titleInput = document.getElementById(`editNoteTitle_${index}`);
             const contentInput = document.getElementById(`editNoteContent_${index}`);
@@ -9460,6 +9509,7 @@
 
         async function addNote(e) {
             e.preventDefault();
+            playTapSound();
             hapticShort();
             const now = new Date();
             const content = document.getElementById('noteContent').value.trim();
@@ -9921,6 +9971,7 @@
             }, 100);
         }
         async function downloadSalesReportPDF() {
+            playTapSound();
             hapticShort();
             await ensureLogoReady();
             const { jsPDF } = window.jspdf;
@@ -10107,6 +10158,7 @@
         }
 
         async function downloadDailyReportPDF() {
+            playTapSound();
             hapticShort();
             await ensureLogoReady();
             const { jsPDF } = window.jspdf;
@@ -10323,6 +10375,7 @@
         }
 
         function downloadSalesReportExcel() {
+            playTapSound();
             hapticShort();
             const rows = [
                 ["TUBA - The Ultimate Business Architecture"],
@@ -10355,6 +10408,7 @@
         }
 
         function downloadBackup() {
+            playTapSound();
             hapticShort();
             exportData();
         }
@@ -11822,6 +11876,7 @@
         // ============================================
 
         async function cleanDuplicatesFromUI() {
+            playTapSound();
             hapticShort();
             if (!confirm('This will remove all duplicate entries. Continue?')) {
                 return;
