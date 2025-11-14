@@ -5984,6 +5984,8 @@
             // Friendly reminder to save a local backup (max 3 per day)
             maybeShowBackupReminder();
 
+            try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { try { document.documentElement.scrollTop = 0; document.body.scrollTop = 0; } catch (e2) { } }
+
             try {
                 document.querySelectorAll('.save-offline-btn').forEach(btn => {
                     btn.classList.add('attention');
