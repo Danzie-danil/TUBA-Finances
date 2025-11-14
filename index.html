@@ -332,14 +332,15 @@
             background: linear-gradient(145deg, #1a1a1a, #000000);
             color: white;
             padding: 16px;
-            position: sticky;
+            position: fixed;
             top: 0;
-            z-index: 100;
+            left: 0;
+            right: 0;
+            z-index: 9999;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             display: flex;
             justify-content: center;
             align-items: center;
-            position: relative;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding-top: max(16px, env(safe-area-inset-top));
             padding-left: max(16px, env(safe-area-inset-left));
@@ -411,6 +412,7 @@
 
         .content {
             padding: 16px;
+            padding-top: calc(70px + env(safe-area-inset-top));
         }
 
         .stat-grid {
