@@ -2437,6 +2437,7 @@
                         // Ensure fresh cloud pull/merge for new session
                         autoCloudPullDone = false;
                         updateSyncIndicator('synced');
+                        try { window.startAuthRestoreGuard && window.startAuthRestoreGuard(); } catch { }
                         await loadSettingsFromCloud();
                         checkLock();
                         await maybeAutoPullCloudData();
@@ -2452,6 +2453,7 @@
                         currentUser = session.user;
                         syncEnabled = true;
                         autoCloudPullDone = false;
+                        try { window.startAuthRestoreGuard && window.startAuthRestoreGuard(); } catch { }
                         await loadSettingsFromCloud();
                         checkLock();
                         await maybeAutoPullCloudData();
@@ -2459,6 +2461,7 @@
                         // After password recovery link is used
                         currentUser = session.user;
                         syncEnabled = true;
+                        try { window.startAuthRestoreGuard && window.startAuthRestoreGuard(); } catch { }
                         await loadSettingsFromCloud();
                         if (state.lockEnabled && !state.lockPIN) {
                             setNewLockPIN();
@@ -2476,6 +2479,7 @@
 
         async function restoreSession() {
             try {
+                try { window.startAuthRestoreGuard && window.startAuthRestoreGuard(); } catch { }
                 const { data: { session }, error } = await supabase.auth.getSession();
 
                 if (error) {
@@ -2767,7 +2771,8 @@
             if (!syncEnabled || !currentUser) {
                 return showToast('Not signed in', 'error');
             }
-
+            if (isSyncing) { console.log('Push already in progress'); return; }
+            isSyncing = true;
             updateSyncIndicator('syncing');
             try {
                 await clearAndPushAllData();
@@ -2777,7 +2782,7 @@
                 console.error('Push error:', error);
                 updateSyncIndicator('synced');
                 showToast('Push failed: ' + error.message, 'error');
-            }
+            } finally { isSyncing = false; }
         }
 
         async function signUp(email, password) {
@@ -13452,6 +13457,7 @@
 
             (function () {
                 let isAuthRestoring = true;
+                let authRestoreGuard = null;
                 const getAuthBannerEl = () => {
                     let el = document.getElementById('authBanner');
                     if (!el) {
@@ -13477,30 +13483,46 @@
                         el.style.display = 'none';
                         el.textContent = '';
                         el.onclick = null;
-                    } else if (isAuthRestoring) {
-                        el.innerHTML = "Restoring session…";
-                        el.style.display = 'block';
-                        el.onclick = null;
-                    } else if (currentUser && syncEnabled) {
+                        return;
+                    }
+                    if (currentUser && syncEnabled) {
                         el.style.display = 'none';
                         el.textContent = '';
                         el.onclick = null;
-                    } else {
-                        el.innerHTML = "You’re not signed in — tap to sign in and sync.";
-                        el.style.display = 'block';
-                        el.onclick = () => {
-                            try {
-                                switchTab('account');
-                                setTimeout(() => {
-                                    try { switchAuthTab('login'); } catch (e) { }
-                                    const lf = document.getElementById('loginForm');
-                                    lf && lf.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                }, 50);
-                            } catch (e) { }
-                        };
+                        return;
                     }
+                    if (isAuthRestoring) {
+                        el.innerHTML = "Restoring session…";
+                        el.style.display = 'block';
+                        el.onclick = null;
+                        return;
+                    }
+                    el.innerHTML = "You’re not signed in — tap to sign in and sync.";
+                    el.style.display = 'block';
+                    el.onclick = () => {
+                        try {
+                            switchTab('account');
+                            setTimeout(() => {
+                                try { switchAuthTab('login'); } catch (e) { }
+                                const lf = document.getElementById('loginForm');
+                                lf && lf.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }, 50);
+                        } catch (e) { }
+                    };
                 };
                 window.updateAuthBanner();
+                window.startAuthRestoreGuard = () => {
+                    try { window.setAuthRestoring(true); window.updateAuthBanner(); } catch { }
+                    try { if (authRestoreGuard) clearTimeout(authRestoreGuard); } catch { }
+                    authRestoreGuard = setTimeout(() => {
+                        try {
+                            if (isAuthRestoring) {
+                                window.setAuthRestoring(false);
+                                window.updateAuthBanner();
+                            }
+                        } catch { }
+                    }, 10000);
+                };
                 window.addEventListener('online', () => {
                     try { window.updateAuthBanner(); } catch { }
                     try {
@@ -13566,6 +13588,7 @@
                         }
                         // On load, after SW ready, reconcile auth state
                         refreshAuthState();
+                        try { window.startAuthRestoreGuard && window.startAuthRestoreGuard(); } catch { }
                         // Also reconcile on online and visibility changes
                         window.addEventListener('online', refreshAuthState);
                         document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAuthState(); });
