@@ -1924,6 +1924,8 @@
             }
         } catch (e) { }
     </script>
+    <div id="hiddenFocusTarget" tabindex="-1"
+        style="position:fixed;top:-10000px;left:-10000px;width:1px;height:1px;opacity:0;"></div>
     <!-- Removed in-app pull-to-refresh indicator -->
 
     <!-- Side Navigation Drawer -->
@@ -11285,6 +11287,7 @@
         loadData();
         try { applyTheme(); } catch (e) { }
         render(); // SHOW UI NOW
+        try { setupKeyboardDismiss(); } catch (e) { }
 
         // Restore session in BACKGROUND
         (async function () {
@@ -12434,6 +12437,28 @@
                     await supabase.auth.updateUser({ data: { theme: state.theme } });
                 }
             } catch (e) { /* no-op */ }
+        }
+
+        function setupKeyboardDismiss() {
+            if (window.__keyboardDismissSetup) return;
+            window.__keyboardDismissSetup = true;
+            const isInputEl = el => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+            const isInteractiveTarget = el => !!(el && el.closest('input, textarea, select, .search-box, .money-input, .filter-row, .form-group, .modal-content'));
+            const rememberCaret = el => { try { const s = el.selectionStart; const e = el.selectionEnd; el.__caret = { s, e }; } catch { } };
+            const restoreCaret = el => { try { if (el.__caret && el.setSelectionRange) el.setSelectionRange(el.__caret.s, el.__caret.e); } catch { } };
+            document.addEventListener('focusin', e => { const el = e.target; if (isInputEl(el)) restoreCaret(el); }, true);
+            document.addEventListener('blur', e => { const el = e.target; if (isInputEl(el)) rememberCaret(el); }, true);
+            const handler = e => {
+                const active = document.activeElement;
+                if (!active || !isInputEl(active)) return;
+                if (isInteractiveTarget(e.target)) return;
+                rememberCaret(active);
+                try { active.blur(); } catch { }
+                try { document.getElementById('hiddenFocusTarget')?.focus(); } catch { }
+            };
+            document.addEventListener('pointerdown', handler, true);
+            document.addEventListener('touchstart', handler, true);
+            document.addEventListener('mousedown', handler, true);
         }
 
         function toggleSoundNotifications() {
