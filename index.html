@@ -679,6 +679,62 @@
             flex-wrap: wrap;
         }
 
+        .save-offline-btn {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(102, 126, 234, 0.35);
+            background: linear-gradient(145deg, #e3f2fd, #bbdefb);
+            color: #0d47a1;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(102, 126, 234, 0.25);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            width: auto;
+        }
+
+        .save-offline-btn .save-offline-sub {
+            font-weight: 500;
+            font-size: 11px;
+            color: #1a1a1a;
+        }
+
+        .save-offline-btn:hover {
+            box-shadow: 0 10px 28px rgba(102, 126, 234, 0.35);
+        }
+
+        @keyframes glowPulse {
+            0% {
+                box-shadow: 0 6px 18px rgba(102, 126, 234, 0.25);
+            }
+
+            50% {
+                box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.35), 0 12px 32px rgba(102, 126, 234, 0.35);
+            }
+
+            100% {
+                box-shadow: 0 6px 18px rgba(102, 126, 234, 0.25);
+            }
+        }
+
+        .save-offline-btn.attention {
+            animation: bounce 0.6s ease-in-out, glowPulse 1.4s ease-in-out 0s 2;
+        }
+
+        body.theme-dark .save-offline-btn {
+            background: linear-gradient(145deg, #0f1115, #121417);
+            color: #e0e0e0;
+            border-color: rgba(102, 126, 234, 0.45);
+        }
+
+        body.theme-dark .save-offline-btn .save-offline-sub {
+            color: #cfcfcf;
+        }
+
         .quick-nav-btn {
             padding: 4px 8px;
             border: none;
@@ -2046,8 +2102,14 @@
             <div class="modal-content"
                 style="width: 92%; max-width: 920px; height: 85vh; display: flex; flex-direction: column;">
                 <div class="modal-title" id="pdfViewerTitle">PDF Preview</div>
-                <div style="flex:1; border:1px solid rgba(0,0,0,0.12); border-radius:8px; overflow:hidden;">
-                    <iframe id="pdfIframe" style="width:100%; height:100%;"></iframe>
+                <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
+                    <div id="filePreviewContainer"
+                        style="display:none; flex:1; border:1px solid rgba(0,0,0,0.12); border-radius:8px; overflow:auto; background: rgba(255,255,255,0.98);">
+                    </div>
+                    <div id="pdfIframeContainer"
+                        style="flex:1; border:1px solid rgba(0,0,0,0.12); border-radius:8px; overflow:hidden;">
+                        <iframe id="pdfIframe" style="width:100%; height:100%;"></iframe>
+                    </div>
                 </div>
                 <div style="display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end;">
                     <button class="btn-small" id="pdfDownloadBtn">Download</button>
@@ -4293,20 +4355,20 @@
                 const blob = doc.output('blob');
                 const url = URL.createObjectURL(blob);
 
-                // iOS: prefer share sheet if supported, else open viewer in new tab
+                // iOS: open preview first, then share if available
                 if (isIOS) {
+                    try { openPdfViewer(url, filename); } catch { }
                     if (navigator.share && navigator.canShare) {
                         try {
                             const file = new File([blob], filename, { type: 'application/pdf' });
                             if (navigator.canShare({ files: [file] })) {
-                                await navigator.share({ files: [file], title: filename, text: APP_BASE_URL });
+                                setTimeout(async () => { try { await navigator.share({ files: [file], title: filename, text: APP_BASE_URL }); } catch { } }, 300);
                                 setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000);
                                 return;
                             }
                         } catch { }
                     }
-                    const w = window.open(url, '_blank');
-                    if (w && typeof w.focus === 'function') { w.focus(); setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000); return; }
+                    return;
                 }
 
                 // Android: use native viewer (new tab), fallback to same-tab navigation
@@ -4344,6 +4406,8 @@
             __pdfFilename = filename || 'document.pdf';
             const modal = document.getElementById('pdfViewerModal');
             const iframe = document.getElementById('pdfIframe');
+            const iframeWrap = document.getElementById('pdfIframeContainer');
+            const fileBox = document.getElementById('filePreviewContainer');
             const btn = document.getElementById('pdfDownloadBtn');
             const titleEl = document.getElementById('pdfViewerTitle');
             iframe.src = url;
@@ -4351,6 +4415,8 @@
             if (titleEl) {
                 try { titleEl.textContent = 'PDF Preview — ' + __pdfFilename; } catch { }
             }
+            if (iframeWrap) iframeWrap.style.display = '';
+            if (fileBox) fileBox.style.display = 'none';
             btn.onclick = function () {
                 (async function () {
                     try {
@@ -4383,12 +4449,16 @@
         function closePdfViewer() {
             const modal = document.getElementById('pdfViewerModal');
             const iframe = document.getElementById('pdfIframe');
+            const iframeWrap = document.getElementById('pdfIframeContainer');
+            const fileBox = document.getElementById('filePreviewContainer');
             const titleEl = document.getElementById('pdfViewerTitle');
             modal.classList.remove('show');
             iframe.src = '';
             if (titleEl) {
                 try { titleEl.textContent = 'PDF Preview'; } catch { }
             }
+            if (iframeWrap) iframeWrap.style.display = '';
+            if (fileBox) fileBox.style.display = 'none';
             if (__pdfViewerURL && __pdfViewerURL.startsWith('blob:')) {
                 try { URL.revokeObjectURL(__pdfViewerURL); } catch { }
             }
@@ -5251,8 +5321,10 @@
         <div class="card">
             <h2>Add Sale</h2>
             <div class="card-header-buttons">
-                <button class="quick-nav-btn products" onclick="switchTab('products')">Products/Services</button>
-                <button class="quick-nav-btn categories" onclick="switchTab('categories')">Categories</button>
+                <button class="save-offline-btn" id="saveOfflineBtn" onclick="exportData('Saved', 2000)">
+                    <span>Click to save for offline</span>
+                    <span class="save-offline-sub">Products, categories, stock and notes won't load offline</span>
+                </button>
             </div>
             <form onsubmit="addSale(event)">
                 <div class="form-group">
@@ -5888,6 +5960,14 @@
 
             // Friendly reminder to save a local backup (max 3 per day)
             maybeShowBackupReminder();
+
+            try {
+                const btn = document.getElementById('saveOfflineBtn');
+                if (btn) {
+                    btn.classList.add('attention');
+                    setTimeout(() => { try { btn.classList.remove('attention'); } catch (e) { } }, 2500);
+                }
+            } catch (e) { }
 
             if (syncEnabled) {
                 await upsertOne('sales', {
@@ -10809,8 +10889,33 @@
             ];
 
             XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
-            XLSX.writeFile(wb, `Financial_Report_${getTodayDateString()}.xlsx`);
-            showToast("Excel downloaded successfully!", "success");
+            downloadExcelSafe(wb, `Financial_Report_${getTodayDateString()}.xlsx`);
+            showToast("Excel ready", "success");
+        }
+
+        function downloadExcelSafe(wb, filename) {
+            try {
+                const ua = navigator.userAgent || navigator.vendor || window.opera;
+                const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                if (isIOS) {
+                    let arr;
+                    try { arr = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }); } catch { arr = null; }
+                    if (arr) {
+                        const blob = new Blob([arr], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                        try { openExcelViewer(wb, filename); } catch { }
+                        if (navigator.share && navigator.canShare) {
+                            try {
+                                const file = new File([blob], filename, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                                if (navigator.canShare({ files: [file] })) { setTimeout(async () => { try { await navigator.share({ files: [file], title: filename, text: APP_BASE_URL }); } catch { } }, 300); }
+                            } catch { }
+                        }
+                        return;
+                    }
+                }
+                XLSX.writeFile(wb, filename);
+            } catch {
+                try { XLSX.writeFile(wb, filename); } catch { }
+            }
         }
 
         function downloadBackup() {
@@ -11406,8 +11511,10 @@
         <div class="card">
             <h2>Add Sale</h2>
             <div class="card-header-buttons">
-                <button class="quick-nav-btn products" onclick="switchTab('products')">Products</button>
-                <button class="quick-nav-btn categories" onclick="switchTab('categories')">Categories</button>
+                <button class="save-offline-btn" id="saveOfflineBtn" onclick="exportData('Saved', 2000)">
+                    <span>Click to save for offline</span>
+                    <span class="save-offline-sub">Products, categories, stock and notes won't load offline</span>
+                </button>
             </div>
             <form onsubmit="addSale(event)">
                 <div class="form-group">
@@ -13223,3 +13330,46 @@
 </body>
 
 </html>
+function openExcelViewer(wb, filename) {
+try {
+const modal = document.getElementById('pdfViewerModal');
+const iframeWrap = document.getElementById('pdfIframeContainer');
+const fileBox = document.getElementById('filePreviewContainer');
+const btn = document.getElementById('pdfDownloadBtn');
+const titleEl = document.getElementById('pdfViewerTitle');
+if (!modal || !fileBox || !btn) return;
+const firstSheetName = (wb && wb.SheetNames && wb.SheetNames[0]) ? wb.SheetNames[0] : null;
+let html = '<p style="padding:12px; color:#666;">No sheet data to preview.</p>';
+if (firstSheetName) {
+try { html = XLSX.utils.sheet_to_html(wb.Sheets[firstSheetName]); } catch { }
+}
+fileBox.innerHTML = html;
+if (titleEl) { try { titleEl.textContent = 'Excel Preview — ' + (filename || 'report.xlsx'); } catch { } }
+if (iframeWrap) iframeWrap.style.display = 'none';
+fileBox.style.display = '';
+modal.classList.add('show');
+btn.onclick = async function () {
+try {
+const arr = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+const blob = new Blob([arr], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+const url = URL.createObjectURL(blob);
+const ua = navigator.userAgent || navigator.vendor || window.opera;
+const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (isIOS && navigator.share && navigator.canShare) {
+const file = new File([blob], filename || 'report.xlsx', { type:
+'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+if (navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: filename ||
+'report.xlsx', text: APP_BASE_URL }); } catch { } }
+setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000);
+return;
+}
+const a = document.createElement('a');
+a.href = url;
+a.download = filename || 'report.xlsx';
+document.body.appendChild(a);
+a.click();
+setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } a.remove(); }, 1000);
+} catch { }
+};
+} catch { }
+}
