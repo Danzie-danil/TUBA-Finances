@@ -2328,7 +2328,7 @@
             </div>
             <div style="display: flex; gap: 8px; margin-top: 12px;">
                 <button class="btn-small btn-success" onclick="unlockWithPIN()">Unlock</button>
-                <button class="btn-small btn-secondary" onclick="closeLockModal()">Cancel</button>
+                <button class="btn-small btn-secondary" onclick="resetLockPIN()">Reset PIN</button>
             </div>
         </div>
     </div>
@@ -2437,6 +2437,8 @@
                         // Ensure fresh cloud pull/merge for new session
                         autoCloudPullDone = false;
                         updateSyncIndicator('synced');
+                        await loadSettingsFromCloud();
+                        checkLock();
                         await maybeAutoPullCloudData();
                     } else if (event === 'SIGNED_OUT') {
                         currentUser = null;
@@ -2450,7 +2452,19 @@
                         currentUser = session.user;
                         syncEnabled = true;
                         autoCloudPullDone = false;
+                        await loadSettingsFromCloud();
+                        checkLock();
                         await maybeAutoPullCloudData();
+                    } else if (event === 'PASSWORD_RECOVERY' && session) {
+                        // After password recovery link is used
+                        currentUser = session.user;
+                        syncEnabled = true;
+                        await loadSettingsFromCloud();
+                        if (state.lockEnabled && !state.lockPIN) {
+                            setNewLockPIN();
+                        } else {
+                            checkLock();
+                        }
                     }
                 });
 
@@ -5020,6 +5034,33 @@
                 • <strong>Push to Cloud:</strong> Upload local data (overwrites cloud)<br>
                 • <strong>Smart Sync:</strong> Auto-detect which direction to sync
             </div>
+        </div>
+
+        <div class="card">
+            <h2>⚙️ Settings</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div class="info-box" style="padding:8px;">
+                    <div style="font-size:12px;">Daily Auto Backup</div>
+                    <div style="font-size:12px;opacity:0.8;">${state.autoBackupDaily ? 'On' : 'Off'}</div>
+                </div>
+                <button class="btn-small" onclick="toggleAutoBackupDaily()">${state.autoBackupDaily ? 'Disable' : 'Enable'}</button>
+
+                <div class="info-box" style="padding:8px;">
+                    <div style="font-size:12px;">Weekly Auto Backup</div>
+                    <div style="font-size:12px;opacity:0.8;">${state.autoBackupWeekly ? 'On' : 'Off'}</div>
+                </div>
+                <button class="btn-small" onclick="toggleAutoBackupWeekly()">${state.autoBackupWeekly ? 'Disable' : 'Enable'}</button>
+
+                <div class="info-box" style="padding:8px;">
+                    <div style="font-size:12px;">App Lock</div>
+                    <div style="font-size:12px;opacity:0.8;">${state.lockEnabled ? 'On' : 'Off'}</div>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-small" onclick="toggleAppLock()">${state.lockEnabled ? 'Disable' : 'Enable'}</button>
+                    <button class="btn-small btn-secondary" onclick="setNewLockPIN()">Set New PIN</button>
+                </div>
+            </div>
+            <button class="btn-secondary" onclick="preloadOfflineData()">⚡ Preload for Offline</button>
         </div>
 
         ${isProfileIncomplete && state.profileEditMode ? `
@@ -10195,9 +10236,11 @@
             modal.classList.add('show');
         }
 
-        function openLockModal() { const m = document.getElementById('lockModal'); if (m) m.classList.add('show'); }
-        function closeLockModal() { const m = document.getElementById('lockModal'); if (m) m.classList.remove('show'); }
+        function openLockModal() { const m = document.getElementById('lockModal'); if (m) { m.classList.add('show'); m.setAttribute('aria-modal', 'true'); m.setAttribute('role', 'dialog'); } }
+        function closeLockModal() { const m = document.getElementById('lockModal'); if (m && (!state.lockEnabled || state.isUnlocked)) m.classList.remove('show'); }
         function unlockWithPIN() { const val = document.getElementById('lockPinInput')?.value || ''; if (val.trim() === state.lockPIN) { state.isUnlocked = true; saveData(); closeLockModal(); showToast('Unlocked', 'success'); } else { showToast('Incorrect PIN', 'error'); } }
+        async function resetLockPIN() { try { if (!currentUser || !currentUser.email) return showToast('Sign in required to reset PIN', 'error'); await supabase.auth.resetPasswordForEmail(currentUser.email, { redirectTo: APP_BASE_URL }); state.lockPIN = ''; state.isUnlocked = false; saveData(); await saveSettingsToCloud(); showToast('Password reset email sent. Set a new PIN after login.', 'info'); } catch (e) { showToast('Failed to request reset', 'error'); } }
+        function setNewLockPIN() { const pin = prompt('Set a new 4-digit PIN'); if (pin && pin.trim().length >= 4) { state.lockPIN = pin.trim(); state.lockEnabled = true; state.isUnlocked = false; saveData(); saveSettingsToCloud(); openLockModal(); showToast('New PIN set. Unlock to continue.', 'success'); } else { showToast('PIN must be at least 4 digits', 'error'); openLockModal(); } }
         function checkLock() { if (state.lockEnabled && !state.isUnlocked) { openLockModal(); } }
 
         function closeNoteModal() {
@@ -12693,8 +12736,8 @@
             if (weeklyText) weeklyText.textContent = `Weekly Auto Backup: ${state.autoBackupWeekly ? 'On' : 'Off'}`;
         }
 
-        function toggleAutoBackupDaily() { state.autoBackupDaily = !state.autoBackupDaily; saveData(); updateSideNavBackupButtons(); showToast(`Daily auto backup ${state.autoBackupDaily ? 'enabled' : 'disabled'}`, 'info'); }
-        function toggleAutoBackupWeekly() { state.autoBackupWeekly = !state.autoBackupWeekly; saveData(); updateSideNavBackupButtons(); showToast(`Weekly auto backup ${state.autoBackupWeekly ? 'enabled' : 'disabled'}`, 'info'); }
+        function toggleAutoBackupDaily() { state.autoBackupDaily = !state.autoBackupDaily; saveData(); saveSettingsToCloud(); updateSideNavBackupButtons(); showToast(`Daily auto backup ${state.autoBackupDaily ? 'enabled' : 'disabled'}`, 'info'); }
+        function toggleAutoBackupWeekly() { state.autoBackupWeekly = !state.autoBackupWeekly; saveData(); saveSettingsToCloud(); updateSideNavBackupButtons(); showToast(`Weekly auto backup ${state.autoBackupWeekly ? 'enabled' : 'disabled'}`, 'info'); }
 
         function updateSideNavLockButton() {
             const icon = document.getElementById('sideNavLockIcon');
@@ -12711,6 +12754,7 @@
                     state.lockEnabled = true;
                     state.isUnlocked = false;
                     saveData();
+                    saveSettingsToCloud();
                     updateSideNavLockButton();
                     openLockModal();
                     showToast('App lock enabled', 'success');
@@ -12721,10 +12765,44 @@
                     state.lockPIN = '';
                     state.isUnlocked = true;
                     saveData();
+                    saveSettingsToCloud();
                     updateSideNavLockButton();
                     showToast('App lock disabled', 'info');
                 }
             }
+        }
+
+        async function saveSettingsToCloud() {
+            try {
+                if (!syncEnabled || !currentUser) return;
+                await upsertOne('settings', {
+                    user_id: currentUser.id,
+                    auto_backup_daily: !!state.autoBackupDaily,
+                    auto_backup_weekly: !!state.autoBackupWeekly,
+                    lock_enabled: !!state.lockEnabled,
+                    lock_pin: String(state.lockPIN || ''),
+                    theme: String(state.theme || 'light')
+                });
+            } catch (e) { console.warn('saveSettingsToCloud error', e); }
+        }
+
+        async function loadSettingsFromCloud() {
+            try {
+                if (!syncEnabled || !currentUser) return;
+                const { data, error } = await supabase.from('settings').select('*').eq('user_id', currentUser.id).limit(1);
+                if (error) { console.warn('loadSettingsFromCloud error', error); return; }
+                const row = data && data[0];
+                if (row) {
+                    state.autoBackupDaily = !!row.auto_backup_daily;
+                    state.autoBackupWeekly = !!row.auto_backup_weekly;
+                    state.lockEnabled = !!row.lock_enabled;
+                    state.lockPIN = String(row.lock_pin || '');
+                    saveData();
+                    updateSideNavBackupButtons();
+                    updateSideNavLockButton();
+                    checkLock();
+                }
+            } catch (e) { console.warn('loadSettingsFromCloud exception', e); }
         }
 
         function sanitizeString(s) {
@@ -13476,6 +13554,7 @@
                                             }
                                         }
                                     } catch (e) { }
+                                    try { await loadSettingsFromCloud(); } catch (e) { }
                                 } else {
                                     currentUser = null;
                                     syncEnabled = false;
