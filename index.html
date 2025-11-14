@@ -405,6 +405,11 @@
             color: #e0e0e0;
         }
 
+        body.theme-dark .modal-title {
+            color: #ffffff;
+            text-shadow: none;
+        }
+
         body.theme-dark input,
         body.theme-dark textarea,
         body.theme-dark select {
@@ -2144,6 +2149,7 @@
         // SUPABASE CONFIGURATION
         // ========================================
         const SUPABASE_URL = 'https://tusrkwljhpkylgfrikrw.supabase.co';
+        const APP_BASE_URL = 'https://tuba-finances.vercel.app/';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1c3Jrd2xqaHBreWxnZnJpa3J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4ODE1MDcsImV4cCI6MjA3ODQ1NzUwN30.2eWlpXzsxYhw6-Fo5QFOz_DYnoMnUGqrF0vxdSTqueQ';
 
         let supabase;
@@ -4291,7 +4297,7 @@
                         try {
                             const file = new File([blob], filename, { type: 'application/pdf' });
                             if (navigator.canShare({ files: [file] })) {
-                                await navigator.share({ files: [file], title: filename });
+                                await navigator.share({ files: [file], title: filename, text: APP_BASE_URL });
                                 setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000);
                                 return;
                             }
@@ -6504,6 +6510,9 @@
 
                <div class="card">
     <h2>All Categories (${state.categories.length})</h2>
+    <div class="search-box" style="margin:8px 0;">
+        <input type="text" placeholder="🔍 Search categories..." oninput="searchCategories(this.value)" id="categorySearch">
+    </div>
     
     ${state.categories.length > 0 ? `
         <div class="bulk-actions">
@@ -6517,9 +6526,16 @@
             </button>
         </div>
     ` : ''}
-    
-    ${state.categories.map((cat, i) => {
-                return `
+    <div id="categoriesList">${renderCategoriesList('')}</div>
+</div>
+            `;
+        }
+
+        function renderCategoriesList(Period) {
+            const q = String(Period || '').toLowerCase();
+            return state.categories.map((cat, i) => ({ cat, i }))
+                .filter(({ cat }) => !q || String(cat).toLowerCase().includes(q))
+                .map(({ cat, i }) => `
             <div class="item">
                 <div style="display: flex; gap: 12px; align-items: center;">
                     <input type="checkbox" class="checkbox-select" 
@@ -6537,10 +6553,12 @@
                     </div>
                 </div>
             </div>
-        `;
-            }).join('') || '<p style="text-align: center; color: #666;">No categories yet</p>'}
-</div>
-            `;
+        `).join('') || '<p style="text-align: center; color: #666;">No categories yet</p>';
+        }
+
+        function searchCategories(Period) {
+            const el = document.getElementById('categoriesList');
+            if (el) el.innerHTML = renderCategoriesList(Period);
         }
 
         function toggleSelectAllCategories() {
@@ -6926,8 +6944,21 @@
                 ` : ''}
 
                 <div class="card">
-                    <h2>Stock Levels (${trackedProducts.length} Items)</h2>
-                    ${trackedProducts.map(p => {
+                    <div class="flex-between">
+                        <h2>Stock Levels</h2>
+                        <div class="search-box" style="max-width:260px;">
+                            <input type="text" id="stockSearch" placeholder="🔍 Search stock..." oninput="searchStock(this.value)">
+                        </div>
+                    </div>
+                    <div id="stockList">${renderStockList('')}</div>
+                </div>
+            `;
+        }
+
+        function renderStockList(query) {
+            const q = String(query || '').toLowerCase();
+            const trackedProducts = state.products.filter(p => p.hasStock !== false);
+            return trackedProducts.filter(p => !q || p.name.toLowerCase().includes(q) || String(p.category || '').toLowerCase().includes(q)).map(p => {
                 const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
                 const isLow = inv.stock <= inv.minAlert;
                 const stockValue = inv.stock * p.cost;
@@ -6953,9 +6984,12 @@
                                 </div>
                             </div>
                         `;
-            }).join('') || '<p style="text-align: center; color: #666;">No stock-tracked items yet</p>'}
-                </div>
-            `;
+            }).join('') || '<p style="text-align: center; color: #666;">No stock-tracked items yet</p>';
+        }
+
+        function searchStock(q) {
+            const el = document.getElementById('stockList');
+            if (el) el.innerHTML = renderStockList(q);
         }
 
         // Unified Inventory Tab: Purchases + Stock
@@ -9920,7 +9954,7 @@
             const modal = document.getElementById('noteModal');
             const content = document.getElementById('noteModalContent');
             content.innerHTML = `
-                ${note.title ? `<h3 style="margin-bottom: 12px; color: #1a1a1a;">${note.title}</h3>` : ''}
+                ${note.title ? `<h3 class="modal-title" style="margin-bottom: 12px;">${note.title}</h3>` : ''}
                 <div style="margin-bottom: 12px; color: #666; font-size: 13px;">${note.date} ${note.time}</div>
                 <div style="white-space: pre-wrap; line-height: 1.6;">${note.content}</div>
             `;
