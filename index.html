@@ -2205,7 +2205,6 @@
                 <button class="btn-small" onclick="copyNoteFromModal()">📋 Copy</button>
                 <button class="btn-small btn-success" onclick="shareNoteFromModal()">📤 Send</button>
                 <button class="btn-small" onclick="editNoteFromModal()">Edit</button>
-                <button class="btn-small btn-danger" onclick="deleteNoteFromModal()">Delete</button>
                 <button class="btn-small btn-secondary" onclick="closeNoteModal()">Close</button>
             </div>
         </div>
@@ -10067,6 +10066,12 @@
                 <div style="white-space: pre-wrap; line-height: 1.6;">${note.content}</div>
             `;
             modal.classList.add('show');
+            const handleOutside = (e) => {
+                if (e.target === modal) {
+                    closeNoteModal();
+                }
+            };
+            modal.addEventListener('click', handleOutside, { once: true });
         }
 
         function closeNoteModal() {
@@ -10124,6 +10129,12 @@
                     return;
                 } catch { }
             }
+            try {
+                const smsBody = encodeURIComponent(text);
+                const smsUrl = isIOS ? `sms:&body=${smsBody}` : `sms:?body=${smsBody}`;
+                window.location.href = smsUrl;
+                return;
+            } catch { }
             try {
                 await navigator.clipboard.writeText(text);
                 showToast('Copied. Share via any app', 'info');
