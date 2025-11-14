@@ -3921,9 +3921,19 @@
 
                 // Android: use native viewer (new tab), fallback to same-tab navigation
                 if (isAndroid) {
+                    const triggerDownload = () => {
+                        try {
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } a.remove(); }, 1000);
+                        } catch { }
+                    };
                     const w = window.open(url, '_blank');
-                    if (w && typeof w.focus === 'function') { w.focus(); setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000); return; }
-                    try { window.location.assign(url); setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000); return; } catch { }
+                    if (w && typeof w.focus === 'function') { w.focus(); triggerDownload(); return; }
+                    try { window.location.assign(url); triggerDownload(); return; } catch { }
                 }
 
                 // Other platforms or fallbacks: trigger direct download
