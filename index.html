@@ -868,7 +868,7 @@
 
         .toast-bar {
             position: fixed;
-            bottom: 70px;
+            bottom: calc(env(safe-area-inset-bottom) + 80px);
             left: 50%;
             transform: translateX(-50%);
             display: flex;
@@ -877,6 +877,7 @@
             align-items: center;
             z-index: 9999;
             pointer-events: none;
+            touch-action: pan-x;
         }
 
         .toast {
