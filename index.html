@@ -3899,24 +3899,31 @@
             try {
                 const ua = navigator.userAgent || navigator.vendor || window.opera;
                 const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                const openWithIframe = (url) => {
+                    try {
+                        const w = window.open('', '_blank');
+                        if (!w) return false;
+                        w.document.write('<!DOCTYPE html><html><head><title>' + (filename || 'document.pdf') + '</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>html,body{height:100%;margin:0;padding:0;background:#111}</style></head><body><iframe src="' + url + '" style="border:0;position:fixed;left:0;top:0;width:100%;height:100%"></iframe></body></html>');
+                        w.document.close();
+                        return true;
+                    } catch { return false; }
+                };
+
                 if (isIOS) {
                     try {
                         const dataUrl = doc.output('dataurlstring');
-                        const w = window.open(dataUrl, '_blank');
-                        if (w) return;
+                        if (openWithIframe(dataUrl)) return;
                     } catch { }
                     try {
                         const blob = doc.output('blob');
                         const url = URL.createObjectURL(blob);
-                        const w = window.open(url, '_blank');
-                        if (w) return;
+                        if (openWithIframe(url)) return;
                     } catch { }
                 }
                 try {
                     const blob = doc.output('blob');
                     const url = URL.createObjectURL(blob);
-                    const w = window.open(url, '_blank');
-                    if (w) return;
+                    if (openWithIframe(url)) return;
                 } catch { }
                 try { doc.save(filename); } catch { }
             } catch { }
