@@ -2538,6 +2538,7 @@
         }
 
         async function signOut() {
+            hapticShort();
             try {
                 // Set these first in case signOut fails
                 currentUser = null;
@@ -2828,6 +2829,7 @@
         }
 
         async function syncAllData() {
+            hapticShort();
             if (!syncEnabled || !currentUser) return;
             if (isSyncing) {
                 console.log('Sync already in progress, skipping...');
@@ -3895,6 +3897,15 @@
             setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, Math.max(1000, durationMs || 3000));
         }
 
+        function hapticShort() {
+            const n = navigator;
+            if (!n || typeof n.vibrate !== 'function') return;
+            const ua = navigator.userAgent || navigator.vendor || window.opera;
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+            if (!isMobile) return;
+            try { n.vibrate(30); } catch (e) { }
+        }
+
         async function downloadPDFSafe(doc, filename) {
             try {
                 const ua = navigator.userAgent || navigator.vendor || window.opera;
@@ -4499,6 +4510,7 @@
 
         async function updateUserProfile(e) {
             e.preventDefault();
+            hapticShort();
 
             const profileData = {
                 businessName: document.getElementById('profileBusinessName').value.trim(),
@@ -4565,6 +4577,7 @@
 
         async function updateUserProfile(e) {
             e.preventDefault();
+            hapticShort();
 
             const profileData = {
                 businessName: document.getElementById('profileBusinessName').value.trim(),
@@ -4683,6 +4696,7 @@
             return false;
         }
         async function pullFromCloud() {
+            hapticShort();
             if (!syncEnabled || !currentUser) {
                 return showToast('Not signed in', 'error');
             }
@@ -4714,6 +4728,7 @@
         }
 
         async function pushToCloud() {
+            hapticShort();
             if (!syncEnabled || !currentUser) {
                 return showToast('Not signed in', 'error');
             }
@@ -4740,6 +4755,7 @@
 
 
         async function handleSignIn() {
+            hapticShort();
             const email = document.getElementById('loginEmail')?.value;
             const password = document.getElementById('loginPassword')?.value;
 
@@ -5409,6 +5425,7 @@
 
         async function addSale(e) {
             e && e.preventDefault && e.preventDefault();
+            hapticShort();
             const productIndex = document.getElementById('saleProduct')?.value;
             if (productIndex === null || productIndex === '' || productIndex === undefined) return showToast('Please select a product', 'error');
             const product = state.products[productIndex];
@@ -5704,6 +5721,7 @@
 
         async function addTransaction(e) {
             e.preventDefault();
+            hapticShort();
             const now = new Date();
             const amount = parseMoney(document.getElementById('transactionAmount').value);
 
@@ -9408,6 +9426,7 @@
         }
 
         async function saveNoteEdit(index) {
+            hapticShort();
             const titleInput = document.getElementById(`editNoteTitle_${index}`);
             const contentInput = document.getElementById(`editNoteContent_${index}`);
 
@@ -9441,6 +9460,7 @@
 
         async function addNote(e) {
             e.preventDefault();
+            hapticShort();
             const now = new Date();
             const content = document.getElementById('noteContent').value.trim();
             const title = document.getElementById('noteTitle')?.value.trim();
@@ -9901,6 +9921,7 @@
             }, 100);
         }
         async function downloadSalesReportPDF() {
+            hapticShort();
             await ensureLogoReady();
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -10086,6 +10107,7 @@
         }
 
         async function downloadDailyReportPDF() {
+            hapticShort();
             await ensureLogoReady();
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -10301,6 +10323,7 @@
         }
 
         function downloadSalesReportExcel() {
+            hapticShort();
             const rows = [
                 ["TUBA - The Ultimate Business Architecture"],
                 ["Financial Report"],
@@ -10332,6 +10355,7 @@
         }
 
         function downloadBackup() {
+            hapticShort();
             exportData();
         }
 
@@ -11798,6 +11822,7 @@
         // ============================================
 
         async function cleanDuplicatesFromUI() {
+            hapticShort();
             if (!confirm('This will remove all duplicate entries. Continue?')) {
                 return;
             }
