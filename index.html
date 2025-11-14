@@ -3899,32 +3899,43 @@
             try {
                 const ua = navigator.userAgent || navigator.vendor || window.opera;
                 const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-                // Prefer native preview: open in new tab/window if possible
-                try {
-                    const blob = doc.output('blob');
-                    const url = URL.createObjectURL(blob);
-                    const w = window.open(url, '_blank');
-                    if (w && typeof w.focus === 'function') { w.focus(); setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000); return; }
-                    // Fallback: iOS share sheet if available
-                    if (isIOS && navigator.share && navigator.canShare) {
+                const isAndroid = /Android/i.test(ua);
+                const blob = doc.output('blob');
+                const url = URL.createObjectURL(blob);
+
+                // iOS: prefer share sheet if supported, else open viewer in new tab
+                if (isIOS) {
+                    if (navigator.share && navigator.canShare) {
                         try {
                             const file = new File([blob], filename, { type: 'application/pdf' });
-                            if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: filename }); return; }
+                            if (navigator.canShare({ files: [file] })) {
+                                await navigator.share({ files: [file], title: filename });
+                                setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000);
+                                return;
+                            }
                         } catch { }
                     }
-                    // Fallback: direct download
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } a.remove(); }, 1000);
-                    return;
-                } catch { }
-                // Last resort: data URL or direct save
-                try { const dataUrl = doc.output('dataurlstring'); const w2 = window.open(dataUrl, '_blank'); if (w2) return; } catch { }
+                    const w = window.open(url, '_blank');
+                    if (w && typeof w.focus === 'function') { w.focus(); setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000); return; }
+                }
+
+                // Android: use native viewer (new tab), fallback to same-tab navigation
+                if (isAndroid) {
+                    const w = window.open(url, '_blank');
+                    if (w && typeof w.focus === 'function') { w.focus(); setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000); return; }
+                    try { window.location.assign(url); setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } }, 10000); return; } catch { }
+                }
+
+                // Other platforms or fallbacks: trigger direct download
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => { try { URL.revokeObjectURL(url); } catch { } a.remove(); }, 1000);
+            } catch {
                 try { doc.save(filename); } catch { }
-            } catch { }
+            }
         }
 
         let __pdfViewerURL = null;
