@@ -3902,21 +3902,21 @@
                 if (isIOS) {
                     try {
                         const dataUrl = doc.output('dataurlstring');
-                        openPdfViewer(dataUrl, filename);
-                        return;
+                        const w = window.open(dataUrl, '_blank');
+                        if (w) return;
                     } catch { }
                     try {
                         const blob = doc.output('blob');
                         const url = URL.createObjectURL(blob);
-                        openPdfViewer(url, filename);
-                        return;
+                        const w = window.open(url, '_blank');
+                        if (w) return;
                     } catch { }
                 }
                 try {
                     const blob = doc.output('blob');
                     const url = URL.createObjectURL(blob);
-                    openPdfViewer(url, filename);
-                    return;
+                    const w = window.open(url, '_blank');
+                    if (w) return;
                 } catch { }
                 try { doc.save(filename); } catch { }
             } catch { }
