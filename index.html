@@ -595,6 +595,80 @@
             box-shadow: 0 2px 10px rgba(25, 118, 210, 0.4), inset 0 2px 5px rgba(0, 0, 0, 0.3);
         }
 
+        .cmd-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 10vh;
+            z-index: 10000;
+        }
+
+        .cmd-box {
+            width: 90%;
+            max-width: 640px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+        }
+
+        .cmd-input {
+            width: 100%;
+            border: none;
+            outline: none;
+            padding: 14px 16px;
+            font-size: 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .cmd-results {
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        .cmd-item {
+            padding: 10px 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            cursor: pointer;
+        }
+
+        .cmd-item:hover {
+            background: rgba(102, 126, 234, 0.10);
+        }
+
+        .cmd-type {
+            font-size: 10px;
+            color: #666;
+        }
+
+        .cmd-title {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        body.theme-dark .cmd-box {
+            background: rgba(24, 24, 24, 0.98);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        body.theme-dark .cmd-input {
+            background: transparent;
+            color: #e0e0e0;
+            border-bottom-color: rgba(255, 255, 255, 0.12);
+        }
+
+        body.theme-dark .cmd-item {
+            border-bottom-color: rgba(255, 255, 255, 0.08);
+        }
+
         .content {
             padding: 16px;
             padding-top: calc(70px + env(safe-area-inset-top));
@@ -2020,6 +2094,14 @@
     </script>
     <div id="hiddenFocusTarget" tabindex="-1"
         style="position:fixed;top:-10000px;left:-10000px;width:1px;height:1px;opacity:0;"></div>
+    <div class="cmd-overlay" id="cmdOverlay" role="dialog" aria-modal="true">
+        <div class="cmd-box">
+            <input id="cmdInput" class="cmd-input" type="text"
+                placeholder="Type to search (Products, Categories, Customers, Sales, Expenses, Notes, Inventory)"
+                oninput="performGlobalSearch(this.value)" />
+            <div class="cmd-results" id="cmdResults"></div>
+        </div>
+    </div>
     <!-- Removed in-app pull-to-refresh indicator -->
 
     <!-- Side Navigation Drawer -->
@@ -2110,6 +2192,22 @@
             <div class="side-nav-item" id="sideNavSoundButton" onclick="toggleSoundNotifications()">
                 <span class="side-nav-icon" id="sideNavSoundIcon">🔊</span>
                 <span id="sideNavSoundText">Sound: On</span>
+            </div>
+            <div class="side-nav-item" id="sideNavDailyBackupButton" onclick="toggleAutoBackupDaily()">
+                <span class="side-nav-icon" id="sideNavDailyBackupIcon">📅</span>
+                <span id="sideNavDailyBackupText">Daily Auto Backup: Off</span>
+            </div>
+            <div class="side-nav-item" id="sideNavWeeklyBackupButton" onclick="toggleAutoBackupWeekly()">
+                <span class="side-nav-icon" id="sideNavWeeklyBackupIcon">🗓️</span>
+                <span id="sideNavWeeklyBackupText">Weekly Auto Backup: Off</span>
+            </div>
+            <div class="side-nav-item" onclick="preloadOfflineData()">
+                <span class="side-nav-icon">⚡</span>
+                <span>Preload for Offline</span>
+            </div>
+            <div class="side-nav-item" id="sideNavLockButton" onclick="toggleAppLock()">
+                <span class="side-nav-icon" id="sideNavLockIcon">🔓</span>
+                <span id="sideNavLockText">App Lock: Off</span>
             </div>
         </div>
 
@@ -2221,6 +2319,19 @@
         </div>
     </div>
 
+    <div class="modal" id="lockModal">
+        <div class="modal-content">
+            <div class="modal-title">Unlock App</div>
+            <div>
+                <label>Enter PIN</label>
+                <input type="password" id="lockPinInput" placeholder="••••">
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button class="btn-small btn-success" onclick="unlockWithPIN()">Unlock</button>
+                <button class="btn-small btn-secondary" onclick="closeLockModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
     <div class="modal" id="floatModal">
         <div class="modal-content">
             <div class="modal-title">Set Initial Float</div>
@@ -3804,6 +3915,11 @@
             backupReminder: { date: '', count: 0 }
             , soundEnabled: true
             , theme: 'light'
+            , autoBackupDaily: false
+            , autoBackupWeekly: false
+            , lockEnabled: false
+            , lockPIN: ''
+            , isUnlocked: true
         };
 
         let chartInstance = null;
@@ -3944,6 +4060,12 @@
                     if (state.theme === undefined || !state.theme) {
                         state.theme = 'light';
                     }
+
+                    if (state.autoBackupDaily === undefined) state.autoBackupDaily = false;
+                    if (state.autoBackupWeekly === undefined) state.autoBackupWeekly = false;
+                    if (state.lockEnabled === undefined) state.lockEnabled = false;
+                    if (state.lockPIN === undefined) state.lockPIN = '';
+                    if (state.isUnlocked === undefined) state.isUnlocked = true;
 
                     // Calculate current float balances
                     calculateFloatBalances();
@@ -6224,7 +6346,7 @@
             const transaction = {
                 id: generateID('transactions'),
                 channel: state.activeTransactionChannel,
-                customerName: document.getElementById('transactionCustomer').value.trim() || 'N/A',
+                customerName: sanitizeString(document.getElementById('transactionCustomer').value || '') || 'N/A',
                 type: document.getElementById('transactionType').value,
                 amount: amount,
                 date: getTodayDateString(),
@@ -6239,6 +6361,7 @@
             saveData();
             render();
             showToast("Transaction recorded", "success");
+            trackEvent('add_transaction', { channel: transaction.channel, type: transaction.type, amount: transaction.amount });
 
             if (syncEnabled) {
                 await upsertOne('transactions', {
@@ -6325,6 +6448,7 @@
                     <h2>Add Product/Service</h2>
                     <div class="card-header-buttons">
                         <button class="quick-nav-btn back" onclick="switchTab('sales')">← Sales</button>
+                        <button class="quick-nav-btn" onclick="preloadOfflineData()">Preload for Offline</button>
                     </div>
                     <form onsubmit="addProduct(event)">
                         <div class="form-group">
@@ -6463,7 +6587,7 @@
 
         async function addProduct(e) {
             e.preventDefault();
-            const name = document.getElementById('productName').value.trim();
+            const name = sanitizeString(document.getElementById('productName').value);
             let category = document.getElementById('productCategory').value;
             if (typeof category === 'string') category = category.trim();
             const cost = parseMoney(document.getElementById('productCost').value);
@@ -6486,7 +6610,7 @@
             }
 
             if (category === 'new') {
-                const newCat = (document.getElementById('newCategoryName')?.value || '').trim();
+                const newCat = sanitizeString(document.getElementById('newCategoryName')?.value || '');
                 if (!newCat) {
                     return showToast('Please enter new category name', 'error');
                 }
@@ -6523,6 +6647,7 @@
             saveData();
             render();
             showToast("Product added successfully!", "success");
+            trackEvent('add_product', { name, category });
 
             if (syncEnabled) {
                 await upsertOne('unpaid_entries', {
@@ -6726,13 +6851,14 @@
 
         async function addCategory(e) {
             e.preventDefault();
-            const name = document.getElementById('categoryName').value.trim();
+            const name = sanitizeString(document.getElementById('categoryName').value);
             if (state.categories.includes(name)) return showToast('Category already exists', 'error');
 
             state.categories.push(name);
             saveData();
             render();
             showToast("Category added", "success");
+            trackEvent('add_category', { name });
 
             // Sync in background
             if (syncEnabled) {
@@ -10030,8 +10156,8 @@
             playTapSound();
             hapticShort();
             const now = new Date();
-            const content = document.getElementById('noteContent').value.trim();
-            const title = document.getElementById('noteTitle')?.value.trim();
+            const content = sanitizeString(document.getElementById('noteContent').value);
+            const title = sanitizeString(document.getElementById('noteTitle')?.value || '');
 
             if (!content) {
                 return showToast('Please enter note content', 'error');
@@ -10049,6 +10175,7 @@
             saveData();
             render();
             showToast("Note saved", "success");
+            trackEvent('add_note', { title: note.title });
 
             // Sync in background
             if (syncEnabled) syncInBackground();
@@ -10059,6 +10186,7 @@
             const note = state.notes[index];
             const modal = document.getElementById('noteModal');
             const content = document.getElementById('noteModalContent');
+            modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
             content.innerHTML = `
                 ${note.title ? `<h3 class="modal-title" style="margin-bottom: 12px;">${note.title}</h3>` : ''}
                 <div style="margin-bottom: 12px; color: #666; font-size: 13px;">${note.date} ${note.time}</div>
@@ -10066,6 +10194,11 @@
             `;
             modal.classList.add('show');
         }
+
+        function openLockModal() { const m = document.getElementById('lockModal'); if (m) m.classList.add('show'); }
+        function closeLockModal() { const m = document.getElementById('lockModal'); if (m) m.classList.remove('show'); }
+        function unlockWithPIN() { const val = document.getElementById('lockPinInput')?.value || ''; if (val.trim() === state.lockPIN) { state.isUnlocked = true; saveData(); closeLockModal(); showToast('Unlocked', 'success'); } else { showToast('Incorrect PIN', 'error'); } }
+        function checkLock() { if (state.lockEnabled && !state.isUnlocked) { openLockModal(); } }
 
         function closeNoteModal() {
             document.getElementById('noteModal').classList.remove('show');
@@ -10409,7 +10542,8 @@
             `).join('');
         }
 
-        function createAnalyticsChart() {
+        async function createAnalyticsChart() {
+            await ensureChart();
             setTimeout(() => {
                 const canvas = document.getElementById('analyticsChart');
                 if (!canvas) return;
@@ -10915,6 +11049,7 @@
             XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
             XLSX.writeFile(wb, `Financial_Report_${getTodayDateString()}.xlsx`);
             showToast("Excel downloaded successfully!", "success");
+            trackEvent('download_excel', { type: 'financial' });
         }
 
         function downloadBackup() {
@@ -10991,6 +11126,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             showToast(customMessage || 'Data exported successfully!', 'success', null, null, customDurationMs || 3000);
+            trackEvent('export_json', { size: (JSON.stringify(data) || '').length });
         }
 
         function importData() {
@@ -11181,6 +11317,8 @@
 
             try { updateSideNavSoundButton(); } catch (e) { }
             try { updateSideNavThemeButton(); } catch (e) { }
+            try { updateSideNavBackupButtons(); } catch (e) { }
+            try { updateSideNavLockButton(); } catch (e) { }
             try { updateSideNavActiveState(); } catch (e) { }
         }
 
@@ -11392,6 +11530,10 @@
         try { applyTheme(); } catch (e) { }
         render(); // SHOW UI NOW
         try { setupKeyboardDismiss(); } catch (e) { }
+        try { setupCommandPalette(); } catch (e) { }
+        try { initAnalytics(); initWebVitals(); } catch (e) { }
+        try { initAutoBackup(); } catch (e) { }
+        try { checkLock(); } catch (e) { }
 
         // Restore session in BACKGROUND
         (async function () {
@@ -12542,6 +12684,144 @@
                     await supabase.auth.updateUser({ data: { theme: state.theme } });
                 }
             } catch (e) { /* no-op */ }
+        }
+
+        function updateSideNavBackupButtons() {
+            const dailyText = document.getElementById('sideNavDailyBackupText');
+            const weeklyText = document.getElementById('sideNavWeeklyBackupText');
+            if (dailyText) dailyText.textContent = `Daily Auto Backup: ${state.autoBackupDaily ? 'On' : 'Off'}`;
+            if (weeklyText) weeklyText.textContent = `Weekly Auto Backup: ${state.autoBackupWeekly ? 'On' : 'Off'}`;
+        }
+
+        function toggleAutoBackupDaily() { state.autoBackupDaily = !state.autoBackupDaily; saveData(); updateSideNavBackupButtons(); showToast(`Daily auto backup ${state.autoBackupDaily ? 'enabled' : 'disabled'}`, 'info'); }
+        function toggleAutoBackupWeekly() { state.autoBackupWeekly = !state.autoBackupWeekly; saveData(); updateSideNavBackupButtons(); showToast(`Weekly auto backup ${state.autoBackupWeekly ? 'enabled' : 'disabled'}`, 'info'); }
+
+        function updateSideNavLockButton() {
+            const icon = document.getElementById('sideNavLockIcon');
+            const text = document.getElementById('sideNavLockText');
+            if (icon) icon.textContent = state.lockEnabled ? '🔒' : '🔓';
+            if (text) text.textContent = `App Lock: ${state.lockEnabled ? 'On' : 'Off'}`;
+        }
+
+        function toggleAppLock() {
+            if (!state.lockEnabled) {
+                const pin = prompt('Set a 4-digit PIN');
+                if (pin && pin.trim().length >= 4) {
+                    state.lockPIN = pin.trim();
+                    state.lockEnabled = true;
+                    state.isUnlocked = false;
+                    saveData();
+                    updateSideNavLockButton();
+                    openLockModal();
+                    showToast('App lock enabled', 'success');
+                }
+            } else {
+                if (confirm('Disable app lock?')) {
+                    state.lockEnabled = false;
+                    state.lockPIN = '';
+                    state.isUnlocked = true;
+                    saveData();
+                    updateSideNavLockButton();
+                    showToast('App lock disabled', 'info');
+                }
+            }
+        }
+
+        function sanitizeString(s) {
+            if (typeof s !== 'string') return s;
+            return s.replace(/[\u0000-\u001F\u007F]/g, '').trim();
+        }
+
+        function setupCommandPalette() {
+            const overlay = document.getElementById('cmdOverlay');
+            const input = document.getElementById('cmdInput');
+            const results = document.getElementById('cmdResults');
+            if (!overlay || !input || !results) return;
+            function openCmd() { overlay.style.display = 'flex'; input.value = ''; results.innerHTML = ''; input.focus(); }
+            function closeCmd() { overlay.style.display = 'none'; }
+            window.openCommandPalette = openCmd; window.closeCommandPalette = closeCmd;
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openCmd(); }
+                if (e.key === 'Escape') { closeCmd(); }
+            });
+        }
+
+        function performGlobalSearch(q) {
+            q = String(q || '').toLowerCase();
+            const results = [];
+            const push = (type, title, action) => results.push({ type, title, action });
+            (state.products || []).forEach(p => { if (!q || p.name.toLowerCase().includes(q) || String(p.category || '').toLowerCase().includes(q)) push('Product', `${p.name} — ${p.category}`, () => switchTab('products')); });
+            (state.categories || []).forEach(c => { if (!q || String(c).toLowerCase().includes(q)) push('Category', c, () => switchTab('categories')); });
+            (state.customers || []).forEach(c => { if (!q || String(c.name || '').toLowerCase().includes(q)) push('Customer', c.name, () => switchTab('customers')); });
+            (state.sales || []).slice(-200).forEach(s => { const t = `${s.productName} ${s.customer} ${s.payment}`.toLowerCase(); if (!q || t.includes(q)) push('Sale', `${s.productName} — ${s.customer} (${s.date})`, () => switchTab('sales')); });
+            (state.expenses || []).slice(-200).forEach(e => { const t = `${e.description} ${e.category}`.toLowerCase(); if (!q || t.includes(q)) push('Expense', `${e.description} — ${e.category}`, () => switchTab('expenses')); });
+            (state.notes || []).slice(-200).forEach(n => { const t = `${n.title || ''} ${n.content || ''}`.toLowerCase(); if (!q || t.includes(q)) push('Note', `${n.title || '(Untitled)'} — ${n.date}`, () => switchTab('notes')); });
+            const list = document.getElementById('cmdResults');
+            list.innerHTML = results.map(r => `<div class="cmd-item" onclick="(${r.action.toString()})(); closeCommandPalette();"><div class="cmd-type">${r.type}</div><div class="cmd-title">${r.title}</div></div>`).join('') || '<div class="cmd-item">No results</div>';
+        }
+
+        function trackEvent(name, payload) {
+            try {
+                const ev = { name, payload, ts: Date.now(), user: currentUser ? currentUser.id : null };
+                console.log('analytics:', ev);
+                if (syncEnabled) upsertOne && upsertOne('analytics', ev);
+            } catch { }
+        }
+
+        function initAnalytics() {
+            window.addEventListener('error', (e) => {
+                try {
+                    const err = { message: e.message, source: e.filename, lineno: e.lineno, colno: e.colno, stack: (e.error && e.error.stack) || '', ts: Date.now() };
+                    console.error('runtime error:', err);
+                    if (syncEnabled) upsertOne && upsertOne('errors', err);
+                } catch { }
+            });
+        }
+
+        function initWebVitals() {
+            try {
+                const po = new PerformanceObserver((list) => {
+                    list.getEntries().forEach(entry => {
+                        const rec = { name: entry.name, type: entry.entryType, start: entry.startTime, duration: entry.duration, value: entry.value, ts: Date.now() };
+                        if (syncEnabled) upsertOne && upsertOne('web_vitals', rec);
+                    });
+                });
+                po.observe({ type: 'largest-contentful-paint', buffered: true });
+                po.observe({ type: 'layout-shift', buffered: true });
+                po.observe({ type: 'first-input', buffered: true });
+            } catch { }
+        }
+
+        function initAutoBackup() {
+            if (!state) return;
+            state.autoBackupDaily = state.autoBackupDaily || false;
+            state.autoBackupWeekly = state.autoBackupWeekly || false;
+            function scheduleDaily() {
+                const now = new Date();
+                const next = new Date(); next.setHours(23, 59, 30, 0);
+                const ms = Math.max(1000, next.getTime() - now.getTime());
+                setTimeout(() => { try { if (state.autoBackupDaily) exportData('Auto Saved', 2000); } catch { } scheduleDaily(); }, ms);
+            }
+            function scheduleWeekly() {
+                const now = new Date();
+                const next = new Date(); next.setDate(now.getDate() + ((7 - now.getDay()) % 7)); next.setHours(23, 59, 0, 0);
+                const ms = Math.max(1000, next.getTime() - now.getTime());
+                setTimeout(() => { try { if (state.autoBackupWeekly) exportData('Weekly Auto Saved', 2000); } catch { } scheduleWeekly(); }, ms);
+            }
+            scheduleDaily(); scheduleWeekly();
+        }
+
+        async function ensureJsPDF() { if (!window.jspdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); }
+        async function ensureXLSX() { if (!window.XLSX) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); }
+        async function ensureChart() { if (!window.Chart) await loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'); }
+        function loadScript(src) { return new Promise((resolve, reject) => { const s = document.createElement('script'); s.src = src; s.onload = () => resolve(); s.onerror = reject; document.head.appendChild(s); }); }
+
+        async function preloadOfflineData() {
+            try {
+                const assets = ['index.html', 'manifest.json', 'tuba-icon.png'];
+                await Promise.all(assets.map(a => fetch(a, { cache: 'reload' }).catch(() => { })));
+                showToast('Preloaded for offline', 'success');
+            } catch { showToast('Failed to preload', 'error'); }
         }
 
         function setupKeyboardDismiss() {
