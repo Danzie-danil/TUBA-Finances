@@ -109,6 +109,9 @@
             font-weight: 600;
             padding: 6px 12px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+            position: sticky;
+            top: calc(70px + env(safe-area-inset-top));
+            z-index: 9998;
         }
 
         .offline-banner.clickable {
@@ -1193,12 +1196,18 @@
             border-radius: 8px;
             margin-bottom: 16px;
             box-shadow: 0 4px 15px rgba(230, 81, 0, 0.2);
+            position: sticky;
+            top: calc(70px + env(safe-area-inset-top));
+            z-index: 9998;
         }
 
         .alert-box-danger {
             background: linear-gradient(145deg, #ffebee, #ffcdd2);
             border-left: 4px solid #d32f2f;
             box-shadow: 0 4px 15px rgba(211, 47, 47, 0.2);
+            position: sticky;
+            top: calc(70px + env(safe-area-inset-top));
+            z-index: 9998;
         }
 
         .alert-success {
@@ -1208,6 +1217,9 @@
             border-radius: 8px;
             margin-bottom: 16px;
             box-shadow: 0 4px 15px rgba(46, 125, 50, 0.2);
+            position: sticky;
+            top: calc(70px + env(safe-area-inset-top));
+            z-index: 9998;
         }
 
         .alert-info {
@@ -1217,6 +1229,9 @@
             border-radius: 8px;
             margin-top: 16px;
             box-shadow: 0 4px 15px rgba(25, 118, 210, 0.2);
+            position: sticky;
+            top: calc(70px + env(safe-area-inset-top));
+            z-index: 9998;
         }
 
         .alert-info {
@@ -1226,6 +1241,9 @@
             border-radius: 8px;
             margin-top: 16px;
             box-shadow: 0 4px 15px rgba(25, 118, 210, 0.2);
+            position: sticky;
+            top: calc(70px + env(safe-area-inset-top));
+            z-index: 9998;
         }
 
         .float-balance-container {
@@ -3912,6 +3930,11 @@
             try {
                 let a = window.__tapSoundAudio;
                 if (a) {
+                    try {
+                        const base = a.src.split('?')[0];
+                        a.src = base + '?v=' + Date.now();
+                        a.load();
+                    } catch (e) { }
                     try { a.volume = 0.5; } catch (e) { }
                     try { a.currentTime = 0; } catch (e) { }
                     await a.play();
@@ -3919,7 +3942,7 @@
                 }
                 const srcs = ['button audio.mp3', 'tap.mp3', 'tap.wav'];
                 for (let i = 0; i < srcs.length; i++) {
-                    const url = encodeURI(srcs[i]);
+                    const url = encodeURI(srcs[i]) + '?v=' + Date.now();
                     const candidate = new Audio(url);
                     candidate.preload = 'auto';
                     candidate.volume = 0.5;
@@ -3952,6 +3975,11 @@
             try {
                 let a = window.__deleteSoundAudio;
                 if (a) {
+                    try {
+                        const base = a.src.split('?')[0];
+                        a.src = base + '?v=' + Date.now();
+                        a.load();
+                    } catch (e) { }
                     try { a.volume = 0.5; } catch (e) { }
                     try { a.currentTime = 0; } catch (e) { }
                     await a.play();
@@ -3959,7 +3987,7 @@
                 }
                 const srcs = ['delete sound.mp3', 'delete.mp3', 'delete.wav'];
                 for (let i = 0; i < srcs.length; i++) {
-                    const url = encodeURI(srcs[i]);
+                    const url = encodeURI(srcs[i]) + '?v=' + Date.now();
                     const candidate = new Audio(url);
                     candidate.preload = 'auto';
                     candidate.volume = 0.5;
