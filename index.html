@@ -3912,6 +3912,7 @@
             try {
                 let a = window.__tapSoundAudio;
                 if (a) {
+                    try { a.volume = 0.5; } catch (e) { }
                     try { a.currentTime = 0; } catch (e) { }
                     await a.play();
                     return;
@@ -3921,7 +3922,7 @@
                     const url = encodeURI(srcs[i]);
                     const candidate = new Audio(url);
                     candidate.preload = 'auto';
-                    candidate.volume = 0.2;
+                    candidate.volume = 0.5;
                     try { candidate.currentTime = 0; } catch (e) { }
                     try {
                         await candidate.play();
@@ -3939,11 +3940,51 @@
                 const g = ctx.createGain();
                 o.type = 'square';
                 o.frequency.value = 600;
-                g.gain.value = 0.02;
+                g.gain.value = 0.05;
                 o.connect(g);
                 g.connect(ctx.destination);
                 o.start();
                 setTimeout(() => { try { o.stop(); o.disconnect(); g.disconnect(); } catch (e) { } }, 60);
+            } catch (e) { }
+        }
+
+        async function playDeleteSound() {
+            try {
+                let a = window.__deleteSoundAudio;
+                if (a) {
+                    try { a.volume = 0.5; } catch (e) { }
+                    try { a.currentTime = 0; } catch (e) { }
+                    await a.play();
+                    return;
+                }
+                const srcs = ['delete sound.mp3', 'delete.mp3', 'delete.wav'];
+                for (let i = 0; i < srcs.length; i++) {
+                    const url = encodeURI(srcs[i]);
+                    const candidate = new Audio(url);
+                    candidate.preload = 'auto';
+                    candidate.volume = 0.5;
+                    try { candidate.currentTime = 0; } catch (e) { }
+                    try {
+                        await candidate.play();
+                        window.__deleteSoundAudio = candidate;
+                        return;
+                    } catch (e) { }
+                }
+            } catch (e) { }
+            try {
+                let ctx = window.__deleteAudioContext;
+                if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+                window.__deleteAudioContext = ctx;
+                try { await ctx.resume(); } catch (e) { }
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'square';
+                o.frequency.value = 250;
+                g.gain.value = 0.05;
+                o.connect(g);
+                g.connect(ctx.destination);
+                o.start();
+                setTimeout(() => { try { o.stop(); o.disconnect(); g.disconnect(); } catch (e) { } }, 80);
             } catch (e) { }
         }
 
@@ -5245,6 +5286,7 @@
             if (selected.length === 0) return showToast('No items selected', 'info');
 
             showConfirm(`Delete ${selected.length} selected items?`, async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const items = type === 'unpaidEntries' ? state.unpaidEntries : state[type];
                 // Issue cloud deletes for each selected item
                 if (syncEnabled) {
@@ -5377,6 +5419,7 @@
 
         function deleteSaleByTimestamp(ts) {
             showConfirm("Delete this sale?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const idx = state.sales.findIndex(s => s.timestamp === ts);
                 if (idx === -1) return showToast("Sale not found", "error");
                 const sale = state.sales[idx];
@@ -5849,6 +5892,7 @@
 
         function deleteTransactionByTimestamp(ts) {
             showConfirm("Delete this transaction?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const idx = state.transactions.findIndex(t => t.timestamp === ts);
                 if (idx === -1) return showToast("Transaction not found", "error");
                 const t = state.transactions[idx];
@@ -6107,6 +6151,7 @@
 
         function deleteProductIndex(i) {
             showConfirm("Delete this item?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const p = state.products[i];
                 if (p && p.name && state.inventory && state.inventory[p.name]) delete state.inventory[p.name];
                 if (p) {
@@ -6290,6 +6335,7 @@
                 }
             }
             showConfirm("Delete this category?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 state.categories.splice(i, 1);
                 saveData();
                 render();
@@ -6529,6 +6575,7 @@
 
         function deleteExpenseIndex(i) {
             showConfirm("Delete this expense?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const e = state.expenses[i];
                 if (e) {
                     try {
@@ -7657,6 +7704,7 @@
 
         function deleteCustomerIndex(i) {
             showConfirm("Delete this customer?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const c = state.customers[i];
                 if (c) {
                     try {
@@ -8046,6 +8094,7 @@
             if (selected.length === 0) return showToast('No invoices selected', 'info');
 
             showConfirm(`Delete ${selected.length} selected invoices?`, async function () {
+                try { playDeleteSound(); } catch (e) { }
                 selected.sort((a, b) => b - a).forEach(i => {
                     const inv = state.invoices[i];
                     if (syncEnabled && inv) { try { deleteOne('invoices', { number: inv.number }); } catch { } }
@@ -8108,6 +8157,7 @@
             if (selected.length === 0) return showToast('No invoices selected', 'info');
 
             showConfirm(`Delete ${selected.length} selected invoices?`, async function () {
+                try { playDeleteSound(); } catch (e) { }
                 selected.sort((a, b) => b - a).forEach(i => {
                     const inv = state.invoices[i];
                     if (syncEnabled && inv) { try { deleteOne('invoices', { number: inv.number }); } catch { } }
@@ -8125,6 +8175,7 @@
 
         function deleteInvoice(index) {
             showConfirm("Delete this invoice?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const inv = state.invoices[index];
                 if (inv) {
                     try {
@@ -8547,6 +8598,7 @@
         }
         function deleteReceipt(idx) {
             showConfirm("Delete this receipt?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const r = state.receipts[idx];
                 if (r) {
                     try {
@@ -8610,6 +8662,7 @@
             if (selected.length === 0) return showToast('No receipts selected', 'info');
 
             showConfirm(`Delete ${selected.length} selected receipts?`, async function () {
+                try { playDeleteSound(); } catch (e) { }
                 selected.sort((a, b) => b - a).forEach(i => {
                     const r = state.receipts[i];
                     if (syncEnabled && r) { try { deleteOne('receipts', { timestamp: r.timestamp }); } catch { } }
@@ -9350,6 +9403,7 @@
 
         function deleteUnpaidEntry(timestamp) {
             showConfirm("Delete this unpaid entry?", function () {
+                try { playDeleteSound(); } catch (e) { }
                 const idx = state.unpaidEntries.findIndex(e => e.timestamp === timestamp);
                 if (idx !== -1) {
                     const entry = state.unpaidEntries[idx];
@@ -9575,6 +9629,7 @@
         function deleteNoteFromModal() {
             if (state.currentNoteIndex === null) return;
             showConfirm("Delete this note?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const note = state.notes[state.currentNoteIndex];
                 if (note) {
                     try {
@@ -9619,6 +9674,7 @@
         function deleteNoteFromModal() {
             if (state.currentNoteIndex === null) return;
             showConfirm("Delete this note?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const note = state.notes[state.currentNoteIndex];
                 if (note) {
                     try {
@@ -9645,6 +9701,7 @@
 
         function deleteNoteByIndex(index) {
             showConfirm("Delete this note?", async function () {
+                try { playDeleteSound(); } catch (e) { }
                 const note = state.notes[index];
                 if (note) {
                     try {
