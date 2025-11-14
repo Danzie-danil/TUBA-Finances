@@ -13,8 +13,8 @@
     <link rel="apple-touch-icon-precomposed" href="tuba-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="tuba-icon.png">
     <link rel="icon" type="image/png" sizes="512x512" href="tuba-icon.png">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#000000">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -36,6 +36,15 @@
             -moz-user-select: none;
             -ms-user-select: none;
             user-select: none;
+        }
+
+        html {
+            -webkit-text-size-adjust: 100%;
+        }
+
+        #loginForm input,
+        #signupForm input {
+            font-size: 16px;
         }
 
         :root {
@@ -329,6 +338,30 @@
             background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
             padding-bottom: 70px;
             overflow-x: hidden;
+        }
+
+        body.theme-dark {
+            background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+            color: #e0e0e0;
+        }
+
+        body.theme-dark .card {
+            background: rgba(24, 24, 24, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #e0e0e0;
+        }
+
+        body.theme-dark .bottom-nav {
+            background: rgba(24, 24, 24, 0.95);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        body.theme-dark .nav-item {
+            color: #cfcfcf;
+        }
+
+        body.theme-dark .nav-item:hover:not(.active) {
+            background: rgba(102, 126, 234, 0.14);
         }
 
         .header {
@@ -1742,6 +1775,10 @@
                 <button class="side-nav-sound" id="sideNavSoundHeaderButton" onclick="toggleSoundNotifications()"
                     title="Toggle sound" aria-label="Toggle sound">
                     <span id="sideNavSoundHeaderIcon">🔊</span>
+                </button>
+                <button class="side-nav-sound" id="sideNavThemeHeaderButton" onclick="toggleTheme()"
+                    title="Toggle theme" aria-label="Toggle theme">
+                    <span id="sideNavThemeHeaderIcon">🌞</span>
                 </button>
             </div>
             <button class="side-nav-close" onclick="toggleSideNav()" title="Close" aria-label="Close">×</button>
@@ -3509,6 +3546,7 @@
             // Daily backup reminder tracking
             backupReminder: { date: '', count: 0 }
             , soundEnabled: true
+            , theme: 'light'
         };
 
         let chartInstance = null;
@@ -3644,6 +3682,10 @@
 
                     if (state.soundEnabled === undefined) {
                         state.soundEnabled = true;
+                    }
+
+                    if (state.theme === undefined || !state.theme) {
+                        state.theme = 'light';
                     }
 
                     // Calculate current float balances
@@ -9635,6 +9677,17 @@
             state.editingNoteIndex = index;
             saveData();
             render();
+            setTimeout(() => {
+                const contentInput = document.getElementById(`editNoteContent_${index}`);
+                if (contentInput && typeof contentInput.focus === 'function') {
+                    try { contentInput.focus(); contentInput.selectionStart = contentInput.value.length; contentInput.selectionEnd = contentInput.value.length; } catch (e) { }
+                    return;
+                }
+                const titleInput = document.getElementById(`editNoteTitle_${index}`);
+                if (titleInput && typeof titleInput.focus === 'function') {
+                    try { titleInput.focus(); } catch (e) { }
+                }
+            }, 50);
         }
 
         function cancelNoteEdit() {
@@ -9726,20 +9779,9 @@
 
         function editNoteFromModal() {
             if (state.currentNoteIndex === null) return;
-            const note = state.notes[state.currentNoteIndex];
-            const newTitle = prompt("Edit title:", note.title);
-            const newContent = prompt("Edit note:", note.content);
-            if (newContent !== null && newContent.trim()) {
-                if (newTitle !== null) note.title = newTitle.trim();
-                note.content = newContent.trim();
-                saveData();
-                closeNoteModal();
-                render();
-                showToast("Note updated", "success");
-
-                // Sync in background
-                if (syncEnabled) syncInBackground();
-            }
+            const idx = state.currentNoteIndex;
+            closeNoteModal();
+            startEditingNote(idx);
         }
 
         function deleteNoteFromModal() {
@@ -10843,6 +10885,7 @@
             body.classList.toggle('nav-open');
 
             try { updateSideNavSoundButton(); } catch (e) { }
+            try { updateSideNavThemeButton(); } catch (e) { }
             try { updateSideNavActiveState(); } catch (e) { }
         }
 
@@ -11051,6 +11094,7 @@
         // Load local data IMMEDIATELY - don't wait
         console.log('📱 Loading local data...');
         loadData();
+        try { applyTheme(); } catch (e) { }
         render(); // SHOW UI NOW
 
         // Restore session in BACKGROUND
@@ -12177,6 +12221,25 @@
                 btn.style.color = 'white';
                 if (headerIcon) headerIcon.textContent = '🔇';
             }
+        }
+
+        function updateSideNavThemeButton() {
+            const headerIcon = document.getElementById('sideNavThemeHeaderIcon');
+            if (headerIcon) headerIcon.textContent = (state.theme === 'dark' ? '🌙' : '🌞');
+        }
+
+        function applyTheme() {
+            try {
+                document.body.classList.toggle('theme-dark', state.theme === 'dark');
+                updateSideNavThemeButton();
+            } catch (e) { }
+        }
+
+        function toggleTheme() {
+            state.theme = (state.theme === 'dark') ? 'light' : 'dark';
+            saveData();
+            applyTheme();
+            showToast(state.theme === 'dark' ? 'Dark mode enabled' : 'Light mode enabled', 'info');
         }
 
         function toggleSoundNotifications() {
