@@ -2202,6 +2202,8 @@
             <div class="modal-title">Note Details</div>
             <div id="noteModalContent"></div>
             <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button class="btn-small" onclick="copyNoteFromModal()">📋 Copy</button>
+                <button class="btn-small btn-success" onclick="shareNoteFromModal()">📤 Send</button>
                 <button class="btn-small" onclick="editNoteFromModal()">Edit</button>
                 <button class="btn-small btn-danger" onclick="deleteNoteFromModal()">Delete</button>
                 <button class="btn-small btn-secondary" onclick="closeNoteModal()">Close</button>
@@ -10070,6 +10072,64 @@
         function closeNoteModal() {
             document.getElementById('noteModal').classList.remove('show');
             state.currentNoteIndex = null;
+        }
+
+        function composeNoteText(note) {
+            const title = (note.title || '').trim();
+            const content = (note.content || '').trim();
+            return title ? (title + '\n\n' + content) : content;
+        }
+
+        async function copyNoteFromModal() {
+            if (state.currentNoteIndex === null) return;
+            try { playTapSound(); } catch { }
+            try { hapticShort(); } catch { }
+            const note = state.notes[state.currentNoteIndex] || {};
+            const text = composeNoteText(note);
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('Note copied', 'success');
+            } catch (e) {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.setAttribute('readonly', '');
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    showToast('Note copied', 'success');
+                } catch {
+                    showToast('Copy failed', 'error');
+                }
+            }
+        }
+
+        async function shareNoteFromModal() {
+            if (state.currentNoteIndex === null) return;
+            try { playTapSound(); } catch { }
+            try { hapticShort(); } catch { }
+            const note = state.notes[state.currentNoteIndex] || {};
+            const title = (note.title || 'Note').trim() || 'Note';
+            const text = composeNoteText(note);
+            const ua = navigator.userAgent || navigator.vendor || window.opera;
+            const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const isAndroid = /Android/.test(ua);
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title, text });
+                    showToast('Shared', 'success');
+                    return;
+                } catch { }
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('Copied. Share via any app', 'info');
+            } catch {
+                showToast('Sharing not supported', 'error');
+            }
         }
 
         function editNoteFromModal() {
