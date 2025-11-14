@@ -727,6 +727,8 @@
             padding-left: env (safe-area-inset-left);
             padding-right: env (safe-area-inset-right);
             touch-action: pan-x;
+            column-gap: 8px;
+            padding-top: 6px;
         }
 
         .nav-item {
@@ -746,6 +748,10 @@
             gap: 4px;
             word-wrap: break-word;
             overflow: hidden;
+            position: relative;
+            border-radius: 12px;
+            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+            border: 2px solid rgba(102, 126, 234, 0.25);
         }
 
         .nav-item span:last-child {
@@ -756,19 +762,36 @@
         }
 
         .nav-item.active {
-            background: linear-gradient(145deg, #1a1a1a, #000000);
-            color: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(102, 126, 234, 0.5);
+        }
+
+        .nav-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 3px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.8);
         }
 
         .nav-item:hover:not(.active) {
-            background: rgba(0, 0, 0, 0.05);
-            border-radius: 12px;
+            background: rgba(102, 126, 234, 0.10);
+            border-color: rgba(102, 126, 234, 0.35);
+        }
+
+        .nav-item:active {
+            transform: scale(0.98);
         }
 
         .nav-icon {
             font-size: 20px;
+            line-height: 1;
         }
 
         .info-box {
@@ -1578,6 +1601,31 @@
             margin: 0;
         }
 
+        .side-nav-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .side-nav-sound {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+
+        .side-nav-sound:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
         .side-nav-close {
             background: transparent;
             border: none;
@@ -1600,13 +1648,13 @@
         .side-nav-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 12px 16px;
+            gap: 6px;
+            padding: 6px 12px;
             color: white;
             text-decoration: none;
             cursor: pointer;
             transition: all 0.2s;
-            border-left: 3px solid transparent;
+            border-left: 1px solid transparent;
             font-size: 13px;
             flex-shrink: 0;
         }
@@ -1623,8 +1671,8 @@
         }
 
         .side-nav-icon {
-            font-size: 18px;
-            width: 20px;
+            font-size: 14px;
+            width: 16px;
             text-align: center;
             flex-shrink: 0;
         }
@@ -1632,11 +1680,11 @@
         .side-nav-divider {
             height: 1px;
             background: rgba(255, 255, 255, 0.1);
-            margin: 8px 0;
+            margin: 4px 0;
         }
 
         .side-nav-section-title {
-            padding: 10px 16px 6px 16px;
+            padding: 4px 16px 2px 16px;
             font-size: 10px;
             font-weight: 700;
             color: rgba(255, 255, 255, 0.5);
@@ -1690,7 +1738,13 @@
     <div class="side-nav-overlay" id="sideNavOverlay" onclick="toggleSideNav()"></div>
     <div class="side-nav" id="sideNav">
         <div class="side-nav-header">
-            <h2>💼 TUBA</h2>
+            <div class="side-nav-title">
+                <h2>💼 TUBA</h2>
+                <button class="side-nav-sound" id="sideNavSoundHeaderButton" onclick="toggleSoundNotifications()"
+                    title="Toggle sound" aria-label="Toggle sound">
+                    <span id="sideNavSoundHeaderIcon">🔊</span>
+                </button>
+            </div>
             <button class="side-nav-close" onclick="toggleSideNav()" title="Close" aria-label="Close">×</button>
         </div>
 
@@ -1760,6 +1814,10 @@
             <div class="side-nav-item" onclick="navigateToTab('notes')">
                 <span class="side-nav-icon">📝</span>
                 <span>Notes</span>
+            </div>
+            <div class="side-nav-item" id="sideNavSoundButton" onclick="toggleSoundNotifications()">
+                <span class="side-nav-icon" id="sideNavSoundIcon">🔊</span>
+                <span id="sideNavSoundText">Sound: On</span>
             </div>
         </div>
 
@@ -3451,6 +3509,7 @@
             privacyBlurred: true,  // ADD THIS LINE
             // Daily backup reminder tracking
             backupReminder: { date: '', count: 0 }
+            , soundEnabled: true
         };
 
         let chartInstance = null;
@@ -3582,6 +3641,10 @@
                     // Ensure profileEditMode exists
                     if (state.profileEditMode === undefined) {
                         state.profileEditMode = false;
+                    }
+
+                    if (state.soundEnabled === undefined) {
+                        state.soundEnabled = true;
                     }
 
                     // Calculate current float balances
@@ -3927,6 +3990,7 @@
         }
 
         async function playTapSound() {
+            if (state && state.soundEnabled === false) return;
             try {
                 let a = window.__tapSoundAudio;
                 if (a) {
@@ -3972,6 +4036,7 @@
         }
 
         async function playDeleteSound() {
+            if (state && state.soundEnabled === false) return;
             try {
                 let a = window.__deleteSoundAudio;
                 if (a) {
@@ -5960,10 +6025,15 @@
                         </div>
                         <div class="form-group">
                             <label>Category</label>
-                            <select id="productCategory" required>
+                            <select id="productCategory" required onchange="toggleNewProductCategory()">
                                 <option value="">-- Select Category --</option>
                                 ${state.categories.slice().sort((a, b) => String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join('')}
+                                <option value="new">+ Add New Category</option>
                             </select>
+                        </div>
+                        <div class="form-group" id="newCategoryFields" style="display:none;">
+                            <label>New Category Name</label>
+                            <input type="text" id="newCategoryName" placeholder="Enter new category name">
                         </div>
                         <div class="form-group">
                             <label>Cost (Capital)</label>
@@ -6072,6 +6142,13 @@
             }).join('');
         }
 
+        function toggleNewProductCategory() {
+            const select = document.getElementById('productCategory');
+            const group = document.getElementById('newCategoryFields');
+            if (!select || !group) return;
+            group.style.display = (select.value === 'new') ? 'block' : 'none';
+        }
+
         function searchProducts(Period) {
             document.getElementById('productsList').innerHTML = renderProductsList(Period);
         }
@@ -6098,6 +6175,18 @@
 
             if (state.products.some(p => p.name.toLowerCase() === name.toLowerCase())) {
                 return showToast('Product already exists', 'error');
+            }
+
+            if (category === 'new') {
+                const newCat = (document.getElementById('newCategoryName')?.value || '').trim();
+                if (!newCat) {
+                    return showToast('Please enter new category name', 'error');
+                }
+                category = newCat;
+                if (!state.categories.includes(newCat)) {
+                    state.categories.push(newCat);
+                    saveData();
+                }
             }
 
             const product = {
@@ -10752,6 +10841,9 @@
             sideNav.classList.toggle('open');
             overlay.classList.toggle('show');
             body.classList.toggle('nav-open');
+
+            try { updateSideNavSoundButton(); } catch (e) { }
+            try { updateSideNavActiveState(); } catch (e) { }
         }
 
         function navigateToTab(tabId) {
@@ -12064,6 +12156,34 @@
                 switchTab('account');
                 toggleSideNav();
             }
+        }
+
+        function updateSideNavSoundButton() {
+            const btn = document.getElementById('sideNavSoundButton');
+            const icon = document.getElementById('sideNavSoundIcon');
+            const text = document.getElementById('sideNavSoundText');
+            const headerIcon = document.getElementById('sideNavSoundHeaderIcon');
+            if (!btn || !icon || !text) return;
+            if (state.soundEnabled) {
+                icon.textContent = '🔊';
+                text.textContent = 'Sound: On';
+                btn.style.background = 'linear-gradient(145deg, #2e7d32, #1b5e20)';
+                btn.style.color = 'white';
+                if (headerIcon) headerIcon.textContent = '🔊';
+            } else {
+                icon.textContent = '🔇';
+                text.textContent = 'Sound: Off';
+                btn.style.background = 'linear-gradient(145deg, #9e9e9e, #616161)';
+                btn.style.color = 'white';
+                if (headerIcon) headerIcon.textContent = '🔇';
+            }
+        }
+
+        function toggleSoundNotifications() {
+            state.soundEnabled = !state.soundEnabled;
+            saveData();
+            updateSideNavSoundButton();
+            showToast(state.soundEnabled ? 'Sound notifications enabled' : 'Sound notifications disabled', 'info');
         }
 
         // Override the original render to update auth button
