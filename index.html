@@ -409,7 +409,7 @@
         }
 
         .header-btn-left:active {
-            transform: translateY(-50%) scale(0.95);
+            transform: translateY(-50%);
             box-shadow: 0 2px 10px rgba(25, 118, 210, 0.4), inset 0 2px 5px rgba(0, 0, 0, 0.3);
         }
 
@@ -1548,8 +1548,6 @@
             box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
             z-index: 1000;
             transition: left 0.3s ease;
-            overflow-y: auto;
-            overflow-x: hidden;
             display: flex;
             flex-direction: column;
         }
@@ -1706,6 +1704,7 @@
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             background: rgba(0, 0, 0, 0.3);
             flex-shrink: 0;
+            padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
         }
 
         .side-nav-footer-text {
@@ -10834,6 +10833,7 @@
 
         // Side Navigation Functions
         function toggleSideNav() {
+            try { hapticShort(); } catch (e) { }
             const sideNav = document.getElementById('sideNav');
             const overlay = document.getElementById('sideNavOverlay');
             const body = document.body;
