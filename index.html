@@ -1031,6 +1031,7 @@
             border-radius: 12px;
             transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
             border: 2px solid rgba(102, 126, 234, 0.25);
+            touch-action: manipulation;
         }
 
         .nav-item span:last-child {
@@ -4045,6 +4046,7 @@
             collapsedSections: {},
             listExpanded: {},
             selectedItems: {},
+            navBusy: false,
             transactionFloats: {
                 mpesa: { initial: 0, current: 0 },
                 crdb: { initial: 0, current: 0 },
@@ -4545,7 +4547,7 @@
         function renderNav() {
             const nav = document.getElementById('bottomNav');
             nav.innerHTML = tabs.map(tab => `
-                <button class="nav-item ${state.activeTab === tab.id ? 'active' : ''}" onclick="switchTab('${tab.id}')">
+                <button class="nav-item ${state.activeTab === tab.id ? 'active' : ''}" data-tab="${tab.id}" onclick="switchTab('${tab.id}')">
                     <span class="nav-icon">${tab.icon}</span>
                     <span>${tab.label}</span>
                 </button>
@@ -4568,6 +4570,9 @@
         })();
 
         function switchTab(tabId) {
+            if (state.navBusy) return;
+            state.navBusy = true;
+            try { hapticShort(); } catch { }
             state.activeTab = tabId;
             // Reset privacy blur when switching away from sales
             if (tabId !== 'sales') {
@@ -4579,6 +4584,7 @@
             state.listExpanded = {};
             state.listShowCount = {};
             render();
+            setTimeout(() => { state.navBusy = false; }, 250);
         }
 
         function refreshApp() {
@@ -12509,6 +12515,21 @@
         loadData();
         try { applyTheme(); } catch (e) { }
         render(); // SHOW UI NOW
+        (function setupBottomNavFastClick() {
+            const nav = document.getElementById('bottomNav');
+            if (!nav || nav.__fastSetup) return;
+            nav.__fastSetup = true;
+            const handler = (e) => {
+                const btn = e.target && e.target.closest && e.target.closest('.nav-item');
+                if (!btn) return;
+                e.preventDefault();
+                const tabId = btn.getAttribute('data-tab');
+                if (!tabId) return;
+                try { switchTab(tabId); } catch { }
+            };
+            nav.addEventListener('touchstart', handler, { passive: false });
+            nav.addEventListener('pointerdown', handler, true);
+        })();
         try { setupKeyboardDismiss(); } catch (e) { }
 
         // Restore session in BACKGROUND
