@@ -2928,7 +2928,7 @@
 
         async function signUp(email, password) {
             try {
-                const { data, error } = await supabase.auth.signUp({ email, password });
+                const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: APP_BASE_URL + '#signup-confirmed' } });
                 if (error) throw error;
                 showToast('Account created! Check your email to confirm.', 'success');
                 return data;
@@ -13788,7 +13788,7 @@
                         email: email.trim(),
                         password: password,
                         options: {
-                            emailRedirectTo: window.location.origin,
+                            emailRedirectTo: APP_BASE_URL + '#signup-confirmed',
                             data: {
                                 created_at: new Date().toISOString(),
                                 app_version: '2.0'
