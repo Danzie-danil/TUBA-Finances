@@ -2130,49 +2130,6 @@
             margin-top: 4px;
         }
     </style>
-    <style>
-        .sync-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 10002;
-        }
-
-        .sync-overlay.show {
-            display: flex;
-        }
-
-        .sync-overlay-content {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 32px;
-            border-radius: 16px;
-            text-align: center;
-            max-width: 300px;
-        }
-
-        .sync-spinner {
-            width: 48px;
-            height: 48px;
-            border: 4px solid rgba(102, 126, 234, 0.2);
-            border-top-color: #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 16px;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-    </style>
     <!-- Add this line -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 
@@ -2555,55 +2512,6 @@
                 console.error('Supabase init error:', error);
                 syncEnabled = false;
             }
-        }
-
-        async function initSupabaseAsync() {
-            return new Promise((resolve, reject) => {
-                try {
-                    if (!window.supabase || !window.supabase.createClient) {
-                        throw new Error('Supabase library not loaded');
-                    }
-                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                        auth: {
-                            persistSession: true,
-                            autoRefreshToken: true,
-                            detectSessionInUrl: true,
-                            multiTab: true,
-                            storageKey: 'tuba-auth-token',
-                            storage: window.localStorage
-                        },
-                        global: {
-                            fetch: (url, options = {}) => {
-                                const controller = new AbortController();
-                                const timeout = setTimeout(() => controller.abort(), 10000);
-                                return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout));
-                            }
-                        }
-                    });
-                    syncEnabled = true;
-                    supabase.auth.onAuthStateChange(async (event, session) => {
-                        if (event === 'SIGNED_IN' && session) {
-                            currentUser = session.user;
-                            syncEnabled = true;
-                            autoCloudPullDone = false;
-                            updateSyncIndicator('synced');
-                        } else if (event === 'SIGNED_OUT') {
-                            currentUser = null;
-                            syncEnabled = false;
-                            autoCloudPullDone = false;
-                            updateSyncIndicator('offline');
-                            render();
-                        } else if (event === 'TOKEN_REFRESHED' && session) {
-                            currentUser = session.user;
-                            syncEnabled = true;
-                        }
-                    });
-                    resolve();
-                } catch (error) {
-                    syncEnabled = false;
-                    reject(error);
-                }
-            });
         }
 
         async function restoreSession() {
@@ -3084,96 +2992,132 @@
         }
 
         async function smartMergeData() {
-            ensureOnline('merge data');
-            updateSyncIndicator('syncing');
-            const localData = {
-                sales: [...(state.sales || [])],
-                products: [...(state.products || [])],
-                expenses: [...(state.expenses || [])],
-                customers: [...(state.customers || [])],
-                transactions: [...(state.transactions || [])],
-                unpaidEntries: [...(state.unpaidEntries || [])],
-                notes: [...(state.notes || [])],
-                categories: [...(state.categories || [])]
-            };
-            const cloudData = await withTimeout(fetchCloudDataDirect(), 30000, 'Fetch cloud data');
+            try {
+                updateSyncIndicator('syncing');
+                showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
+                console.log('🔄 Starting smart merge...');
 
-            // Enhanced merge function with better duplicate detection
-            const mergeByID = (local, cloud, dataType) => {
-                const idMap = new Map();
-                const seenHashes = new Set();
-
-                // Helper function to create content hash for duplicate detection
-                const createContentHash = (item) => {
-                    const content = { ...item };
-                    delete content.id;
-                    delete content.created_at;
-                    delete content.updated_at;
-                    // Strip DB-only ownership/meta fields to compare local vs cloud consistently
-                    delete content.user_id;
-                    delete content.userId;
-                    delete content.inserted_at;
-                    delete content.deleted_at;
-                    return JSON.stringify(content);
+                // Save local data BEFORE pulling from cloud
+                const localData = {
+                    sales: [...(state.sales || [])],
+                    products: [...(state.products || [])],
+                    expenses: [...(state.expenses || [])],
+                    customers: [...(state.customers || [])],
+                    transactions: [...(state.transactions || [])],
+                    unpaidEntries: [...(state.unpaidEntries || [])],
+                    notes: [...(state.notes || [])],
+                    categories: [...(state.categories || [])]
                 };
 
-                // Add cloud items first (they take priority for same IDs)
-                cloud.forEach(item => {
-                    if (!item.id) item.id = generateID(dataType);
-                    const contentHash = createContentHash(item);
-
-                    idMap.set(item.id, item);
-                    seenHashes.add(contentHash);
+                console.log('📱 Local data counts:', {
+                    sales: localData.sales.length,
+                    products: localData.products.length,
+                    expenses: localData.expenses.length,
+                    customers: localData.customers.length,
+                    transactions: localData.transactions.length,
+                    unpaidEntries: localData.unpaidEntries.length,
+                    notes: localData.notes.length
                 });
 
-                // Add local items only if ID doesn't exist AND content is unique
-                local.forEach(item => {
-                    if (!item.id) item.id = generateID(dataType);
-                    const contentHash = createContentHash(item);
+                // Fetch cloud data directly from Supabase (don't overwrite state yet)
+                const cloudData = await fetchCloudDataDirect();
 
-                    // Only add if both ID and content are unique
-                    if (!idMap.has(item.id) && !seenHashes.has(contentHash)) {
+                console.log('☁️ Cloud data counts:', {
+                    sales: cloudData.sales.length,
+                    products: cloudData.products.length,
+                    expenses: cloudData.expenses.length,
+                    customers: cloudData.customers.length,
+                    transactions: cloudData.transactions.length,
+                    unpaidEntries: cloudData.unpaidEntries.length,
+                    notes: cloudData.notes.length
+                });
+
+                // Enhanced merge function with better duplicate detection
+                const mergeByID = (local, cloud, dataType) => {
+                    const idMap = new Map();
+                    const seenHashes = new Set();
+
+                    // Helper function to create content hash for duplicate detection
+                    const createContentHash = (item) => {
+                        const content = { ...item };
+                        delete content.id;
+                        delete content.created_at;
+                        delete content.updated_at;
+                        // Strip DB-only ownership/meta fields to compare local vs cloud consistently
+                        delete content.user_id;
+                        delete content.userId;
+                        delete content.inserted_at;
+                        delete content.deleted_at;
+                        return JSON.stringify(content);
+                    };
+
+                    // Add cloud items first (they take priority for same IDs)
+                    cloud.forEach(item => {
+                        if (!item.id) item.id = generateID(dataType);
+                        const contentHash = createContentHash(item);
+
                         idMap.set(item.id, item);
                         seenHashes.add(contentHash);
-                    }
+                    });
+
+                    // Add local items only if ID doesn't exist AND content is unique
+                    local.forEach(item => {
+                        if (!item.id) item.id = generateID(dataType);
+                        const contentHash = createContentHash(item);
+
+                        // Only add if both ID and content are unique
+                        if (!idMap.has(item.id) && !seenHashes.has(contentHash)) {
+                            idMap.set(item.id, item);
+                            seenHashes.add(contentHash);
+                        }
+                    });
+
+                    return Array.from(idMap.values());
+                };
+
+                // Merge each array with proper data type identification
+                state.sales = mergeByID(localData.sales, cloudData.sales, 'sales');
+                state.products = mergeByID(localData.products, cloudData.products, 'products');
+                state.expenses = mergeByID(localData.expenses, cloudData.expenses, 'expenses');
+                state.customers = mergeByID(localData.customers, cloudData.customers, 'customers');
+                state.transactions = mergeByID(localData.transactions, cloudData.transactions, 'transactions');
+                state.unpaidEntries = mergeByID(localData.unpaidEntries, cloudData.unpaidEntries, 'unpaid');
+                state.notes = mergeByID(localData.notes, cloudData.notes, 'notes');
+                // Categories: merge by name (set uniqueness)
+                state.categories = Array.from(new Set([...(localData.categories || []), ...((cloudData.categories) || [])]));
+
+                // Final pass: content-based deduplication per type
+                state.sales = deduplicateByContent(state.sales, 'sales');
+                state.products = deduplicateByContent(state.products, 'products');
+                state.expenses = deduplicateByContent(state.expenses, 'expenses');
+                state.customers = deduplicateByContent(state.customers, 'customers');
+                state.transactions = deduplicateByContent(state.transactions, 'transactions');
+                state.unpaidEntries = deduplicateByContent(state.unpaidEntries, 'unpaid');
+                state.notes = deduplicateByContent(state.notes, 'notes');
+
+                console.log('🔀 Merged data counts:', {
+                    sales: state.sales.length,
+                    products: state.products.length,
+                    expenses: state.expenses.length,
+                    customers: state.customers.length,
+                    transactions: state.transactions.length,
+                    unpaidEntries: state.unpaidEntries.length,
+                    notes: state.notes.length
                 });
 
-                return Array.from(idMap.values());
-            };
+                // Save merged data locally
+                saveData();
 
-            // Merge each array with proper data type identification
-            state.sales = mergeByID(localData.sales, cloudData.sales, 'sales');
-            state.products = mergeByID(localData.products, cloudData.products, 'products');
-            state.expenses = mergeByID(localData.expenses, cloudData.expenses, 'expenses');
-            state.customers = mergeByID(localData.customers, cloudData.customers, 'customers');
-            state.transactions = mergeByID(localData.transactions, cloudData.transactions, 'transactions');
-            state.unpaidEntries = mergeByID(localData.unpaidEntries, cloudData.unpaidEntries, 'unpaid');
-            state.notes = mergeByID(localData.notes, cloudData.notes, 'notes');
-            // Categories: merge by name (set uniqueness)
-            state.categories = Array.from(new Set([...(localData.categories || []), ...((cloudData.categories) || [])]));
+                // Push merged data back to cloud (clear and push to avoid server-side duplicates)
+                await clearAndPushAllData();
+                updateSyncIndicator('synced');
 
-            // Final pass: content-based deduplication per type
-            state.sales = deduplicateByContent(state.sales, 'sales');
-            state.products = deduplicateByContent(state.products, 'products');
-            state.expenses = deduplicateByContent(state.expenses, 'expenses');
-            state.customers = deduplicateByContent(state.customers, 'customers');
-            state.transactions = deduplicateByContent(state.transactions, 'transactions');
-            state.unpaidEntries = deduplicateByContent(state.unpaidEntries, 'unpaid');
-            state.notes = deduplicateByContent(state.notes, 'notes');
-
-            console.log('🔀 Merged data counts:', {
-                sales: state.sales.length,
-                products: state.products.length,
-                expenses: state.expenses.length,
-                customers: state.customers.length,
-                transactions: state.transactions.length,
-                unpaidEntries: state.unpaidEntries.length,
-                notes: state.notes.length
-            });
-
-            saveData();
-            await withTimeout(clearAndPushAllData(), 60000, 'Push merged data');
-            updateSyncIndicator('synced');
+                console.log('✅ Smart merge completed successfully');
+            } catch (error) {
+                console.error('Smart merge error:', error);
+                updateSyncIndicator('synced');
+                throw error;
+            }
         }
 
         // Helper function to fetch cloud data without overwriting local state
@@ -3600,10 +3544,15 @@
         }
 
         async function pullDataFromSupabase() {
-            ensureOnline('pull data from cloud');
+            if (!syncEnabled || !currentUser) return;
+
             try {
+                showToast('Loading Your Data, Please wait...', 'info', null, null, 8000);
+                console.log('📥 Pulling data from cloud (parallel)...');
+
                 const uid = currentUser.id;
-                const fetchSel = (table, cols) => supabase.from(table).select(cols).eq('user_id', uid);
+                const fetch = (table, cols) => supabase.from(table).select(cols).eq('user_id', uid);
+
                 const [
                     productsRes,
                     salesRes,
@@ -3620,23 +3569,23 @@
                     settingsRes,
                     periodsRes,
                     purchasesRes
-                ] = await withTimeout(Promise.all([
-                    fetchSel('products', 'name,category,cost,price,has_stock'),
+                ] = await Promise.all([
+                    fetch('products', 'name,category,cost,price,has_stock'),
                     supabase.from('sales').select('date,time,timestamp,product_name,customer,quantity,cost_per_unit,price_per_unit,total_cost,total_price,profit,payment').eq('user_id', uid).order('timestamp', { ascending: false }),
-                    fetchSel('categories', 'name'),
-                    fetchSel('expenses', 'date,time,timestamp,description,category,amount,payment,comment'),
-                    fetchSel('customers', 'name,email,phone,address,total_purchases'),
-                    fetchSel('invoices', 'number,customer,date,due_date,items,amount,status'),
-                    fetchSel('receipts', 'number,customer,customer_email,date,time,timestamp,description,amount,payment_method'),
-                    fetchSel('inventory', 'product_name,stock,min_alert'),
-                    fetchSel('notes', 'title,content,date,time,timestamp'),
-                    fetchSel('transactions', 'channel,customer_name,type,amount,date,time,timestamp'),
-                    fetchSel('unpaid_entries', 'name,type,amount,date,time,timestamp,paid'),
-                    fetchSel('transaction_floats', 'channel,initial_float'),
+                    fetch('categories', 'name'),
+                    fetch('expenses', 'date,time,timestamp,description,category,amount,payment,comment'),
+                    fetch('customers', 'name,email,phone,address,total_purchases'),
+                    fetch('invoices', 'number,customer,date,due_date,items,amount,status'),
+                    fetch('receipts', 'number,customer,customer_email,date,time,timestamp,description,amount,payment_method'),
+                    fetch('inventory', 'product_name,stock,min_alert'),
+                    fetch('notes', 'title,content,date,time,timestamp'),
+                    fetch('transactions', 'channel,customer_name,type,amount,date,time,timestamp'),
+                    fetch('unpaid_entries', 'name,type,amount,date,time,timestamp,paid'),
+                    fetch('transaction_floats', 'channel,initial_float'),
                     supabase.from('settings').select('daily_target,monthly_target').eq('user_id', uid).single(),
-                    fetchSel('inventory_purchase_periods', 'period_number,title,start_date,end_date,notes'),
-                    fetchSel('inventory_purchases', 'period_number,item_name,quantity,unit_cost,total_cost,purchase_date,supplier_name,supplier_phone,supplier_address,notes,timestamp')
-                ]), 30000, 'Pull from cloud');
+                    fetch('inventory_purchase_periods', 'period_number,title,start_date,end_date,notes'),
+                    fetch('inventory_purchases', 'period_number,item_name,quantity,unit_cost,total_cost,purchase_date,supplier_name,supplier_phone,supplier_address,notes,timestamp')
+                ]);
 
                 const products = productsRes.data || [];
                 if (products.length) {
@@ -4294,18 +4243,6 @@
             el.addEventListener('blur', handle);
             // Initialize
             handle();
-        }
-
-        async function withTimeout(promise, timeoutMs, operation) {
-            return Promise.race([
-                promise,
-                new Promise((_, reject) => setTimeout(() => reject(new Error(operation + ' timeout after ' + timeoutMs + 'ms')), timeoutMs))
-            ]);
-        }
-
-        function ensureOnline(operation) {
-            if (!navigator.onLine) { throw new Error('Cannot ' + operation + ' - device is offline'); }
-            if (!syncEnabled || !currentUser) { throw new Error('Cannot ' + operation + ' - not authenticated'); }
         }
 
         function loadData() {
@@ -12371,25 +12308,6 @@
             try { updateSideNavActiveState(); } catch (e) { }
         }
 
-        function showSyncOverlay(message) {
-            let overlay = document.getElementById('syncOverlay');
-            if (!overlay) {
-                overlay = document.createElement('div');
-                overlay.id = 'syncOverlay';
-                overlay.className = 'sync-overlay';
-                overlay.innerHTML = "<div class='sync-overlay-content'><div class='sync-spinner'></div><div id='syncOverlayMessage' style='font-size:14px;font-weight:600;color:#333;'></div></div>";
-                document.body.appendChild(overlay);
-            }
-            const msg = document.getElementById('syncOverlayMessage');
-            if (msg) msg.textContent = message || 'Syncing...';
-            overlay.classList.add('show');
-        }
-
-        function hideSyncOverlay() {
-            const overlay = document.getElementById('syncOverlay');
-            if (overlay) overlay.classList.remove('show');
-        }
-
         function navigateToTab(tabId) {
             switchTab(tabId);
             toggleSideNav();
@@ -12411,7 +12329,23 @@
             }
         }
 
-
+        // Initialize
+        (function () {
+            function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+            async function ensureSupabaseThenInit() {
+                try {
+                    if (window.supabase && window.supabase.createClient) { initSupabase(); return; }
+                    let tries = 0;
+                    while (tries < 60) {
+                        await wait(50);
+                        if (window.supabase && window.supabase.createClient) { initSupabase(); return; }
+                        tries++;
+                    }
+                } catch { }
+            }
+            ensureSupabaseThenInit();
+            window.addEventListener('online', () => { try { if (!supabase && window.supabase && window.supabase.createClient) initSupabase(); } catch { } });
+        })();
 
         // ============================================
         // TUBA SWIPE NAVIGATION v2.0
@@ -12615,31 +12549,19 @@
         })();
         try { setupKeyboardDismiss(); } catch (e) { }
 
-        (async function initializeApp() {
-            loadData();
-            try { applyTheme(); } catch { }
-            try { render(); } catch { }
-            if (!navigator.onLine) { try { window.updateOfflineBanner && window.updateOfflineBanner(); } catch { } return; }
+        // Restore session BEFORE showing UI to avoid sign-out flash on refresh
+        (async function () {
             try {
-                await Promise.race([
-                    initSupabaseAsync(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase init timeout')), 5000))
-                ]).catch(() => { syncEnabled = false; });
-                if (syncEnabled) {
-                    try {
-                        const sessionRestored = await Promise.race([
-                            restoreSession(),
-                            new Promise((_, reject) => setTimeout(() => reject(new Error('Session restore timeout')), 8000))
-                        ]);
-                        if (sessionRestored) {
-                            const hasLocal = hasAnyLocalData();
-                            if (hasLocal) { await smartMergeData(); } else { await pullDataFromSupabase(); }
-                            try { render(); } catch { }
-                        }
-                    } catch { }
+                try { window.setAuthRestoring(true); } catch { }
+                const sessionRestored = await restoreSession();
+                if (sessionRestored) {
+                    console.log('☁️ Session restored - syncing...');
                 }
-            } catch { } finally {
-                try { window.updateOfflineBanner && window.updateOfflineBanner(); } catch { }
+            } catch (error) {
+                console.error('Session restore failed:', error);
+            } finally {
+                try { window.setAuthRestoring(false); } catch { }
+                render(); // SHOW UI NOW
             }
         })();
 
@@ -14539,8 +14461,8 @@
             // Initialize mobile features
             document.addEventListener('DOMContentLoaded', function () {
                 addTouchFeedback();
-                try { attemptSilentCredentialSignIn(); } catch (e) { }
-                if (!currentUser) {
+                try { if (!isIOSSafari()) { attemptSilentCredentialSignIn(); } } catch (e) { }
+                if (!currentUser && !isIOSSafari()) {
                     try { autoSubmitLoginIfAutofilled(); } catch (e) { }
                 }
 
