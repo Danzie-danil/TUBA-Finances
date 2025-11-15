@@ -46,21 +46,30 @@ self.addEventListener('install', event => {
 // Activate event - clean old caches and claim clients
 self.addEventListener('activate', event => {
   console.log('[SW] Activating service worker...');
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
+  event.waitUntil((async () => {
+    try {
+      const staticCache = await caches.open(STATIC_CACHE);
+      const hasShell = (await staticCache.match(BASE_PATH + 'index.html'))
+        || (await staticCache.match('index.html'))
+        || (await staticCache.match(BASE_PATH));
+
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames.map(async (cacheName) => {
+          // Only delete old caches if essential shell is present in the new static cache
+          if (hasShell && cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
             console.log('[SW] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
+            await caches.delete(cacheName);
           }
         })
       );
-    }).then(() => {
       console.log('[SW] Service worker activated');
-      return self.clients.claim();
-    })
-  );
+      await self.clients.claim();
+    } catch (e) {
+      console.error('[SW] Activate error:', e);
+      await self.clients.claim();
+    }
+  })());
 });
 
 // Fetch event - implement cache-first strategy with network fallback
@@ -85,13 +94,22 @@ self.addEventListener('fetch', event => {
         return new Response('', { status: 503, statusText: 'Offline' });
       }
     }
-    // App-shell navigation fallback
-    if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
+    // App-shell navigation: if offline, return cache immediately
+    const isNavigate = request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html');
+    if (isNavigate) {
+      const online = (typeof self.navigator !== 'undefined') ? self.navigator.onLine : true;
+      if (!online) {
+        const offlineShell = await (async () => {
+          return (await caches.match(BASE_PATH + 'index.html'))
+            || (await caches.match(BASE_PATH))
+            || (await caches.match('index.html'));
+        })();
+        if (offlineShell) return offlineShell;
+      }
       try {
         const fresh = await fetch(request);
         return fresh;
       } catch {
-        // Try multiple fallbacks for iOS A2HS launch paths
         const shell1 = await caches.match(BASE_PATH + 'index.html');
         if (shell1) return shell1;
         const shell2 = await caches.match(BASE_PATH);
@@ -178,6 +196,19 @@ self.addEventListener('push', event => {
   event.waitUntil(
     self.registration.showNotification('TUBA', options)
   );
+});
+
+self.addEventListener('sync', event => {
+  const tag = event.tag || '';
+  if (tag === 'sync-queues' || tag === 'background-sync') {
+    event.waitUntil(
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          try { client.postMessage({ type: 'sync-queues' }); } catch (e) { /* no-op */ }
+        });
+      })
+    );
+  }
 });
 
 // Notification click handling
