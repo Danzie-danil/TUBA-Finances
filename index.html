@@ -12201,6 +12201,28 @@
                 if (state.activeTab === 'customers') { setupWindowVirtualList('customers'); }
                 if (state.activeTab === 'notes') { setupWindowVirtualList('notes'); }
             } catch { }
+            try { adjustContentPadding(); } catch { }
+        }
+
+        function adjustContentPadding() {
+            const content = document.getElementById('app');
+            const header = document.querySelector('.header');
+            const bottom = document.getElementById('bottomNav');
+            const banner = document.getElementById('offlineBanner');
+            const auth = document.getElementById('authBanner');
+            if (!content) return;
+            const bannerH = (banner && banner.style.display !== 'none') ? banner.offsetHeight : 0;
+            const authH = (auth && auth.style.display !== 'none') ? auth.offsetHeight : 0;
+            const gap = 8;
+            const topH = (header ? header.offsetHeight : 70) + bannerH + authH + gap;
+            const bottomGap = 8;
+            const bottomH = (bottom ? bottom.offsetHeight : 90) + bottomGap;
+            content.style.paddingTop = topH + 'px';
+            content.style.scrollPaddingTop = topH + 'px';
+            content.style.paddingBottom = bottomH + 'px';
+            content.style.scrollPaddingBottom = bottomH + 'px';
+            if (banner && header) banner.style.top = header.offsetHeight + 'px';
+            if (auth && header) auth.style.top = (header.offsetHeight + (bannerH || 0)) + 'px';
         }
 
         function positionDashboardPrivacyButton() {
@@ -14167,6 +14189,7 @@
                         offlineBannerEl.onclick = () => { try { openOfflineInfoModal(); } catch (e) { } };
                         offlineBannerEl.classList.add('clickable');
                     }
+                    try { adjustContentPadding(); } catch { }
                 };
 
                 updateOfflineBanner();
@@ -14225,6 +14248,7 @@
                             } catch (e) { }
                         };
                     }
+                    try { adjustContentPadding(); } catch { }
                 };
                 window.updateAuthBanner();
                 window.addEventListener('online', () => {
@@ -14391,6 +14415,7 @@
                 window.addEventListener('orientationchange', function () {
                     setTimeout(() => {
                         window.scrollTo(0, 1);
+                        try { adjustContentPadding(); } catch { }
                     }, 500);
                 });
 
