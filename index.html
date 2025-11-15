@@ -2458,6 +2458,7 @@
         let autoLoginLocked = localStorage.getItem('tuba-auto-login-locked') === '1';
         let autoLoginDetectTimer = null;
         let cloudPushBusy = false;
+        let autoSaveInProgress = false;
 
         // Your existing code continues below...
         const SHOP_NAME = "";
@@ -3922,8 +3923,6 @@
             }
         };
         deleteQueue.load();
-        setInterval(() => { try { deleteQueue.process(); } catch { } }, 30000);
-        window.addEventListener('online', () => { try { deleteQueue.process(); } catch { } });
 
         async function deleteOne(table, keySource) {
             if (!syncEnabled || !currentUser) {
@@ -4008,8 +4007,6 @@
         };
         // Initialize queue and periodic processing
         upsertQueue.load();
-        setInterval(() => { try { upsertQueue.process(); } catch { } }, 30000);
-        window.addEventListener('online', () => { try { upsertQueue.process(); } catch { } });
         async function upsertOne(table, payload) {
             if (!syncEnabled || !currentUser) {
                 try { upsertQueue.enqueue(table, payload); } catch { }
@@ -4453,7 +4450,7 @@
                 showToast('Error saving data!', 'error');
             }
             try {
-                if (syncEnabled && currentUser && navigator.onLine) {
+                if (!autoSaveInProgress && syncEnabled && currentUser && navigator.onLine) {
                     if (!cloudPushBusy) {
                         cloudPushBusy = true;
                         try { clearAndPushAllData().finally(() => { cloudPushBusy = false; }); } catch (e) { cloudPushBusy = false; }
@@ -4462,6 +4459,11 @@
                     try { deleteQueue && deleteQueue.process && deleteQueue.process(); } catch (e) { }
                 }
             } catch (e) { }
+        }
+
+        function autoSaveData() {
+            autoSaveInProgress = true;
+            try { saveData(); } finally { autoSaveInProgress = false; }
         }
 
         function calculateFloatBalances() {
@@ -12589,7 +12591,7 @@
 
         // Auto-save every 15 seconds
         setInterval(() => {
-            saveData();
+            autoSaveData();
         }, 15000);
 
         // PWA Manifest (find this section and replace it)
@@ -14408,19 +14410,6 @@
                         setInterval(refreshAuthState, 60000);
                         window.addEventListener('online', () => {
                             window.updateAuthBanner && window.updateAuthBanner();
-                            try {
-                                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-                                    navigator.serviceWorker.ready.then(reg => {
-                                        if (reg.sync && typeof reg.sync.register === 'function') {
-                                            reg.sync.register('background-sync').catch(() => { });
-                                        }
-                                    });
-                                }
-                                // Trigger a background sync merge immediately when online
-                                if (syncEnabled && currentUser) {
-                                    try { syncInBackground(); } catch (e) { /* no-op */ }
-                                }
-                            } catch (e) { /* no-op */ }
                         });
                         window.addEventListener('offline', () => {
                             window.updateAuthBanner && window.updateAuthBanner();
