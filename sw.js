@@ -94,13 +94,22 @@ self.addEventListener('fetch', event => {
         return new Response('', { status: 503, statusText: 'Offline' });
       }
     }
-    // App-shell navigation fallback
-    if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
+    // App-shell navigation: if offline, return cache immediately
+    const isNavigate = request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html');
+    if (isNavigate) {
+      const online = (typeof self.navigator !== 'undefined') ? self.navigator.onLine : true;
+      if (!online) {
+        const offlineShell = await (async () => {
+          return (await caches.match(BASE_PATH + 'index.html'))
+            || (await caches.match(BASE_PATH))
+            || (await caches.match('index.html'));
+        })();
+        if (offlineShell) return offlineShell;
+      }
       try {
         const fresh = await fetch(request);
         return fresh;
       } catch {
-        // Try multiple fallbacks for iOS A2HS launch paths
         const shell1 = await caches.match(BASE_PATH + 'index.html');
         if (shell1) return shell1;
         const shell2 = await caches.match(BASE_PATH);

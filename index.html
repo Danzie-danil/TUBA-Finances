@@ -2516,6 +2516,8 @@
 
         async function restoreSession() {
             try {
+                if (!navigator.onLine) return false;
+                if (!window.supabase || !supabase || !supabase.auth) return false;
                 const { data: { session }, error } = await supabase.auth.getSession();
 
                 if (error) {
@@ -14357,6 +14359,8 @@
                         // Periodic auth heartbeat to keep UI in sync
                         async function refreshAuthState() {
                             try {
+                                if (!navigator.onLine) return;
+                                if (!window.supabase || !supabase || !supabase.auth) return;
                                 const { data: { session } } = await supabase.auth.getSession();
                                 if (session && session.user) {
                                     currentUser = session.user;
@@ -14381,7 +14385,7 @@
                             updateSideNavAuthButton && updateSideNavAuthButton();
                         }
                         // On load, after SW ready, reconcile auth state
-                        refreshAuthState();
+                        try { refreshAuthState(); } catch { }
                         // Also reconcile on online and visibility changes
                         window.addEventListener('online', refreshAuthState);
                         document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAuthState(); });
