@@ -598,6 +598,9 @@
         .content {
             padding: 16px;
             padding-top: calc(70px + env(safe-area-inset-top));
+            padding-bottom: calc(90px + env(safe-area-inset-bottom));
+            scroll-padding-top: calc(70px + env(safe-area-inset-top));
+            scroll-padding-bottom: calc(90px + env(safe-area-inset-bottom));
         }
 
         .stat-grid {
@@ -2837,7 +2840,7 @@
             }
             if (citySel) {
                 citySel.innerHTML = `<option value="">-- Select City --</option><option value="__manual__">Manual entry…</option>` + getCityOptionsSelectHTML(val);
-                citySel.disabled = false;
+                citySel.disabled = !state.profileEditMode;
                 if (cityInput) { cityInput.style.display = 'none'; }
             }
         }
@@ -2846,12 +2849,11 @@
             const input = document.getElementById('profileCity');
             const sel = document.getElementById('profileCitySelect');
             if (!input || !sel) return;
-            if (val === '__manual__') {
+            if (val === '__manual__' && state.profileEditMode) {
                 input.style.display = 'block';
-                input.value = '';
             } else {
                 input.style.display = 'none';
-                input.value = val;
+                if (val !== '__manual__') input.value = val;
             }
         }
 
