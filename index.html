@@ -2147,6 +2147,30 @@
                 }
             }
         } catch (e) { }
+        async function initPWA() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const reg = await navigator.serviceWorker.register('service-worker.js');
+                    navigator.serviceWorker.addEventListener('message', function (event) {
+                        if (event.data && event.data.type === 'sync-queues') {
+                            try { upsertQueue.process(); } catch { }
+                            try { deleteQueue.process(); } catch { }
+                        }
+                    });
+                }
+            } catch { }
+        }
+
+        function requestBackgroundSync() {
+            try {
+                navigator.serviceWorker.ready.then(function (reg) {
+                    reg.sync.register('sync-queues');
+                });
+            } catch { }
+        }
+
+        window.addEventListener('load', function () { try { initPWA(); } catch { } });
+
     </script>
     <div id="hiddenFocusTarget" tabindex="-1"
         style="position:fixed;top:-10000px;left:-10000px;width:1px;height:1px;opacity:0;"></div>
@@ -2779,6 +2803,50 @@
             const map = state.countriesCities || COUNTRY_CITY_DATA;
             const cities = map[country] || [];
             return cities.sort((a, b) => String(a).localeCompare(String(b))).map(city => `<option value="${city}"></option>`).join("");
+        }
+
+        function getCountryOptionsSelectHTML() {
+            const source = state.countriesCities ? Object.keys(state.countriesCities) : Object.keys(COUNTRY_CITY_DATA);
+            return source.sort((a, b) => String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join("");
+        }
+
+        function getCityOptionsSelectHTML(country) {
+            const map = state.countriesCities || COUNTRY_CITY_DATA;
+            const cities = map[country] || [];
+            return cities.sort((a, b) => String(a).localeCompare(String(b))).map(city => `<option value="${city}">${city}</option>`).join("");
+        }
+
+        function onProfileCountrySelect(val) {
+            const input = document.getElementById('profileCountry');
+            const sel = document.getElementById('profileCountrySelect');
+            const citySel = document.getElementById('profileCitySelect');
+            const cityInput = document.getElementById('profileCity');
+            if (!input || !sel) return;
+            if (val === '__manual__') {
+                input.style.display = 'block';
+                input.value = '';
+            } else {
+                input.style.display = 'none';
+                input.value = val;
+            }
+            if (citySel) {
+                citySel.innerHTML = `<option value="">-- Select City --</option><option value="__manual__">Manual entry…</option>` + getCityOptionsSelectHTML(val);
+                citySel.disabled = false;
+                if (cityInput) { cityInput.style.display = 'none'; }
+            }
+        }
+
+        function onProfileCitySelect(val) {
+            const input = document.getElementById('profileCity');
+            const sel = document.getElementById('profileCitySelect');
+            if (!input || !sel) return;
+            if (val === '__manual__') {
+                input.style.display = 'block';
+                input.value = '';
+            } else {
+                input.style.display = 'none';
+                input.value = val;
+            }
         }
 
         async function initCountryCityData() {
@@ -5021,13 +5089,21 @@
                     </div>
                     <div class="form-group">
                         <label>Country</label>
-                        <input type="text" id="profileCountry" list="profileCountryList" value="${profile.country}" placeholder="Select or type country" ${state.profileEditMode ? '' : 'readonly'} oninput="onProfileCountryChange(this.value)">
-                        <datalist id="profileCountryList">${getCountryOptionsHTML()}</datalist>
+                        <select id="profileCountrySelect" onchange="onProfileCountrySelect(this.value)" ${state.profileEditMode ? '' : 'disabled'}>
+                            <option value="">-- Select Country --</option>
+                            <option value="__manual__">Manual entry…</option>
+                            ${getCountryOptionsSelectHTML()}
+                        </select>
+                        <input type="text" id="profileCountry" value="${profile.country}" placeholder="Type country" ${state.profileEditMode ? '' : 'readonly'} style="margin-top:6px; display:none;">
                     </div>
                     <div class="form-group">
                         <label>City</label>
-                        <input type="text" id="profileCity" list="profileCityList" value="${profile.city}" placeholder="Select or type city" ${state.profileEditMode ? '' : 'readonly'}>
-                        <datalist id="profileCityList">${getCityOptionsHTML(profile.country)}</datalist>
+                        <select id="profileCitySelect" onchange="onProfileCitySelect(this.value)" ${state.profileEditMode ? '' : 'disabled'}>
+                            <option value="">-- Select City --</option>
+                            <option value="__manual__">Manual entry…</option>
+                            ${getCityOptionsSelectHTML(profile.country)}
+                        </select>
+                        <input type="text" id="profileCity" value="${profile.city}" placeholder="Type city" ${state.profileEditMode ? '' : 'readonly'} style="margin-top:6px; display:none;">
                     </div>
                     <div class="form-group">
                         <label>Address</label>
@@ -5236,13 +5312,21 @@
                 </div>
                 <div class="form-group">
                     <label>Country</label>
-                    <input type="text" id="profileCountry" list="profileCountryList" value="${profile.country}" placeholder="Select or type country" ${state.profileEditMode ? '' : 'readonly'} oninput="onProfileCountryChange(this.value)">
-                    <datalist id="profileCountryList">${getCountryOptionsHTML()}</datalist>
+                    <select id="profileCountrySelect" onchange="onProfileCountrySelect(this.value)" ${state.profileEditMode ? '' : 'disabled'}>
+                        <option value="">-- Select Country --</option>
+                        <option value="__manual__">Manual entry…</option>
+                        ${getCountryOptionsSelectHTML()}
+                    </select>
+                    <input type="text" id="profileCountry" value="${profile.country}" placeholder="Type country" ${state.profileEditMode ? '' : 'readonly'} style="margin-top:6px; display:none;">
                 </div>
                 <div class="form-group">
                     <label>City</label>
-                    <input type="text" id="profileCity" list="profileCityList" value="${profile.city}" placeholder="Select or type city" ${state.profileEditMode ? '' : 'readonly'}>
-                    <datalist id="profileCityList">${getCityOptionsHTML(profile.country)}</datalist>
+                    <select id="profileCitySelect" onchange="onProfileCitySelect(this.value)" ${state.profileEditMode ? '' : 'disabled'}>
+                        <option value="">-- Select City --</option>
+                        <option value="__manual__">Manual entry…</option>
+                        ${getCityOptionsSelectHTML(profile.country)}
+                    </select>
+                    <input type="text" id="profileCity" value="${profile.city}" placeholder="Type city" ${state.profileEditMode ? '' : 'readonly'} style="margin-top:6px; display:none;">
                 </div>
                 <div class="form-group">
                     <label>Address</label>
@@ -12027,7 +12111,7 @@
             hours = hours % 12;
             hours = hours ? hours : 12; // Convert 0 to 12
 
-            dateElement.textContent = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${ampm}`;
+            dateElement.innerHTML = `${year}-${month}-${day}<br>${hours}:${minutes}:${seconds} ${ampm}`;
         }
 
         function render() {
@@ -12077,11 +12161,29 @@
                     setTimeout(async () => {
                         try { await initCountryCityData(); } catch { }
                         try {
-                            const countryList = document.getElementById('profileCountryList');
-                            const cityList = document.getElementById('profileCityList');
+                            const countrySelect = document.getElementById('profileCountrySelect');
+                            const citySelect = document.getElementById('profileCitySelect');
                             const countryInput = document.getElementById('profileCountry');
-                            if (countryList) countryList.innerHTML = getCountryOptionsHTML();
-                            if (cityList) cityList.innerHTML = getCityOptionsHTML(countryInput?.value || '');
+                            const cityInput = document.getElementById('profileCity');
+                            const currentCountry = (countryInput?.value || state.userProfile?.country || '').trim();
+                            const currentCity = (cityInput?.value || state.userProfile?.city || '').trim();
+                            if (countrySelect) {
+                                countrySelect.innerHTML = `<option value="">-- Select Country --</option><option value="__manual__">Manual entry…</option>` + getCountryOptionsSelectHTML();
+                                if (currentCountry) {
+                                    const src = state.countriesCities ? Object.keys(state.countriesCities) : Object.keys(COUNTRY_CITY_DATA);
+                                    countrySelect.value = src.includes(currentCountry) ? currentCountry : '__manual__';
+                                    onProfileCountrySelect(countrySelect.value);
+                                }
+                            }
+                            if (citySelect) {
+                                const baseCountry = currentCountry || (countrySelect?.value || '');
+                                citySelect.innerHTML = `<option value="">-- Select City --</option><option value="__manual__">Manual entry…</option>` + getCityOptionsSelectHTML(baseCountry);
+                                if (currentCity) {
+                                    const cities = (state.countriesCities || COUNTRY_CITY_DATA)[baseCountry] || [];
+                                    citySelect.value = cities.includes(currentCity) ? currentCity : '__manual__';
+                                    onProfileCitySelect(citySelect.value);
+                                }
+                            }
                         } catch { }
                     }, 0);
                 }
@@ -14302,26 +14404,3 @@
 </body>
 
 </html>
-async function initPWA() {
-try {
-if ('serviceWorker' in navigator) {
-const reg = await navigator.serviceWorker.register('service-worker.js');
-navigator.serviceWorker.addEventListener('message', function (event) {
-if (event.data && event.data.type === 'sync-queues') {
-try { upsertQueue.process(); } catch { }
-try { deleteQueue.process(); } catch { }
-}
-});
-}
-} catch { }
-}
-
-function requestBackgroundSync() {
-try {
-navigator.serviceWorker.ready.then(function (reg) {
-reg.sync.register('sync-queues');
-});
-} catch { }
-}
-
-window.addEventListener('load', function () { try { initPWA(); } catch { } });
