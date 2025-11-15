@@ -2516,8 +2516,8 @@
 
         async function restoreSession() {
             try {
-                if (!navigator.onLine) return false;
                 if (!window.supabase || !supabase || !supabase.auth) return false;
+                if (state.autoAuthDisabled) return false;
                 const { data: { session }, error } = await supabase.auth.getSession();
 
                 if (error) {
@@ -2531,14 +2531,19 @@
                     updateSyncIndicator('synced');
 
                     // Load user profile
-                    await loadUserProfile();
-
-                    // Always pull and merge cloud data after session restore
-                    // This is safe because pullDataFromSupabase merges and deduplicates
                     try {
-                        await pullDataFromSupabase();
-                    } catch (e) {
-                        console.warn('Cloud pull after restore failed:', e);
+                        if (navigator.onLine) {
+                            await loadUserProfile();
+                        }
+                    } catch { }
+
+                    // Only pull cloud data when online
+                    if (navigator.onLine) {
+                        try {
+                            await pullDataFromSupabase();
+                        } catch (e) {
+                            console.warn('Cloud pull after restore failed:', e);
+                        }
                     }
 
                     console.log('✅ Session restored successfully (local data preserved)');
