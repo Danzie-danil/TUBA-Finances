@@ -1141,6 +1141,7 @@
             justify-content: center;
             z-index: 200;
             padding: 16px;
+            overflow-x: hidden;
         }
 
         .modal.show {
@@ -1156,16 +1157,71 @@
             width: 100%;
             max-height: 80vh;
             overflow-y: auto;
+            overflow-x: hidden;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
                 0 0 0 1px rgba(255, 255, 255, 0.5),
                 inset 0 1px 0 rgba(255, 255, 255, 0.9);
             border: 1px solid rgba(255, 255, 255, 0.5);
+            position: relative;
+            overflow-wrap: anywhere;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(102, 126, 234, 0.6) rgba(0, 0, 0, 0.08);
+        }
+
+        .modal-content::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .modal-content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb {
+            background: linear-gradient(145deg, #667eea, #5a67d8);
+            border-radius: 8px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(145deg, #5a67d8, #4c51bf);
+        }
+
+        #invBulkHeader {
+            display: grid;
+        }
+
+        .modal-content input[type="text"],
+        .modal-content input[type="email"],
+        .modal-content input[type="password"],
+        .modal-content input[type="tel"],
+        .modal-content input[type="date"],
+        .modal-content input[type="time"],
+        .modal-content input[type="number"],
+        .modal-content textarea,
+        .modal-content select {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        .modal-content input[type="checkbox"] {
+            width: auto;
+            height: 16px;
+        }
+
+        .checkbox-select {
+            width: 16px;
+            height: 16px;
+            min-width: 16px;
+            min-height: 16px;
         }
 
         .modal-close {
-            position: absolute;
-            top: 10px;
-            right: 12px;
+            position: sticky;
+            top: 8px;
+            float: right;
+            z-index: 5;
             width: 28px;
             height: 28px;
             border: none;
@@ -1174,6 +1230,58 @@
             color: #fff;
             font-size: 16px;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        #invAddBulkBtn.floating-add {
+            position: sticky;
+            top: 8px;
+            float: right;
+            z-index: 4;
+            margin-right: 40px;
+            transition: all 200ms ease;
+        }
+
+        @media (max-width: 480px) {
+            .modal-content {
+                max-width: 95vw;
+                padding: 16px;
+                border-radius: 16px;
+            }
+
+            #inventoryModal .modal-content {
+                max-height: 85vh;
+            }
+
+            #invToolbar {
+                flex-wrap: nowrap;
+            }
+
+            #invBulkHeader {
+                grid-template-columns: 1fr 1fr !important;
+                row-gap: 6px;
+                margin-top: 8px !important;
+            }
+
+            .inv-bulk-row {
+                grid-template-columns: 1fr 1fr !important;
+                row-gap: 8px;
+            }
+
+            .inv-bulk-row>div:nth-child(5) button {
+                width: 100%;
+            }
+
+            .grid-2 {
+                grid-template-columns: 1fr !important;
+            }
+
+            #invAddBulkBtn.floating-add {
+                margin-right: 36px;
+            }
         }
 
         .modal-title {
@@ -1182,6 +1290,14 @@
             margin-bottom: 16px;
             color: #1a1a1a;
             text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+        }
+
+        .bulk-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 4px;
         }
 
         .toast-bar {
@@ -2632,8 +2748,56 @@
                 businessName: state.userProfile?.businessName || "",
                 email: state.userProfile?.email || currentUser?.email || "",
                 phone: state.userProfile?.phone || "",
-                address: state.userProfile?.address || ""
+                address: state.userProfile?.address || "",
+                country: state.userProfile?.country || "",
+                city: state.userProfile?.city || ""
             };
+        }
+
+        const COUNTRY_CITY_DATA = {
+            "Tanzania": ["Dar es Salaam", "Dodoma", "Arusha", "Mwanza"],
+            "Kenya": ["Nairobi", "Mombasa", "Kisumu"],
+            "Uganda": ["Kampala", "Entebbe", "Gulu"],
+            "Rwanda": ["Kigali", "Butare", "Gisenyi"],
+            "South Africa": ["Johannesburg", "Cape Town", "Durban", "Pretoria"],
+            "United States": ["New York", "Los Angeles", "Chicago", "Houston"],
+            "United Kingdom": ["London", "Manchester", "Birmingham"],
+            "India": ["Mumbai", "Delhi", "Bengaluru", "Chennai"],
+            "China": ["Beijing", "Shanghai", "Shenzhen", "Guangzhou"]
+        };
+
+        function getCountryOptionsHTML() {
+            const source = state.countriesCities ? Object.keys(state.countriesCities) : Object.keys(COUNTRY_CITY_DATA);
+            return source.sort((a, b) => String(a).localeCompare(String(b))).map(c => `<option value="${c}"></option>`).join("");
+        }
+
+        function getCityOptionsHTML(country) {
+            const map = state.countriesCities || COUNTRY_CITY_DATA;
+            const cities = map[country] || [];
+            return cities.sort((a, b) => String(a).localeCompare(String(b))).map(city => `<option value="${city}"></option>`).join("");
+        }
+
+        async function initCountryCityData() {
+            if (state.countriesCities) return;
+            try {
+                const resp = await fetch('https://countriesnow.space/api/v0.1/countries');
+                const json = await resp.json();
+                if (json && json.data) {
+                    const map = {};
+                    json.data.forEach(item => { if (item.country) map[item.country] = item.cities || []; });
+                    state.countriesCities = map;
+                    saveData();
+                }
+            } catch { }
+        }
+
+        function onProfileCountryChange(val) {
+            try {
+                const list = document.getElementById('profileCityList');
+                if (list) list.innerHTML = getCityOptionsHTML(val);
+                const cityInput = document.getElementById('profileCity');
+                if (cityInput) cityInput.value = '';
+            } catch { }
         }
 
         function updateSyncIndicator(status) {
@@ -3812,7 +3976,9 @@
                 businessName: "",
                 email: "",
                 phone: "",
-                address: ""
+                address: "",
+                country: "",
+                city: ""
             },
             // User logo
             userLogoDataUrl: '',
@@ -3948,7 +4114,9 @@
                             businessName: "",
                             email: "",
                             phone: "",
-                            address: ""
+                            address: "",
+                            country: "",
+                            city: ""
                         };
                     }
 
@@ -4774,6 +4942,16 @@
                             required>
                     </div>
                     <div class="form-group">
+                        <label>Country</label>
+                        <input type="text" id="profileCountry" list="profileCountryList" value="${profile.country}" placeholder="Select or type country" ${state.profileEditMode ? '' : 'readonly'} oninput="onProfileCountryChange(this.value)">
+                        <datalist id="profileCountryList">${getCountryOptionsHTML()}</datalist>
+                    </div>
+                    <div class="form-group">
+                        <label>City</label>
+                        <input type="text" id="profileCity" list="profileCityList" value="${profile.city}" placeholder="Select or type city" ${state.profileEditMode ? '' : 'readonly'}>
+                        <datalist id="profileCityList">${getCityOptionsHTML(profile.country)}</datalist>
+                    </div>
+                    <div class="form-group">
                         <label>Address</label>
                         <input 
                             type="text" 
@@ -4979,6 +5157,16 @@
                         required>
                 </div>
                 <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" id="profileCountry" list="profileCountryList" value="${profile.country}" placeholder="Select or type country" ${state.profileEditMode ? '' : 'readonly'} oninput="onProfileCountryChange(this.value)">
+                    <datalist id="profileCountryList">${getCountryOptionsHTML()}</datalist>
+                </div>
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" id="profileCity" list="profileCityList" value="${profile.city}" placeholder="Select or type city" ${state.profileEditMode ? '' : 'readonly'}>
+                    <datalist id="profileCityList">${getCityOptionsHTML(profile.country)}</datalist>
+                </div>
+                <div class="form-group">
                     <label>Address</label>
                     <input 
                         type="text" 
@@ -5028,7 +5216,9 @@
                 businessName: document.getElementById('profileBusinessName').value.trim(),
                 email: document.getElementById('profileEmail').value.trim(),
                 phone: document.getElementById('profilePhone').value.trim(),
-                address: document.getElementById('profileAddress').value.trim()
+                address: document.getElementById('profileAddress').value.trim(),
+                country: (document.getElementById('profileCountry')?.value || '').trim(),
+                city: (document.getElementById('profileCity')?.value || '').trim()
             };
 
             const success = await saveUserProfile(profileData);
@@ -5096,7 +5286,9 @@
                 businessName: document.getElementById('profileBusinessName').value.trim(),
                 email: document.getElementById('profileEmail').value.trim(),
                 phone: document.getElementById('profilePhone').value.trim(),
-                address: document.getElementById('profileAddress').value.trim()
+                address: document.getElementById('profileAddress').value.trim(),
+                country: (document.getElementById('profileCountry')?.value || '').trim(),
+                city: (document.getElementById('profileCity')?.value || '').trim()
             };
 
             const success = await saveUserProfile(profileData);
@@ -7410,19 +7602,9 @@
             const cycleOptions = cycles.map(c => `<option value="${c.number}">Period ${c.number} ${c.title ? '– ' + c.title : ''}</option>`).join('');
 
             content.innerHTML = `
-                <div class="flex-gap" style="align-items:center; margin-bottom:8px;">
-                    <label style="display:flex;align-items:center;gap:8px;">
-                        <input id="invBulkMode" type="checkbox" onchange="invToggleBulkMode()" />
-                        Bulk mode
-                    </label>
-                    <button class="btn-small" type="button" onclick="invAddBulkRow()">+ Add Product</button>
-                </div>
-                <div id="invBulkHeader" style="display:none; margin-bottom:6px; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap:8px; align-items:center;">
-                    <div style="font-size:12px; font-weight:600; color:#333;">Product</div>
-                    <div style="font-size:12px; font-weight:600; color:#333;">Quantity</div>
-                    <div style="font-size:12px; font-weight:600; color:#333;">Unit Cost</div>
-                    <div style="font-size:12px; font-weight:600; color:#333;">Discount</div>
-                    <div style="font-size:12px; font-weight:600; color:#333;">Action</div>
+                <div id="invToolbar" style="display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:8px;">
+                    <button class="btn-small" id="invBulkToggle" type="button" onclick="invToggleBulkMode()" aria-pressed="false">Bulk Mode: Off</button>
+                    <button class="btn-small" id="invAddBulkBtn" type="button" onclick="invAddBulkRow()" style="margin-left:auto; display:none;">+ Add Product</button>
                 </div>
                 <div id="invBulkContainer" style="display:none; margin-bottom:12px;"></div>
                 <div id="invNewProductFields" style="display:none; margin-bottom:12px;">
@@ -7614,14 +7796,54 @@
             };
             modal.addEventListener('click', handleOutside, { once: true });
 
-            window.invToggleBulkMode = function () {
-                const bulk = document.getElementById('invBulkMode')?.checked;
+            // Floating Add Product button behavior
+            try {
+                const contentEl = document.querySelector('#inventoryModal .modal-content');
+                const toolbarEl = document.getElementById('invToolbar');
+                const addBtn = document.getElementById('invAddBulkBtn');
+                const closeBtn = document.querySelector('#inventoryModal .modal-close');
+                const stickThreshold = (toolbarEl?.offsetHeight || 0) + 8;
+                const updateFloating = () => {
+                    if (!contentEl || !toolbarEl || !addBtn) return;
+                    if (contentEl.scrollTop > stickThreshold && addBtn.style.display !== 'none') {
+                        // Move next to the Close (to the left)
+                        try { closeBtn?.insertAdjacentElement('afterend', addBtn); } catch { }
+                        addBtn.classList.add('floating-add');
+                    } else {
+                        // Move back into toolbar
+                        try { toolbarEl?.appendChild(addBtn); } catch { }
+                        addBtn.classList.remove('floating-add');
+                    }
+                };
+                contentEl.addEventListener('scroll', updateFloating);
+                updateFloating();
+            } catch { }
+
+            window.invToggleBulkMode = function (force) {
+                const btn = document.getElementById('invBulkToggle');
+                const addBtn = document.getElementById('invAddBulkBtn');
+                let active = false;
+                if (typeof force === 'boolean') {
+                    active = force;
+                } else {
+                    const pressed = btn && btn.getAttribute('aria-pressed') === 'true';
+                    active = !pressed;
+                }
+                if (btn) {
+                    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+                    btn.classList.toggle('btn-success', active);
+                    btn.textContent = active ? 'Bulk Mode: On' : 'Bulk Mode: Off';
+                }
+                if (addBtn) addBtn.style.display = active ? 'inline-block' : 'none';
                 const cont = document.getElementById('invBulkContainer');
                 const header = document.getElementById('invBulkHeader');
                 const single = document.getElementById('invSingleItemFields');
-                if (cont) cont.style.display = bulk ? 'block' : 'none';
-                if (header) header.style.display = bulk ? 'grid' : 'none';
-                if (single) single.style.display = bulk ? 'none' : 'grid';
+                if (cont) cont.style.display = active ? 'block' : 'none';
+                if (header) header.style.display = active ? 'grid' : 'none';
+                if (single) single.style.display = active ? 'none' : 'grid';
+                if (active && cont && cont.children.length === 0) {
+                    try { invAddBulkRow(); } catch { }
+                }
             };
             window.invOnPeriodChange = function () {
                 const sel = document.getElementById('invPeriodSelect');
@@ -7638,11 +7860,15 @@
             window.invAddBulkRow = function () {
                 const cont = document.getElementById('invBulkContainer');
                 if (!cont) return;
+                const btn = document.getElementById('invBulkToggle');
+                if (btn && btn.getAttribute('aria-pressed') !== 'true') {
+                    invToggleBulkMode(true);
+                }
                 const all = (state.products || []).filter(p => p.hasStock !== false).map(p => p.name);
                 const recent = all.slice(-3);
                 const rest = all.filter(n => !recent.includes(n)).sort((a, b) => String(a).localeCompare(String(b)));
                 const ordered = [...recent, ...rest];
-                const opts = ordered.map(name => `< option value = "${name}" > ${name}</option > `).join('');
+                const opts = ordered.map(name => `<option value="${name}">${name}</option>`).join('');
                 const row = document.createElement('div');
                 row.className = 'inv-bulk-row';
                 row.style.display = 'grid';
@@ -7650,13 +7876,31 @@
                 row.style.gap = '8px';
                 row.style.marginBottom = '8px';
                 row.innerHTML = `
-                    <div><select class="inv-bulk-name">${opts}</select></div>
-                    <div><input class="inv-bulk-qty money-input" type="text" placeholder="Qty" /></div>
-                    <div><input class="inv-bulk-unit money-input" type="text" placeholder="Unit Cost" /></div>
-                    <div><input class="inv-bulk-disc money-input" type="text" placeholder="Discount" /></div>
-                    <div><button class="btn-small btn-danger" type="button">✖</button></div>
+                    <div>
+                        <label class="bulk-label">Product</label>
+                        <select class="inv-bulk-name">${opts}</select>
+                    </div>
+                    <div>
+                        <label class="bulk-label">Quantity</label>
+                        <input class="inv-bulk-qty money-input" type="text" placeholder="Qty" />
+                    </div>
+                    <div>
+                        <label class="bulk-label">Unit Cost</label>
+                        <input class="inv-bulk-unit money-input" type="text" placeholder="Unit Cost" />
+                    </div>
+                    <div>
+                        <label class="bulk-label">Discount</label>
+                        <input class="inv-bulk-disc money-input" type="text" placeholder="Discount" />
+                    </div>
+                    <div>
+                        <label class="bulk-label">Action</label>
+                        <button class="btn-small btn-danger" type="button">✖</button>
+                    </div>
                 `;
-                row.querySelector('button')?.addEventListener('click', () => { try { cont.removeChild(row); } catch { } });
+                row.querySelector('button')?.addEventListener('click', () => {
+                    try { cont.removeChild(row); } catch { }
+                    try { if (cont.children.length === 0) invToggleBulkMode(false); } catch { }
+                });
                 cont.appendChild(row);
                 try { document.querySelectorAll('.money-input').forEach(el => attachMoneyFormatter(el)); } catch { }
             };
@@ -8348,8 +8592,7 @@
             openInventoryModal();
             setTimeout(() => {
                 try {
-                    const bulk = document.getElementById('invBulkMode');
-                    if (bulk) { bulk.checked = false; invToggleBulkMode(); }
+                    invToggleBulkMode(false);
                     const prodSel = document.getElementById('invProductSelect');
                     if (prodSel) { prodSel.value = productName; invHandleProductSelection(); }
                     const last = (state.inventoryPurchases || []).filter(p => p.itemName === productName).sort((a, b) => b.timestamp - a.timestamp)[0];
@@ -8393,8 +8636,7 @@
             openInventoryModal();
             setTimeout(() => {
                 try {
-                    const bulk = document.getElementById('invBulkMode');
-                    if (bulk) { bulk.checked = false; invToggleBulkMode(); }
+                    invToggleBulkMode(false);
                     const prodSel = document.getElementById('invProductSelect');
                     if (prodSel) { prodSel.value = p.itemName; invHandleProductSelection(); }
                     const qtyEl = document.getElementById('invQuantity');
@@ -11770,6 +12012,18 @@
                 mt && mt.addEventListener('blur', () => { try { setMonthlyTarget(); } catch { } });
                 if (state.activeTab === 'dashboard') {
                     setTimeout(() => { try { positionDashboardPrivacyButton(); } catch { } }, 0);
+                }
+                if (state.activeTab === 'account') {
+                    setTimeout(async () => {
+                        try { await initCountryCityData(); } catch { }
+                        try {
+                            const countryList = document.getElementById('profileCountryList');
+                            const cityList = document.getElementById('profileCityList');
+                            const countryInput = document.getElementById('profileCountry');
+                            if (countryList) countryList.innerHTML = getCountryOptionsHTML();
+                            if (cityList) cityList.innerHTML = getCityOptionsHTML(countryInput?.value || '');
+                        } catch { }
+                    }, 0);
                 }
             } catch { }
         }
