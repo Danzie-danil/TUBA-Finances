@@ -883,8 +883,8 @@
         }
 
         .btn-small {
-            padding: 8px 12px;
-            font-size: 13px;
+            padding: 6px 10px;
+            font-size: 12px;
             width: auto;
         }
 
@@ -893,8 +893,8 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 12px;
-            padding: 12px;
-            margin-bottom: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
             box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07),
                 inset 0 1px 0 rgba(255, 255, 255, 0.8);
         }
@@ -913,7 +913,7 @@
 
         .item-title {
             font-weight: 700;
-            font-size: 15px;
+            font-size: 14px;
             color: #1a1a1a;
         }
 
@@ -1160,6 +1160,20 @@
                 0 0 0 1px rgba(255, 255, 255, 0.5),
                 inset 0 1px 0 rgba(255, 255, 255, 0.9);
             border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #757575, #424242);
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
         }
 
         .modal-title {
@@ -2116,6 +2130,7 @@
         <!-- Offline Info Modal -->
         <div class="modal" id="offlineInfoModal">
             <div class="modal-content">
+                <button class="modal-close" onclick="closeOfflineInfoModal()">×</button>
                 <div class="modal-title">Offline Usage</div>
                 <div style="font-size: 13px; color: #333; line-height: 1.5;">
                     <p>You’re offline. All changes are saved locally and will sync when you’re back online.</p>
@@ -2139,6 +2154,7 @@
         <div class="modal" id="pdfViewerModal">
             <div class="modal-content"
                 style="width: 92%; max-width: 920px; height: 85vh; display: flex; flex-direction: column;">
+                <button class="modal-close" onclick="closePdfViewer()">×</button>
                 <div class="modal-title" id="pdfViewerTitle">PDF Preview</div>
                 <div style="flex:1; border:1px solid rgba(0,0,0,0.12); border-radius:8px; overflow:hidden;">
                     <iframe id="pdfIframe" style="width:100%; height:100%;"></iframe>
@@ -2199,6 +2215,7 @@
 
     <div class="modal" id="noteModal">
         <div class="modal-content">
+            <button class="modal-close" onclick="closeNoteModal()">×</button>
             <div class="modal-title">Note Details</div>
             <div id="noteModalContent"></div>
             <div style="display: flex; gap: 8px; margin-top: 16px;">
@@ -2213,6 +2230,7 @@
 
     <div class="modal" id="cleanupModal">
         <div class="modal-content">
+            <button class="modal-close" onclick="closeCleanupModal()">×</button>
             <div class="modal-title">Clean Duplicate Records</div>
             <p>This will remove duplicate entries from your local and cloud data based on ID.</p>
             <div style="display: flex; gap: 8px; margin-top: 16px;">
@@ -2224,6 +2242,7 @@
 
     <div class="modal" id="floatModal">
         <div class="modal-content">
+            <button class="modal-close" onclick="closeFloatModal()">×</button>
             <div class="modal-title">Set Initial Float</div>
             <div id="floatModalContent"></div>
         </div>
@@ -2232,6 +2251,7 @@
     <!-- Inventory Purchase Modal -->
     <div class="modal" id="inventoryModal">
         <div class="modal-content">
+            <button class="modal-close" onclick="closeInventoryModal()">×</button>
             <div class="modal-title">Add Inventory Purchase</div>
             <div id="inventoryModalContent"></div>
             <div class="flex-gap" style="margin-top:12px;">
@@ -3840,8 +3860,7 @@
                 }
                 if ((state.backupReminder.count || 0) < 3) {
                     setTimeout(() => {
-                        // Click anywhere on toast to save/export immediately
-                        showToast('Consider Local Backup', 'info', null, null, 3000, () => exportData('Saved', 2000));
+                        showToast('Consider Local Backup', 'info', null, null, 3000);
                     }, 600);
                     state.backupReminder.count = (state.backupReminder.count || 0) + 1;
                     saveData();
@@ -4443,6 +4462,8 @@
             const titleEl = document.getElementById('pdfViewerTitle');
             iframe.src = url;
             modal.classList.add('show');
+            const handleOutside = (e) => { if (e.target === modal) { closePdfViewer(); } };
+            modal.addEventListener('click', handleOutside, { once: true });
             if (titleEl) {
                 try { titleEl.textContent = 'PDF Preview — ' + __pdfFilename; } catch { }
             }
@@ -4489,6 +4510,22 @@
             }
             __pdfViewerURL = null;
         }
+
+        function closeFloatModal() {
+            const modal = document.getElementById('floatModal');
+            if (modal) modal.classList.remove('show');
+        }
+
+        (function () {
+            const modal = document.getElementById('floatModal');
+            if (modal) {
+                modal.addEventListener('click', function (e) {
+                    if (e.target === modal) {
+                        closeFloatModal();
+                    }
+                });
+            }
+        })();
 
         function showConfirm(text, onYes) {
             if (confirm(text)) {
@@ -5355,10 +5392,19 @@
                     <label>Product/Service</label>
                     <select id="saleProduct" onchange="updateSaleTotal()" required>
                         <option value="">-- Select Product/Service --</option>
-                        ${state.products
-                    .map((p, i) => ({ p, i }))
-                    .sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)))
-                    .map(({ p, i }) => { const stockText = (p.hasStock === false) ? 'N/A' : ((state.inventory[p.name] || { stock: 0 }).stock); const typeTag = p.hasStock === false ? '[Service]' : '[Product]'; return `<option value="${i}">${p.name} - ${p.category} ${typeTag}${p.hasStock === false ? '' : ` (Stock: ${stockText})`}</option>`; }).join('')}
+                        ${(() => {
+                    const recentNames = [];
+                    const seen = new Set();
+                    (state.sales || []).slice().sort((a, b) => b.timestamp - a.timestamp).forEach(s => {
+                        if (!seen.has(s.productName)) { recentNames.push(s.productName); seen.add(s.productName); }
+                    });
+                    const prioritized = recentNames.slice(0, 3);
+                    const entries = state.products.map((p, i) => ({ p, i }));
+                    const prioritizedEntries = entries.filter(e => prioritized.includes(e.p.name));
+                    const restEntries = entries.filter(e => !prioritized.includes(e.p.name)).sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)));
+                    const merged = [...prioritizedEntries, ...restEntries];
+                    return merged.map(({ p, i }) => { const stockText = (p.hasStock === false) ? 'N/A' : ((state.inventory[p.name] || { stock: 0 }).stock); const typeTag = p.hasStock === false ? '[Service]' : '[Product]'; return `<option value="${i}">${p.name} - ${p.category} ${typeTag}${p.hasStock === false ? '' : ` (Stock: ${stockText})`}</option>`; }).join('');
+                })()}
                     </select>
                 </div>
                 <div class="form-group">
@@ -5384,7 +5430,7 @@
                 </div>
                 <div class="form-group">
                     <label>Quantity</label>
-                    <input type="text" id="saleQuantity" class="money-input" value="1" onchange="updateSaleTotal()" required>
+                    <input type="text" id="saleQuantity" class="money-input" placeholder="Qty" onchange="updateSaleTotal()" required>
                 </div>
                 <div class="form-group">
                     <label>Payment Method</label>
@@ -5599,6 +5645,21 @@
         function toggleListExpanded(key) {
             if (!state.listExpanded) state.listExpanded = {};
             state.listExpanded[key] = !state.listExpanded[key];
+            render();
+        }
+
+        function showMoreList(key) {
+            if (!state.listShowCount) state.listShowCount = {};
+            const current = state.listShowCount[key] || 3;
+            state.listShowCount[key] = current + 5;
+            saveData();
+            render();
+        }
+
+        function collapseList(key) {
+            if (!state.listShowCount) state.listShowCount = {};
+            state.listShowCount[key] = 3;
+            saveData();
             render();
         }
 
@@ -6329,8 +6390,11 @@
                     </div>
                     <form onsubmit="addProduct(event)">
                         <div class="form-group">
-                            <label>Item Name</label>
-                            <input type="text" id="productName" placeholder="Enter item name" required>
+                            <label>Item Type</label>
+                            <select id="productHasStock" onchange="toggleInitialStock()">
+                                <option value="yes" selected>Product (has stock)</option>
+                                <option value="no">Service (no stock)</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label>Category</label>
@@ -6345,19 +6409,16 @@
                             <input type="text" id="newCategoryName" placeholder="Enter new category name">
                         </div>
                         <div class="form-group">
+                            <label>Item Name</label>
+                            <input type="text" id="productName" placeholder="Enter item name" required>
+                        </div>
+                        <div class="form-group">
                             <label>Cost (Capital)</label>
                             <input type="text" id="productCost" class="money-input" placeholder="0" required>
                         </div>
                         <div class="form-group">
                             <label>Price (Selling)</label>
                             <input type="text" id="productPrice" class="money-input" placeholder="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Item Type</label>
-                            <select id="productHasStock" onchange="toggleInitialStock()">
-                                <option value="yes" selected>Product (has stock)</option>
-                                <option value="no">Service (no stock)</option>
-                            </select>
                         </div>
                         <div class="form-group" id="initialStockGroup">
                             <label>Initial Stock</label>
@@ -6389,6 +6450,7 @@
     <div id="productsList">
         ${renderProductsList()}
     </div>
+    ${(() => { const total = state.products.length; const count = (state.listShowCount && state.listShowCount.products) ? state.listShowCount.products : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('products')` : `collapseList('products')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
 </div>
             `;
         }
@@ -6418,7 +6480,8 @@
             if (products.length === 0) {
                 return '<p style="text-align: center; color: #666;">No items found</p>';
             }
-
+            const count = (state.listShowCount && state.listShowCount.products) ? state.listShowCount.products : 3;
+            products = products.slice(0, count);
             return products.map((p, i) => {
                 const actualIndex = state.products.indexOf(p);
                 const inv = state.inventory[p.name] || { stock: 0 };
@@ -6634,15 +6697,18 @@
         </div>
     ` : ''}
     <div id="categoriesList">${renderCategoriesList('')}</div>
+    ${(() => { const total = state.categories.length; const count = (state.listShowCount && state.listShowCount.categories) ? state.listShowCount.categories : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('categories')` : `collapseList('categories')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
 </div>
             `;
         }
 
         function renderCategoriesList(Period) {
             const q = String(Period || '').toLowerCase();
-            return state.categories.map((cat, i) => ({ cat, i }))
+            let cats = state.categories.map((cat, i) => ({ cat, i }))
                 .filter(({ cat }) => !q || String(cat).toLowerCase().includes(q))
-                .map(({ cat, i }) => `
+            const count = (state.listShowCount && state.listShowCount.categories) ? state.listShowCount.categories : 3;
+            cats = cats.slice(0, count);
+            return cats.map(({ cat, i }) => `
             <div class="item">
                 <div style="display: flex; gap: 12px; align-items: center;">
                     <input type="checkbox" class="checkbox-select" 
@@ -6904,7 +6970,8 @@
         </div>
     ` : ''}
 
-                    ${filteredExpenses.slice().reverse().map((e, idx) => `
+                    ${(() => {
+                    const arr = filteredExpenses.slice().reverse(); const count = (state.listShowCount && state.listShowCount.expenses) ? state.listShowCount.expenses : 3; return arr.slice(0, count).map((e, idx) => `
     <div class="item">
         <div style="display: flex; gap: 12px; align-items: start;">
             <input type="checkbox" class="checkbox-select" 
@@ -6919,17 +6986,26 @@
                                 ${e.date} | ${e.category} | ${e.payment}
                                 ${e.comment ? '<br>💬 ' + e.comment : ''}
                             </div>
-                            <div class="flex-gap" style="margin-top:8px;">
-                                <button class="btn-small" onclick="editExpenseIndex(${state.expenses.length - 1 - idx})">Edit</button>
-                                <button class="btn-small btn-danger" onclick="deleteExpenseIndex(${state.expenses.length - 1 - idx})">Delete</button>
-                       </div>
+                            ${e.category === 'Inventory Purchase' && /^Period \d+/.test(e.comment || '') ? `
+                            <div class=\"flex-gap\" style=\"margin-top:8px;\">
+                                <button class=\"btn-small\" onclick=\"openInventoryForPeriod(${parseInt(String(e.comment).replace('Period ', ''), 10)})\">Update Stock Info</button>
+                                <button class=\"btn-small btn-danger\" onclick=\"terminateInventoryPeriod(${parseInt(String(e.comment).replace('Period ', ''), 10)})\">Delete</button>
+                            </div>
+                            ` : `
+                            <div class=\"flex-gap\" style=\"margin-top:8px;\">
+                                <button class=\"btn-small\" onclick=\"editExpenseIndex(${state.expenses.length - 1 - idx})\">Edit</button>
+                                <button class=\"btn-small btn-danger\" onclick=\"deleteExpenseIndex(${state.expenses.length - 1 - idx})\">Delete</button>
+                            </div>
+                            `}
                 </div>
             </div>
         </div>
     </div>
-                    `).join('') || '<p style="text-align: center; color: #666;">No expenses yet</p>'}
+                    `).join('') || '<p style="text-align: center; color: #666;">No expenses yet</p>'
+                })()}
+                    ${(() => { const total = filteredExpenses.length; const count = (state.listShowCount && state.listShowCount.expenses) ? state.listShowCount.expenses : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('expenses')` : `collapseList('expenses')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
                 </div>
-            `;
+                `;
         }
 
         function updateFilterCategory(value) {
@@ -7048,17 +7124,18 @@
                     <div class="alert-box-danger">
                         <strong>⚠️ ${lowStock.length} Products Low on Stock!</strong>
                     </div>
-                ` : ''}
+                ` : ''
+                }
 
-                <div class="card">
-                    <div class="flex-between">
-                        <h2>Stock Levels</h2>
-                        <div class="search-box" style="max-width:260px;">
-                            <input type="text" id="stockSearch" placeholder="🔍 Search stock..." oninput="searchStock(this.value)">
-                        </div>
+            <div class="card">
+                <div class="flex-between">
+                    <h2>Stock Levels</h2>
+                    <div class="search-box" style="max-width:260px;">
+                        <input type="text" id="stockSearch" placeholder="🔍 Search stock..." oninput="searchStock(this.value)" />
                     </div>
-                    <div id="stockList">${renderStockList('')}</div>
                 </div>
+                <div id="stockList">${renderStockList('')}</div>
+            </div>
             `;
         }
 
@@ -7070,7 +7147,7 @@
                 const isLow = inv.stock <= inv.minAlert;
                 const stockValue = inv.stock * p.cost;
                 return `
-                            <div class="item" style="${isLow ? 'border-left: 4px solid #d32f2f;' : ''}">
+                <div class="item" style="${isLow ? 'border-left: 4px solid #d32f2f;' : ''}">
                                 <div class="item-header">
                                     <span class="item-title">${p.name}</span>
                                     <span class="badge ${isLow ? 'badge-danger' : 'badge-success'}">
@@ -7085,12 +7162,12 @@
                                     <button class="btn-success btn-small" onclick="adjustStock('${p.name}', 10)">+10</button>
                                     <button class="btn-success btn-small" onclick="adjustStock('${p.name}', 1)">+1</button>
                                     <button class="btn-danger btn-small" onclick="adjustStock('${p.name}', -1)">-1</button>
-                                    <input type="number" id="inv_input_${encodeURIComponent(p.name)}" value="${inv.stock}" min="0" style="width:80px;padding:6px;">
+                                    <input type="number" id="inv_input_${encodeURIComponent(p.name)}" value="${inv.stock}" min="0" style="width:80px;padding:6px;" />
                                     <button class="btn-small" onclick="saveStockFor('${p.name}')">Save</button>
                                     <button class="btn-small btn-secondary" onclick="setMinAlert('${p.name}')">⚠️ ${inv.minAlert}</button>
                                 </div>
-                            </div>
-                        `;
+                            </div >
+                `;
             }).join('') || '<p style="text-align: center; color: #666;">No stock-tracked items yet</p>';
         }
 
@@ -7125,7 +7202,10 @@
             });
 
             // Group by Period
-            const groupedHTML = cycles.map(cycle => {
+            const showCount = state.inventoryPeriodsShowCount || 1;
+            const cyclesSorted = cycles.slice().sort((a, b) => b.number - a.number);
+            const visibleCycles = cyclesSorted.slice(0, showCount);
+            const groupedHTML = visibleCycles.map(cycle => {
                 const cps = filtered.filter(p => p.cycleNumber === cycle.number);
                 const cycleTotal = cps.reduce((sum, p) => sum + (Number(p.totalCost) || Number(p.buyingPrice) || 0), 0);
                 const cycleStart = cycle.startDate || (cps[0]?.purchaseDate) || '';
@@ -7134,19 +7214,20 @@
                 let lastedText = '';
                 if (cycleStart && cycleEnd) {
                     const days = Math.round((new Date(cycleEnd).getTime() - new Date(cycleStart).getTime()) / (1000 * 60 * 60 * 24));
-                    if (!isNaN(days)) lastedText = `Lasted: ${days} day${days === 1 ? '' : 's'}`;
+                    if (!isNaN(days)) lastedText = `Lasted: ${days} day${days === 1 ? '' : 's'} `;
                 }
                 return `
-                    <div class="card">
-                        <div class="flex-between">
-                            <h2>Period ${cycle.number} ${cycle.title ? '– ' + cycle.title : ''}</h2>
-                            <div class="flex-gap">
-                                <span class="badge">Items: ${cps.length}</span>
-                                <span class="badge">Spent: ${formatNumber(cycleTotal)} Tsh</span>
-                                ${lastedText ? `<span class="badge">${lastedText}</span>` : ''}
-                                <button class="btn-small" onclick="downloadInventoryCyclePDF(${cycle.number})">📥 Period PDF</button>
-                            </div>
+                <div class="card">
+                    <div class="flex-between">
+                        <h2>Period ${cycle.number} ${cycle.title ? '– ' + cycle.title : ''}</h2>
+                        <div class="flex-gap">
+                            <span class="badge">Items: ${cps.length}</span>
+                            <span class="badge">Spent: ${formatNumber(cycleTotal)} Tsh</span>
+                            ${lastedText ? `<span class="badge">${lastedText}</span>` : ''}
+                            <button class="btn-small" onclick="downloadInventoryCyclePDF(${cycle.number})">📥 Period PDF</button>
+                            <button class="btn-small btn-danger" onclick="terminateInventoryPeriod(${cycle.number})">✖ Terminate</button>
                         </div>
+                    </div>
                         ${cps.length === 0 ? '<p style="color:#666">No purchases in this Period</p>' : cps.map(p => `
                             <div class="item">
                                 <div class="item-header">
@@ -7160,8 +7241,13 @@
                                     ${p.supplierAddress || ''}
                                     ${p.notes ? `<br>Notes: ${p.notes}` : ''}
                                 </div>
+                                <div class="flex-gap" style="margin-top:8px;">
+                                    <button class="btn-small" onclick="openUpdateInventoryForPurchase(${p.timestamp})">Update Stock Info</button>
+                                    <button class="btn-small btn-danger" onclick="deleteInventoryPurchaseByTimestamp(${p.timestamp})">Delete</button>
+                                </div>
                             </div>
-                        `).join('')}
+                        `).join('')
+                    }
                     </div>
                 `;
             }).join('');
@@ -7194,15 +7280,15 @@
                         </div>
                         <div>
                             <label>Supplier</label>
-                            <input id="invFilterSupplier" type="text" value="${filter.supplier || ''}" placeholder="Supplier name" oninput="updateInventoryFilter('supplier', this.value)">
+                            <input id="invFilterSupplier" type="text" value="${filter.supplier || ''}" placeholder="Supplier name" oninput="updateInventoryFilter('supplier', this.value)" />
                         </div>
                         <div>
                             <label>From</label>
-                            <input id="invFilterFrom" type="date" value="${filter.dateFrom || ''}" onchange="updateInventoryFilter('dateFrom', this.value)">
+                            <input id="invFilterFrom" type="date" value="${filter.dateFrom || ''}" onchange="updateInventoryFilter('dateFrom', this.value)" />
                         </div>
                         <div>
                             <label>To</label>
-                            <input id="invFilterTo" type="date" value="${filter.dateTo || ''}" onchange="updateInventoryFilter('dateTo', this.value)">
+                            <input id="invFilterTo" type="date" value="${filter.dateTo || ''}" onchange="updateInventoryFilter('dateTo', this.value)" />
                         </div>
                     </div>
                 </div>`;
@@ -7210,7 +7296,87 @@
             // Embed the existing stock view
             const stock = renderInventory();
 
-            return summary + filters + (groupedHTML || '<p style="text-align:center;color:#666;">No Periods yet. Add an inventory purchase to create a new Period.</p>') + stock;
+            const moreBtn = (cyclesSorted.length > showCount)
+                ? `<div style="display:flex;justify-content:center;margin:8px 0;"><button class="btn-small" onclick="showMoreInventoryPeriods()">click to See stock info</button></div>`
+                : '';
+            return summary + filters + (groupedHTML || '<p style="text-align:center;color:#666;">No Periods yet. Add an inventory purchase to create a new Period.</p>') + moreBtn + stock;
+        }
+
+        function showMoreInventoryPeriods() {
+            const total = (state.inventoryPurchaseCycles || []).length;
+            const current = state.inventoryPeriodsShowCount || 1;
+            state.inventoryPeriodsShowCount = Math.min(total, current + 5);
+            saveData();
+            render();
+        }
+
+        function openInventoryForPeriod(num) {
+            openInventoryModal();
+            setTimeout(() => {
+                try {
+                    const perSel = document.getElementById('invPeriodSelect');
+                    const chkNew = document.getElementById('invCreateNewPeriod');
+                    if (perSel) perSel.value = String(num);
+                    if (chkNew) chkNew.checked = false;
+                } catch { }
+            }, 50);
+        }
+
+        function processPlannedPurchases() {
+            const todayTs = new Date(getTodayDateString()).getTime();
+            (state.inventoryPurchases || []).forEach(p => {
+                const pt = new Date(p.purchaseDate || getTodayDateString()).getTime();
+                if (p.planned && !p.activated && pt <= todayTs) {
+                    updateProductStock(p.itemName, p.quantity);
+                    p.activated = true;
+                }
+            });
+        }
+
+        function terminateInventoryPeriod(num) {
+            const purchases = (state.inventoryPurchases || []).filter(p => p.cycleNumber === num);
+            purchases.forEach(p => {
+                const inv = state.inventory[p.itemName] || { stock: 0, minAlert: 5 };
+                inv.stock = Math.max(0, (inv.stock || 0) - (p.quantity || 0));
+                state.inventory[p.itemName] = inv;
+            });
+            try {
+                purchases.forEach(p => { try { deleteOne('inventory_purchases', { timestamp: p.timestamp }); } catch { } });
+            } catch { }
+            state.inventoryPurchases = (state.inventoryPurchases || []).filter(p => p.cycleNumber !== num);
+            state.inventoryPurchaseCycles = (state.inventoryPurchaseCycles || []).filter(c => c.number !== num);
+            saveData();
+            render();
+            showToast('Period terminated', 'success');
+
+            (async () => {
+                if (syncEnabled && currentUser) {
+                    try {
+                        const { error: perr } = await supabase
+                            .from('inventory_purchase_periods')
+                            .delete()
+                            .match({ user_id: currentUser.id, period_number: num });
+                        if (perr) console.warn('Cloud period delete error:', perr.message || perr);
+
+                        const { error: eerr } = await supabase
+                            .from('expenses')
+                            .delete()
+                            .match({ user_id: currentUser.id, comment: `Period ${num} ` });
+                        if (eerr) console.warn('Cloud expenses delete error:', eerr.message || eerr);
+
+                        const affected = Array.from(new Set(purchases.map(p => p.itemName)));
+                        for (const name of affected) {
+                            const inv = state.inventory[name] || { stock: 0, minAlert: 5 };
+                            await upsertOne('inventory', { product_name: name, stock: inv.stock || 0, min_alert: inv.minAlert || 5 });
+                        }
+                        syncInBackground();
+                        showToast('Cloud updated', 'success');
+                    } catch (err) {
+                        console.warn('Cloud update after termination failed:', err?.message || err);
+                        showToast('Cloud update failed; will retry when online', 'info');
+                    }
+                }
+            })();
         }
 
         function updateInventoryFilter(key, value) {
@@ -7224,26 +7390,48 @@
             const modal = document.getElementById('inventoryModal');
             const content = document.getElementById('inventoryModalContent');
             if (!modal || !content) return;
-            const products = (state.products || []).filter(p => p.hasStock !== false);
-            const productOptions = products.length > 0
-                ? products
+            function getInventoryProductOptions() {
+                const all = (state.products || []).filter(p => p.hasStock !== false);
+                if (all.length === 0) return '<option value="">No products found</option>';
+                const recent = all.slice(-3).map(p => p.name);
+                const rest = all
+                    .filter(p => !recent.includes(p.name))
                     .slice()
                     .sort((a, b) => String(a.name).localeCompare(String(b.name)))
-                    .map(p => `<option value="${p.name}">${p.name}</option>`).join('') + `<option value="new" style="background:#fff3e0;font-weight:600;">+ Add New Product</option>`
-                : '<option value="">No products found</option>';
+                    .map(p => p.name);
+                const ordered = [...recent, ...rest];
+                const opts = ordered.map(name => `<option value="${name}">${name}</option>`).join('');
+                return opts + `<option value="new" style="background:#fff3e0;font-weight:600;">+ Add New Product</option>`;
+            }
+            const productOptions = getInventoryProductOptions();
             const cycles = state.inventoryPurchaseCycles || [];
             const nextPeriodNumber = (cycles?.length || 0) + 1;
             const defaultTitle = new Date().toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + ' Period';
             const cycleOptions = cycles.map(c => `<option value="${c.number}">Period ${c.number} ${c.title ? '– ' + c.title : ''}</option>`).join('');
 
             content.innerHTML = `
+                <div class="flex-gap" style="align-items:center; margin-bottom:8px;">
+                    <label style="display:flex;align-items:center;gap:8px;">
+                        <input id="invBulkMode" type="checkbox" onchange="invToggleBulkMode()" />
+                        Bulk mode
+                    </label>
+                    <button class="btn-small" type="button" onclick="invAddBulkRow()">+ Add Product</button>
+                </div>
+                <div id="invBulkHeader" style="display:none; margin-bottom:6px; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap:8px; align-items:center;">
+                    <div style="font-size:12px; font-weight:600; color:#333;">Product</div>
+                    <div style="font-size:12px; font-weight:600; color:#333;">Quantity</div>
+                    <div style="font-size:12px; font-weight:600; color:#333;">Unit Cost</div>
+                    <div style="font-size:12px; font-weight:600; color:#333;">Discount</div>
+                    <div style="font-size:12px; font-weight:600; color:#333;">Action</div>
+                </div>
+                <div id="invBulkContainer" style="display:none; margin-bottom:12px;"></div>
                 <div id="invNewProductFields" style="display:none; margin-bottom:12px;">
                     <div class="card">
                         <h3>New Product</h3>
                         <div class="grid-2" style="gap:8px;">
                             <div>
                                 <label>Name</label>
-                                <input type="text" id="invNewProductName" placeholder="Enter product name">
+                                <input type="text" id="invNewProductName" placeholder="Enter product name" />
                             </div>
                             <div>
                                 <label>Category</label>
@@ -7255,23 +7443,23 @@
                             </div>
                             <div id="invNewCategoryField" class="grid-span-2" style="display:none;">
                                 <label>New Category Name</label>
-                                <input type="text" id="invNewCategoryName" placeholder="Enter category name">
+                                <input type="text" id="invNewCategoryName" placeholder="Enter category name" />
                             </div>
                             <div class="grid-span-2" style="display:flex;align-items:center;gap:8px;">
                                 <label style="margin:0;">Track stock</label>
-                                <input type="checkbox" id="invNewProductHasStock" checked onchange="invToggleNewProductHasStock()">
+                                <input type="checkbox" id="invNewProductHasStock" checked onchange="invToggleNewProductHasStock()" />
                             </div>
                             <div>
                                 <label>Cost (Capital)</label>
-                                <input type="text" id="invNewProductCost" class="money-input" placeholder="0">
+                                <input type="text" id="invNewProductCost" class="money-input" placeholder="0" />
                             </div>
                             <div>
                                 <label>Price (Selling)</label>
-                                <input type="text" id="invNewProductPrice" class="money-input" placeholder="0">
+                                <input type="text" id="invNewProductPrice" class="money-input" placeholder="0" />
                             </div>
                             <div id="invNewProductStockGroup" class="grid-span-2">
                                 <label>Initial Stock</label>
-                                <input type="text" id="invNewProductStock" class="money-input" placeholder="0" value="0">
+                                <input type="text" id="invNewProductStock" class="money-input" placeholder="0" value="0" />
                             </div>
                         </div>
                         <div class="flex-gap" style="margin-top:8px;">
@@ -7280,50 +7468,52 @@
                         </div>
                     </div>
                 </div>
-                <div class="grid-2" style="gap:12px;">
+                <div id="invSingleItemFields" class="grid-2" style="gap:12px;">
                     <div>
                         <label>Product</label>
                         <select id="invProductSelect" onchange="invHandleProductSelection()">${productOptions}</select>
                     </div>
                     <div>
                         <label>Quantity</label>
-                        <input id="invQuantity" type="text" class="money-input" value="1">
+                        <input id="invQuantity" type="text" class="money-input" placeholder="Qty" />
                     </div>
                     <div>
                         <label>Unit Cost (Tsh)</label>
-                        <input id="invUnitCost" type="text" class="money-input" placeholder="0">
+                        <input id="invUnitCost" type="text" class="money-input" placeholder="0" />
                     </div>
                     <div>
                         <label>Total Cost (auto)</label>
-                        <input id="invTotalCost" type="text" placeholder="0" disabled>
+                        <input id="invTotalCost" type="text" placeholder="0" disabled />
                     </div>
                     <div>
                         <label>Discount (Tsh)</label>
-                        <input id="invDiscount" type="text" class="money-input" placeholder="0">
+                        <input id="invDiscount" type="text" class="money-input" placeholder="0" />
                     </div>
+                </div>
+                <div class="grid-2" style="gap:12px;">
                     <div>
                         <label>Supplier Name</label>
-                        <input id="invSupplierName" type="text" placeholder="Supplier name">
+                        <input id="invSupplierName" type="text" placeholder="Supplier name" />
                     </div>
                     <div>
                         <label>Supplier Phone</label>
-                        <input id="invSupplierPhone" type="text" placeholder="Phone">
+                        <input id="invSupplierPhone" type="text" placeholder="Phone" />
                     </div>
                     <div class="grid-span-2">
                         <label>Supplier Address</label>
-                        <input id="invSupplierAddress" type="text" placeholder="Address">
+                        <input id="invSupplierAddress" type="text" placeholder="Address" />
                     </div>
                     <div>
                         <label>Date</label>
-                        <input id="invDate" type="date" value="${getTodayDateString()}">
+                        <input id="invDate" type="date" value="${getTodayDateString()}" />
                     </div>
                     <div>
                         <label>Time</label>
-                        <input id="invTime" type="time" value="${new Date().toISOString().slice(11, 16)}">
+                        <input id="invTime" type="time" value="${new Date().toISOString().slice(11, 16)}" />
                     </div>
                     <div class="grid-span-2">
                         <label>Notes (optional)</label>
-                        <input id="invNotes" type="text" placeholder="Notes">
+                        <input id="invNotes" type="text" placeholder="Notes" />
                     </div>
                 </div>
 
@@ -7333,7 +7523,7 @@
                         <div class="grid-2" style="gap:8px;">
                             <div>
                                 <label>Name</label>
-                                <input type="text" id="invNewProductName" placeholder="Enter product name">
+                                <input type="text" id="invNewProductName" placeholder="Enter product name" />
                             </div>
                             <div>
                                 <label>Category</label>
@@ -7345,23 +7535,23 @@
                             </div>
                             <div id="invNewCategoryField" class="grid-span-2" style="display:none;">
                                 <label>New Category Name</label>
-                                <input type="text" id="invNewCategoryName" placeholder="Enter category name">
+                                <input type="text" id="invNewCategoryName" placeholder="Enter category name" />
                             </div>
                             <div class="grid-span-2" style="display:flex;align-items:center;gap:8px;">
                                 <label style="margin:0;">Track stock</label>
-                                <input type="checkbox" id="invNewProductHasStock" checked onchange="invToggleNewProductHasStock()">
+                                <input type="checkbox" id="invNewProductHasStock" checked onchange="invToggleNewProductHasStock()" />
                             </div>
                             <div>
                                 <label>Cost (Capital)</label>
-                                <input type="text" id="invNewProductCost" class="money-input" placeholder="0">
+                                <input type="text" id="invNewProductCost" class="money-input" placeholder="0" />
                             </div>
                             <div>
                                 <label>Price (Selling)</label>
-                                <input type="text" id="invNewProductPrice" class="money-input" placeholder="0">
+                                <input type="text" id="invNewProductPrice" class="money-input" placeholder="0" />
                             </div>
                             <div id="invNewProductStockGroup" class="grid-span-2">
                                 <label>Initial Stock</label>
-                                <input type="text" id="invNewProductStock" class="money-input" placeholder="0" value="0">
+                                <input type="text" id="invNewProductStock" class="money-input" placeholder="0" value="0" />
                             </div>
                         </div>
                         <div class="flex-gap" style="margin-top:8px;">
@@ -7375,20 +7565,20 @@
                         <h3>Period</h3>
                         <div class="flex-gap">
                             <label style="display:flex;align-items:center;gap:8px;">
-                                <input id="invCreateNewPeriod" type="checkbox" checked>
+                                <input id="invCreateNewPeriod" type="checkbox" checked />
                                 Create new Period (recommended)
                             </label>
                             <div>
                                 <label>Existing Period</label>
-                                <select id="invPeriodSelect"><option value="">—</option>${cycleOptions}</select>
+                                <select id="invPeriodSelect" onchange="invOnPeriodChange()"><option value="">—</option>${cycleOptions}</select>
                             </div>
                             <div>
                                 <label>New Period Title</label>
-                                <input id="invNewPeriodTitle" type="text" value="${defaultTitle}">
+                                <input id="invNewPeriodTitle" type="text" value="${defaultTitle}" />
                             </div>
                         </div>
                     </div>
-                `;
+            `;
 
             // Attach money formatters in modal
             try {
@@ -7416,6 +7606,60 @@
                 discEl?.addEventListener('input', updateTotal);
                 updateTotal();
             }, 0);
+
+            const handleOutside = (e) => {
+                if (e.target === modal) {
+                    closeInventoryModal();
+                }
+            };
+            modal.addEventListener('click', handleOutside, { once: true });
+
+            window.invToggleBulkMode = function () {
+                const bulk = document.getElementById('invBulkMode')?.checked;
+                const cont = document.getElementById('invBulkContainer');
+                const header = document.getElementById('invBulkHeader');
+                const single = document.getElementById('invSingleItemFields');
+                if (cont) cont.style.display = bulk ? 'block' : 'none';
+                if (header) header.style.display = bulk ? 'grid' : 'none';
+                if (single) single.style.display = bulk ? 'none' : 'grid';
+            };
+            window.invOnPeriodChange = function () {
+                const sel = document.getElementById('invPeriodSelect');
+                const createNew = document.getElementById('invCreateNewPeriod');
+                const titleEl = document.getElementById('invNewPeriodTitle');
+                if (!sel) return;
+                if (sel.value) {
+                    if (createNew) createNew.checked = false;
+                    // keep title editable to allow updating existing Period title
+                } else {
+                    if (createNew) createNew.checked = true;
+                }
+            };
+            window.invAddBulkRow = function () {
+                const cont = document.getElementById('invBulkContainer');
+                if (!cont) return;
+                const all = (state.products || []).filter(p => p.hasStock !== false).map(p => p.name);
+                const recent = all.slice(-3);
+                const rest = all.filter(n => !recent.includes(n)).sort((a, b) => String(a).localeCompare(String(b)));
+                const ordered = [...recent, ...rest];
+                const opts = ordered.map(name => `< option value = "${name}" > ${name}</option > `).join('');
+                const row = document.createElement('div');
+                row.className = 'inv-bulk-row';
+                row.style.display = 'grid';
+                row.style.gridTemplateColumns = '2fr 1fr 1fr 1fr auto';
+                row.style.gap = '8px';
+                row.style.marginBottom = '8px';
+                row.innerHTML = `
+                    <div><select class="inv-bulk-name">${opts}</select></div>
+                    <div><input class="inv-bulk-qty money-input" type="text" placeholder="Qty" /></div>
+                    <div><input class="inv-bulk-unit money-input" type="text" placeholder="Unit Cost" /></div>
+                    <div><input class="inv-bulk-disc money-input" type="text" placeholder="Discount" /></div>
+                    <div><button class="btn-small btn-danger" type="button">✖</button></div>
+                `;
+                row.querySelector('button')?.addEventListener('click', () => { try { cont.removeChild(row); } catch { } });
+                cont.appendChild(row);
+                try { document.querySelectorAll('.money-input').forEach(el => attachMoneyFormatter(el)); } catch { }
+            };
 
             modal.classList.add('show');
         }
@@ -7555,75 +7799,170 @@
             const createNew = !!(document.getElementById('invCreateNewPeriod')?.checked);
             const selectedPeriod = document.getElementById('invPeriodSelect')?.value || '';
             const newPeriodTitle = (document.getElementById('invNewPeriodTitle')?.value || '').trim();
+            const bulkMode = !!(document.getElementById('invBulkMode')?.checked);
 
-            if (!productName) return showToast('Select a product', 'error');
-            if (!quantity || quantity <= 0) return showToast('Enter a valid quantity', 'error');
-            if (isNaN(unitCost) || unitCost <= 0) return showToast('Enter unit cost', 'error');
-            if (discount < 0) return showToast('Discount cannot be negative', 'error');
+            if (!bulkMode) {
+                if (!productName) return showToast('Select a product', 'error');
+                if (!quantity || quantity <= 0) return showToast('Enter a valid quantity', 'error');
+                if (isNaN(unitCost) || unitCost <= 0) return showToast('Enter unit cost', 'error');
+                if (discount < 0) return showToast('Discount cannot be negative', 'error');
+            }
 
-            // DePeriodine Period number
+            // Determine Period number: only create when no selection and createNew toggled
             let cycleNumber = selectedPeriod ? parseInt(selectedPeriod, 10) : null;
-            if (createNew || !cycleNumber) {
+            if (!cycleNumber && createNew) {
                 cycleNumber = ensurePeriodCreated(purchaseDate, time, newPeriodTitle);
             }
 
-            const timestamp = Date.now();
-            const record = {
-                id: generateID('invPurchase'),
-                cycleNumber,
-                itemName: productName,
-                quantity,
-                unitCost,
-                discount,
-                totalCost: (isNaN(totalCost) || totalCost === 0) ? Math.max(0, (quantity * unitCost) - discount) : totalCost,
-                supplierName,
-                supplierPhone,
-                supplierAddress,
-                purchaseDate,
-                time,
-                notes: notes ? `${notes}${discount ? ' | Discount: ' + formatMoney(discount) + ' Tsh' : ''}` : (discount ? `Discount: ${formatMoney(discount)} Tsh` : ''),
-                timestamp
-            };
+            // If using existing Period and a new title is provided, update the Period locally and in cloud
+            if (cycleNumber && !createNew && newPeriodTitle) {
+                const existing = (state.inventoryPurchaseCycles || []).find(c => c.number === cycleNumber);
+                if (existing) existing.title = newPeriodTitle;
+                if (syncEnabled && currentUser) {
+                    await upsertOne('inventory_purchase_periods', {
+                        period_number: cycleNumber,
+                        title: newPeriodTitle
+                    });
+                }
+            }
+
+            const nowTs = Date.now();
+            const todayStr = getTodayDateString();
+            const isPlanned = new Date(purchaseDate).getTime() > new Date(todayStr).getTime();
+            let totalExpenseAmount = 0;
+            let expenseDescription = '';
 
             state.inventoryPurchases = state.inventoryPurchases || [];
-            state.inventoryPurchases.push(record);
+            const createdRecords = [];
 
-            // Update product stock locally
-            updateProductStock(productName, quantity);
+            if (bulkMode) {
+                const rows = Array.from(document.querySelectorAll('.inv-bulk-row'));
+                if (rows.length === 0) return showToast('Add at least one product row', 'error');
+                rows.forEach((row, idx) => {
+                    const name = (row.querySelector('.inv-bulk-name')?.value || '').trim();
+                    const q = parseMoney(row.querySelector('.inv-bulk-qty')?.value || '0');
+                    const u = parseMoney(row.querySelector('.inv-bulk-unit')?.value || '0');
+                    const d = parseMoney(row.querySelector('.inv-bulk-disc')?.value || '0');
+                    if (!name || q <= 0 || u <= 0) return;
+                    const rec = {
+                        id: generateID('invPurchase'),
+                        cycleNumber,
+                        itemName: name,
+                        quantity: q,
+                        unitCost: u,
+                        discount: d,
+                        totalCost: Math.max(0, (q * u) - d),
+                        supplierName,
+                        supplierPhone,
+                        supplierAddress,
+                        purchaseDate,
+                        time,
+                        notes: notes,
+                        timestamp: nowTs + idx,
+                        planned: isPlanned,
+                        activated: !isPlanned
+                    };
+                    state.inventoryPurchases.push(rec);
+                    createdRecords.push(rec);
+                    if (!isPlanned) updateProductStock(name, q);
+                    totalExpenseAmount += rec.totalCost;
+                });
+                expenseDescription = `Inventory(Bulk): ${rows.length} items`;
+            } else {
+                const record = {
+                    id: generateID('invPurchase'),
+                    cycleNumber,
+                    itemName: productName,
+                    quantity,
+                    unitCost,
+                    discount,
+                    totalCost: (isNaN(totalCost) || totalCost === 0) ? Math.max(0, (quantity * unitCost) - discount) : totalCost,
+                    supplierName,
+                    supplierPhone,
+                    supplierAddress,
+                    purchaseDate,
+                    time,
+                    notes: notes ? `${notes}${discount ? ' | Discount: ' + formatMoney(discount) + ' Tsh' : ''} ` : (discount ? `Discount: ${formatMoney(discount)} Tsh` : ''),
+                    timestamp: nowTs,
+                    planned: isPlanned,
+                    activated: !isPlanned
+                };
+                state.inventoryPurchases.push(record);
+                createdRecords.push(record);
+                if (!isPlanned) updateProductStock(productName, quantity);
+                totalExpenseAmount = record.totalCost;
+                expenseDescription = `Inventory: ${productName} × ${quantity} `;
+            }
+
+            if (isPlanned) { showToast('Planned purchase saved', 'success'); }
 
             // Record as an expense (office money usage)
-            const expense = {
-                id: generateID('expenses'),
-                date: purchaseDate,
-                time,
-                timestamp,
-                description: `Inventory: ${productName} × ${quantity}`,
-                category: 'Inventory Purchase',
-                amount: record.totalCost,
-                payment: 'cash',
-                comment: `Period ${cycleNumber}`
-            };
-            state.expenses.push(expense);
+            const expenseTs = nowTs;
+            // Upsert period-level expense (summary)
+            const periodComment = `Period ${cycleNumber} `;
+            const existingIdx = (state.expenses || []).findIndex(e => e.category === 'Inventory Purchase' && e.comment === periodComment);
+            if (existingIdx !== -1) {
+                state.expenses[existingIdx].amount = (state.expenses[existingIdx].amount || 0) + (totalExpenseAmount || 0);
+                try {
+                    const e = state.expenses[existingIdx];
+                    await upsertOne('expenses', {
+                        date: e.date,
+                        time: e.time,
+                        timestamp: e.timestamp,
+                        description: e.description,
+                        category: e.category,
+                        amount: e.amount,
+                        payment: e.payment,
+                        comment: e.comment
+                    });
+                } catch { }
+            } else {
+                const expense = {
+                    id: generateID('expenses'),
+                    date: purchaseDate,
+                    time,
+                    timestamp: expenseTs,
+                    description: `Inventory Period ${cycleNumber} `,
+                    category: 'Inventory Purchase',
+                    amount: totalExpenseAmount,
+                    payment: 'cash',
+                    comment: periodComment
+                };
+                state.expenses.push(expense);
+                try {
+                    await upsertOne('expenses', {
+                        date: expense.date,
+                        time: expense.time,
+                        timestamp: expense.timestamp,
+                        description: expense.description,
+                        category: expense.category,
+                        amount: expense.amount,
+                        payment: expense.payment,
+                        comment: expense.comment
+                    });
+                } catch { }
+            }
 
             saveData();
             closeInventoryModal();
             render();
             showToast('Inventory purchase saved', 'success');
             if (syncEnabled) {
-                // Upsert purchase
-                await upsertOne('inventory_purchases', {
-                    period_number: record.cycleNumber,
-                    item_name: record.itemName,
-                    quantity: record.quantity,
-                    unit_cost: record.unitCost,
-                    total_cost: record.totalCost,
-                    purchase_date: record.purchaseDate,
-                    supplier_name: record.supplierName,
-                    supplier_phone: record.supplierPhone,
-                    supplier_address: record.supplierAddress,
-                    notes: record.notes,
-                    timestamp: record.timestamp
-                });
+                for (const r of createdRecords) {
+                    await upsertOne('inventory_purchases', {
+                        period_number: r.cycleNumber,
+                        item_name: r.itemName,
+                        quantity: r.quantity,
+                        unit_cost: r.unitCost,
+                        total_cost: r.totalCost,
+                        purchase_date: r.purchaseDate,
+                        supplier_name: r.supplierName,
+                        supplier_phone: r.supplierPhone,
+                        supplier_address: r.supplierAddress,
+                        notes: r.notes,
+                        timestamp: r.timestamp
+                    });
+                }
                 // Upsert related expense
                 await upsertOne('expenses', {
                     date: expense.date,
@@ -7636,8 +7975,10 @@
                     comment: expense.comment
                 });
                 // Upsert inventory stock snapshot
-                const inv = state.inventory[productName] || { stock: 0, minAlert: 5 };
-                await upsertOne('inventory', { product_name: productName, stock: inv.stock || 0, min_alert: inv.minAlert || 5 });
+                for (const r of createdRecords) {
+                    const inv = state.inventory[r.itemName] || { stock: 0, minAlert: 5 };
+                    await upsertOne('inventory', { product_name: r.itemName, stock: inv.stock || 0, min_alert: inv.minAlert || 5 });
+                }
                 syncInBackground();
             }
         }
@@ -7711,7 +8052,7 @@
                 doc.text(profile.businessName || 'TUBA', titleXTermHdr, 45);
                 doc.setFontSize(10);
                 doc.setFont(undefined, 'normal');
-                doc.text(`${profile.address || ''} | ${profile.phone || ''} | ${profile.email || ''}`, margin, 70);
+                doc.text(`${profile.address || ''} | ${profile.phone || ''} | ${profile.email || ''} `, margin, 70);
                 doc.setDrawColor(102, 126, 234);
                 doc.setLineWidth(3);
                 doc.line(margin, 85, pageWidth - margin, 85);
@@ -7724,7 +8065,7 @@
                 doc.setFontSize(10);
                 doc.setFont(undefined, 'normal');
                 doc.setTextColor(100, 100, 100);
-                doc.text(`Generated: ${getTodayDateString()}`, margin, y + 20);
+                doc.text(`Generated: ${getTodayDateString()} `, margin, y + 20);
                 y += 50;
 
                 const cycles = state.inventoryPurchaseCycles || [];
@@ -7734,10 +8075,10 @@
                     const colCount = headers.length;
                     const colWidth = usableWidth / colCount;
                     let curY = startY;
-                    const rowHeight = 20;
+                    const headerH = 20;
 
                     doc.setFillColor(102, 126, 234);
-                    doc.roundedRect(margin, curY, usableWidth, rowHeight, 3, 3, 'F');
+                    doc.roundedRect(margin, curY, usableWidth, headerH, 3, 3, 'F');
                     doc.setTextColor(255, 255, 255);
                     doc.setFont(undefined, 'bold');
                     doc.setFontSize(10);
@@ -7745,26 +8086,41 @@
                         const txtX = margin + i * colWidth + 8;
                         doc.text(String(headers[i]), txtX, curY + 14);
                     }
-                    curY += rowHeight + 2;
+                    curY += headerH + 2;
 
                     doc.setFont(undefined, 'normal');
                     doc.setFontSize(9);
                     for (let r = 0; r < rows.length; r++) {
-                        if (curY + rowHeight > 750) {
+                        let maxLines = 1;
+                        const cellLines = [];
+                        for (let c = 0; c < colCount; c++) {
+                            const txt = rows[r][c] === null || rows[r][c] === undefined ? '' : String(rows[r][c]);
+                            const lines = doc.splitTextToSize(txt, colWidth - 16);
+                            cellLines.push(lines);
+                            if (lines.length > maxLines) maxLines = lines.length;
+                        }
+                        const lineH = 10;
+                        const rowH = maxLines * lineH + 8;
+
+                        if (curY + rowH > 750) {
                             doc.addPage();
                             curY = margin;
                         }
+
                         if (r % 2 === 0) {
                             doc.setFillColor(248, 249, 250);
-                            doc.roundedRect(margin, curY, usableWidth, rowHeight, 2, 2, 'F');
+                            doc.roundedRect(margin, curY, usableWidth, rowH, 2, 2, 'F');
                         }
+
                         doc.setTextColor(40, 40, 40);
                         for (let c = 0; c < colCount; c++) {
-                            const txt = rows[r][c] === null || rows[r][c] === undefined ? '' : String(rows[r][c]);
                             const txtX = margin + c * colWidth + 8;
-                            doc.text(txt, txtX, curY + 14, { maxWidth: colWidth - 16 });
+                            const lines = cellLines[c];
+                            for (let li = 0; li < lines.length; li++) {
+                                doc.text(lines[li], txtX, curY + 14 + li * lineH);
+                            }
                         }
-                        curY += rowHeight;
+                        curY += rowH;
                     }
                     return curY + 20;
                 };
@@ -7781,7 +8137,7 @@
                         doc.setFontSize(14);
                         doc.setFont(undefined, 'bold');
                         doc.setTextColor(0, 0, 0);
-                        doc.text(`Period ${cycle.number} ${cycle.title ? '– ' + cycle.title : ''}`, margin, y);
+                        doc.text(`Period ${cycle.number} ${cycle.title ? '– ' + cycle.title : ''} `, margin, y);
                         doc.setFontSize(10);
                         doc.setFont(undefined, 'normal');
                         doc.setTextColor(100, 100, 100);
@@ -7811,8 +8167,8 @@
                     doc.rect(0, 792 - 30, pageWidth, 30, 'F');
                     doc.setTextColor(100, 100, 100);
                     doc.setFontSize(9);
-                    doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 11);
-                    doc.text(`The Ultimate Business Architecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
+                    doc.text(`Page ${i} of ${pageCount} `, margin, 792 - 11);
+                    doc.text(`The Ultimate Business Architecture(TUBA) © ${new Date().getFullYear()} `, pageWidth - margin, 792 - 8, { align: 'right' });
                 }
 
                 downloadPDFSafe(doc, `Inventory_Purchases_${getTodayDateString()}.pdf`);
@@ -7851,7 +8207,7 @@
                 doc.text(profile.businessName || 'TUBA', titleX, 45);
                 doc.setFontSize(10);
                 doc.setFont(undefined, 'normal');
-                doc.text(`${profile.address || ''} | ${profile.phone || ''} | ${profile.email || ''}`, margin, 70);
+                doc.text(`${profile.address || ''} | ${profile.phone || ''} | ${profile.email || ''} `, margin, 70);
                 doc.setDrawColor(102, 126, 234);
                 doc.setLineWidth(3);
                 doc.line(margin, 85, pageWidth - margin, 85);
@@ -7864,7 +8220,7 @@
                 doc.setTextColor(0, 0, 0);
                 doc.setFontSize(18);
                 doc.setFont(undefined, 'bold');
-                doc.text(`Inventory Period ${cycleNumber} ${cycle?.title ? '– ' + cycle.title : ''}`, margin, y);
+                doc.text(`Inventory Period ${cycleNumber} ${cycle?.title ? '– ' + cycle.title : ''} `, margin, y);
                 doc.setFontSize(10);
                 doc.setFont(undefined, 'normal');
                 doc.setTextColor(100, 100, 100);
@@ -7883,13 +8239,12 @@
                     p.supplierPhone || p.supplierContact || ''
                 ]);
 
-                // Table
                 const colCount = headers.length;
                 const colWidth = usableWidth / colCount;
                 let curY = y;
-                const rowHeight = 20;
+                const headerH = 20;
                 doc.setFillColor(102, 126, 234);
-                doc.roundedRect(margin, curY, usableWidth, rowHeight, 3, 3, 'F');
+                doc.roundedRect(margin, curY, usableWidth, headerH, 3, 3, 'F');
                 doc.setTextColor(255, 255, 255);
                 doc.setFont(undefined, 'bold');
                 doc.setFontSize(10);
@@ -7897,19 +8252,31 @@
                     const txtX = margin + i * colWidth + 8;
                     doc.text(String(headers[i]), txtX, curY + 14);
                 }
-                curY += rowHeight + 2;
+                curY += headerH + 2;
                 doc.setFont(undefined, 'normal');
                 doc.setFontSize(9);
                 for (let r = 0; r < rows.length; r++) {
-                    if (curY + rowHeight > 750) { doc.addPage(); curY = margin; }
-                    if (r % 2 === 0) { doc.setFillColor(248, 249, 250); doc.roundedRect(margin, curY, usableWidth, rowHeight, 2, 2, 'F'); }
-                    doc.setTextColor(40, 40, 40);
+                    let maxLines = 1;
+                    const cellLines = [];
                     for (let c = 0; c < colCount; c++) {
                         const txt = rows[r][c] === null || rows[r][c] === undefined ? '' : String(rows[r][c]);
-                        const txtX = margin + c * colWidth + 8;
-                        doc.text(txt, txtX, curY + 14, { maxWidth: colWidth - 16 });
+                        const lines = doc.splitTextToSize(txt, colWidth - 16);
+                        cellLines.push(lines);
+                        if (lines.length > maxLines) maxLines = lines.length;
                     }
-                    curY += rowHeight;
+                    const lineH = 10;
+                    const rowH = maxLines * lineH + 8;
+                    if (curY + rowH > 750) { doc.addPage(); curY = margin; }
+                    if (r % 2 === 0) { doc.setFillColor(248, 249, 250); doc.roundedRect(margin, curY, usableWidth, rowH, 2, 2, 'F'); }
+                    doc.setTextColor(40, 40, 40);
+                    for (let c = 0; c < colCount; c++) {
+                        const txtX = margin + c * colWidth + 8;
+                        const lines = cellLines[c];
+                        for (let li = 0; li < lines.length; li++) {
+                            doc.text(lines[li], txtX, curY + 14 + li * lineH);
+                        }
+                    }
+                    curY += rowH;
                 }
 
                 // Footer
@@ -7920,8 +8287,8 @@
                     doc.rect(0, 792 - 30, pageWidth, 30, 'F');
                     doc.setTextColor(100, 100, 100);
                     doc.setFontSize(9);
-                    doc.text(`Page ${i} of ${pageCount}`, margin, 792 - 11);
-                    doc.text(`The Ultimate Business Architecture (TUBA) © ${new Date().getFullYear()}`, pageWidth - margin, 792 - 8, { align: 'right' });
+                    doc.text(`Page ${i} of ${pageCount} `, margin, 792 - 11);
+                    doc.text(`The Ultimate Business Architecture(TUBA) © ${new Date().getFullYear()} `, pageWidth - margin, 792 - 8, { align: 'right' });
                 }
 
                 downloadPDFSafe(doc, `Inventory_Period_${cycleNumber}.pdf`);
@@ -7939,10 +8306,172 @@
             state.inventory[productName].stock = Math.max(0, state.inventory[productName].stock + amount);
             saveData();
             render();
-            showToast(`Stock ${amount > 0 ? 'increased' : 'decreased'}`, 'success');
+            showToast(`Stock ${amount > 0 ? 'increased' : 'decreased'} `, 'success');
             if (syncEnabled) {
                 const inv = state.inventory[productName] || { stock: 0, minAlert: 5 };
                 await upsertOne('inventory', { product_name: productName, stock: inv.stock || 0, min_alert: inv.minAlert || 5 });
+                syncInBackground();
+            }
+        }
+
+        async function deleteInventoryByPeriod(productName) {
+            const periods = Array.from(new Set((state.inventoryPurchases || [])
+                .filter(p => p.itemName === productName)
+                .map(p => p.cycleNumber))).sort((a, b) => a - b);
+            if (periods.length === 0) { showToast('No purchases found for this product', 'info'); return; }
+            let sel = periods[periods.length - 1];
+            if (periods.length > 1) {
+                const input = prompt(`Enter Period number to delete for ${productName}(${periods.join(', ')})`);
+                if (!input) return;
+                const num = parseInt(input, 10);
+                if (!periods.includes(num)) { showToast('Invalid Period number', 'error'); return; }
+                sel = num;
+            }
+            const toDelete = (state.inventoryPurchases || []).filter(p => p.itemName === productName && p.cycleNumber === sel);
+            if (toDelete.length === 0) { showToast('No entries in selected Period', 'info'); return; }
+            const qtySum = toDelete.reduce((s, p) => s + (p.quantity || 0), 0);
+            const inv = state.inventory[productName] || { stock: 0, minAlert: 5 };
+            inv.stock = Math.max(0, (inv.stock || 0) - qtySum);
+            state.inventory[productName] = inv;
+            toDelete.forEach(p => { try { deleteOne('inventory_purchases', { timestamp: p.timestamp }); } catch { } });
+            state.inventoryPurchases = (state.inventoryPurchases || []).filter(p => !(p.itemName === productName && p.cycleNumber === sel));
+            saveData();
+            render();
+            showToast('Inventory updated', 'success');
+            if (syncEnabled) {
+                await upsertOne('inventory', { product_name: productName, stock: inv.stock || 0, min_alert: inv.minAlert || 5 });
+                syncInBackground();
+            }
+        }
+
+        async function openUpdateInventoryForProduct(productName) {
+            openInventoryModal();
+            setTimeout(() => {
+                try {
+                    const bulk = document.getElementById('invBulkMode');
+                    if (bulk) { bulk.checked = false; invToggleBulkMode(); }
+                    const prodSel = document.getElementById('invProductSelect');
+                    if (prodSel) { prodSel.value = productName; invHandleProductSelection(); }
+                    const last = (state.inventoryPurchases || []).filter(p => p.itemName === productName).sort((a, b) => b.timestamp - a.timestamp)[0];
+                    if (last) {
+                        const qtyEl = document.getElementById('invQuantity');
+                        const unitEl = document.getElementById('invUnitCost');
+                        const discEl = document.getElementById('invDiscount');
+                        const totalEl = document.getElementById('invTotalCost');
+                        const supN = document.getElementById('invSupplierName');
+                        const supP = document.getElementById('invSupplierPhone');
+                        const supA = document.getElementById('invSupplierAddress');
+                        const notesEl = document.getElementById('invNotes');
+                        const perSel = document.getElementById('invPeriodSelect');
+                        const chkNew = document.getElementById('invCreateNewPeriod');
+                        const perTitle = document.getElementById('invNewPeriodTitle');
+                        const dateEl = document.getElementById('invDate');
+                        const timeEl = document.getElementById('invTime');
+                        if (qtyEl) qtyEl.value = String(last.quantity || 1);
+                        if (unitEl) unitEl.value = formatMoney(last.unitCost || 0);
+                        if (discEl) discEl.value = formatMoney(last.discount || 0);
+                        const computedTotal = Math.max(0, (last.quantity || 0) * (last.unitCost || 0) - (last.discount || 0));
+                        if (totalEl) totalEl.value = formatMoney(computedTotal);
+                        if (supN) supN.value = last.supplierName || '';
+                        if (supP) supP.value = last.supplierPhone || '';
+                        if (supA) supA.value = last.supplierAddress || '';
+                        if (notesEl) notesEl.value = last.notes || '';
+                        if (dateEl) dateEl.value = last.purchaseDate || dateEl.value;
+                        if (timeEl) timeEl.value = last.time || timeEl.value;
+                        if (perSel) perSel.value = String(last.cycleNumber || '');
+                        if (chkNew) chkNew.checked = !Boolean(last.cycleNumber);
+                        const cycle = (state.inventoryPurchaseCycles || []).find(c => c.number === last.cycleNumber);
+                        if (perTitle && cycle && cycle.title) perTitle.value = cycle.title;
+                    }
+                } catch { }
+            }, 50);
+        }
+
+        async function openUpdateInventoryForPurchase(ts) {
+            const p = (state.inventoryPurchases || []).find(x => x.timestamp === ts);
+            if (!p) { showToast('Purchase not found', 'error'); return; }
+            openInventoryModal();
+            setTimeout(() => {
+                try {
+                    const bulk = document.getElementById('invBulkMode');
+                    if (bulk) { bulk.checked = false; invToggleBulkMode(); }
+                    const prodSel = document.getElementById('invProductSelect');
+                    if (prodSel) { prodSel.value = p.itemName; invHandleProductSelection(); }
+                    const qtyEl = document.getElementById('invQuantity');
+                    const unitEl = document.getElementById('invUnitCost');
+                    const discEl = document.getElementById('invDiscount');
+                    const totalEl = document.getElementById('invTotalCost');
+                    const supN = document.getElementById('invSupplierName');
+                    const supP = document.getElementById('invSupplierPhone');
+                    const supA = document.getElementById('invSupplierAddress');
+                    const notesEl = document.getElementById('invNotes');
+                    const perSel = document.getElementById('invPeriodSelect');
+                    const chkNew = document.getElementById('invCreateNewPeriod');
+                    const perTitle = document.getElementById('invNewPeriodTitle');
+                    const dateEl = document.getElementById('invDate');
+                    const timeEl = document.getElementById('invTime');
+                    if (qtyEl) qtyEl.value = String(p.quantity || 1);
+                    if (unitEl) unitEl.value = formatMoney(p.unitCost || p.buyingPrice || 0);
+                    if (discEl) discEl.value = formatMoney(p.discount || 0);
+                    const computedTotal = Math.max(0, (p.quantity || 0) * (p.unitCost || p.buyingPrice || 0) - (p.discount || 0));
+                    if (totalEl) totalEl.value = formatMoney(computedTotal);
+                    if (supN) supN.value = p.supplierName || '';
+                    if (supP) supP.value = p.supplierPhone || '';
+                    if (supA) supA.value = p.supplierAddress || '';
+                    if (notesEl) notesEl.value = p.notes || '';
+                    if (dateEl) dateEl.value = p.purchaseDate || dateEl.value;
+                    if (timeEl) timeEl.value = p.time || timeEl.value;
+                    if (perSel) perSel.value = String(p.cycleNumber || '');
+                    if (chkNew) chkNew.checked = !Boolean(p.cycleNumber);
+                    const cycle = (state.inventoryPurchaseCycles || []).find(c => c.number === p.cycleNumber);
+                    if (perTitle && cycle && cycle.title) perTitle.value = cycle.title;
+                } catch { }
+            }, 50);
+        }
+
+        async function deleteInventoryPurchaseByTimestamp(ts) {
+            const p = (state.inventoryPurchases || []).find(x => x.timestamp === ts);
+            if (!p) { showToast('Purchase not found', 'error'); return; }
+            if (p.activated) {
+                const inv = state.inventory[p.itemName] || { stock: 0, minAlert: 5 };
+                inv.stock = Math.max(0, (inv.stock || 0) - (p.quantity || 0));
+                state.inventory[p.itemName] = inv;
+            }
+            try { deleteOne('inventory_purchases', { timestamp: ts }); } catch { }
+            state.inventoryPurchases = (state.inventoryPurchases || []).filter(x => x.timestamp !== ts);
+            // Adjust period-level expense
+            try {
+                const periodComment = `Period ${p.cycleNumber} `;
+                const idx = (state.expenses || []).findIndex(e => e.category === 'Inventory Purchase' && e.comment === periodComment);
+                if (idx !== -1) {
+                    state.expenses[idx].amount = Math.max(0, (state.expenses[idx].amount || 0) - (p.totalCost || p.buyingPrice || 0));
+                    if (state.expenses[idx].amount === 0) {
+                        // remove the expense entirely
+                        const tsExp = state.expenses[idx].timestamp;
+                        try { deleteOne('expenses', { timestamp: tsExp }); } catch { }
+                        state.expenses.splice(idx, 1);
+                    } else {
+                        // upsert adjusted expense
+                        const e = state.expenses[idx];
+                        await upsertOne('expenses', {
+                            date: e.date,
+                            time: e.time,
+                            timestamp: e.timestamp,
+                            description: e.description,
+                            category: e.category,
+                            amount: e.amount,
+                            payment: e.payment,
+                            comment: e.comment
+                        });
+                    }
+                }
+            } catch { }
+            saveData();
+            render();
+            showToast('Purchase deleted', 'success');
+            if (syncEnabled) {
+                const inv = state.inventory[p.itemName] || { stock: 0, minAlert: 5 };
+                await upsertOne('inventory', { product_name: p.itemName, stock: inv.stock || 0, min_alert: inv.minAlert || 5 });
                 syncInBackground();
             }
         }
@@ -7960,13 +8489,17 @@
             render();
             showToast("Stock updated", "success");
 
-            // Sync in background
-            if (syncEnabled) syncInBackground();
+            // Sync inventory snapshot to cloud
+            if (syncEnabled) {
+                const inv = state.inventory[productName] || { stock: 0, minAlert: 5 };
+                await upsertOne('inventory', { product_name: productName, stock: inv.stock || 0, min_alert: inv.minAlert || 5 });
+                syncInBackground();
+            }
         }
 
         function setMinAlert(productName) {
             const current = state.inventory[productName]?.minAlert || 5;
-            const newValue = prompt(`Set minimum stock alert for ${productName}:`, current);
+            const newValue = prompt(`Set minimum stock alert for ${productName}: `, current);
             if (newValue !== null) {
                 const val = parseInt(newValue);
                 if (!isNaN(val) && val >= 0) {
@@ -8014,15 +8547,15 @@
                         </div>
                         <button type="submit">Add Customer</button>
                     </form>
-                </div>
+                    </div>
 
                 <div class="card">
-    <h2>All Customers (${state.customers.length})</h2>
-    <div class="search-box">
-        <input type="text" placeholder="🔍 Search customers..." oninput="searchCustomers(this.value)" id="customerSearch">
-    </div>
-    
-    ${state.customers.length > 0 ? `
+                    <h2>All Customers (${state.customers.length})</h2>
+                    <div class="search-box">
+                        <input type="text" placeholder="🔍 Search customers..." oninput="searchCustomers(this.value)" id="customerSearch">
+                    </div>
+
+                    ${state.customers.length > 0 ? `
         <div class="bulk-actions">
             <input type="checkbox" id="selectAll_customers" onchange="toggleSelectAll('customers')" class="checkbox-select">
             <label for="selectAll_customers">Select All</label>
@@ -8034,11 +8567,12 @@
             </button>
         </div>
     ` : ''}
-    
-    <div id="customersList">
-        ${renderCustomersList()}
-    </div>
-</div>
+
+                    <div id="customersList">
+                        ${renderCustomersList()}
+                    </div>
+                    ${(() => { const total = state.customers.length; const count = (state.listShowCount && state.listShowCount.customers) ? state.listShowCount.customers : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('customers')` : `collapseList('customers')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
+                </div>
             `;
         }
 
@@ -8057,35 +8591,37 @@
                 return '<p style="text-align: center; color: #666;">No customers found</p>';
             }
 
+            const count = (state.listShowCount && state.listShowCount.customers) ? state.listShowCount.customers : 3;
+            customers = customers.slice(0, count);
             return customers.map((c, i) => {
                 const actualIndex = state.customers.indexOf(c);
                 const purchaseCount = state.sales.filter(s => s.customer === c.name).length;
                 return `
-        <div class="item">
-            <div style="display: flex; gap: 12px; align-items: start;">
-                <input type="checkbox" class="checkbox-select" 
-                       ${state.selectedItems.customers && state.selectedItems.customers[c.id] ? 'checked' : ''}
-                       onchange="toggleSelect('customers', '${c.id}')">
-                <div style="flex: 1;">
-                    <div class="item-title">${c.name}</div>
-                        <div class="item-subtitle">
-                            ${c.email ? '📧 ' + c.email + '<br>' : ''}
-                            ${c.phone ? '📱 ' + c.phone + '<br>' : ''}
-                            ${c.address ? '📍 ' + c.address + '<br>' : ''}
-                            <div style="color: #2e7d32; font-weight: 600; margin-top: 4px;">
-                                💰 Total Purchases: 💱 ${formatNumber(c.totalPurchases || 0)} Tsh<br>
-                                📊 ${purchaseCount} transactions
+                <div class="item">
+                    <div style="display: flex; gap: 12px; align-items: start;">
+                        <input type="checkbox" class="checkbox-select"
+                            ${state.selectedItems.customers && state.selectedItems.customers[c.id] ? 'checked' : ''}
+                            onchange="toggleSelect('customers', '${c.id}')">
+                            <div style="flex: 1;">
+                                <div class="item-title">${c.name}</div>
+                                <div class="item-subtitle">
+                                    ${c.email ? '📧 ' + c.email + '<br>' : ''}
+                                    ${c.phone ? '📱 ' + c.phone + '<br>' : ''}
+                                    ${c.address ? '📍 ' + c.address + '<br>' : ''}
+                                    <div style="color: #2e7d32; font-weight: 600; margin-top: 4px;">
+                                        💰 Total Purchases: 💱 ${formatNumber(c.totalPurchases || 0)} Tsh<br>
+                                            📊 ${purchaseCount} transactions
+                                    </div>
+                                </div>
+                                <div class="flex-gap" style="margin-top:8px;">
+                                    <button class="btn-small" onclick="viewCustomerHistory(${actualIndex})">History</button>
+                                    <button class="btn-small" onclick="editCustomerIndex(${actualIndex})">Edit</button>
+                                    <button class="btn-small btn-danger" onclick="deleteCustomerIndex(${actualIndex})">Delete</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="flex-gap" style="margin-top:8px;">
-                        <button class="btn-small" onclick="viewCustomerHistory(${actualIndex})">History</button>
-                        <button class="btn-small" onclick="editCustomerIndex(${actualIndex})">Edit</button>
-                        <button class="btn-small btn-danger" onclick="deleteCustomerIndex(${actualIndex})">Delete</button>
                     </div>
-                </div>
-            </div>
-        </div>
-    `;
+        </div >
+                `;
             }).join('');
         }
 
@@ -8104,7 +8640,7 @@
                 return;
             }
 
-            let history = `${customer.name}'s Purchase History:\n\n`;
+            let history = `${customer.name} 's Purchase History:\n\n`;
             sales.slice(-10).reverse().forEach(s => {
                 history += `${s.date}: ${s.productName} - ${formatNumber(s.totalPrice)} Tsh\n`;
             });
@@ -9405,11 +9941,15 @@
                 const description = item.description || String(item);
                 const amount = item.amount || 0;
 
-                doc.text(description, margin + 10, y + 14);
+                const maxDescWidth = usableWidth - 20;
+                const descLines = doc.splitTextToSize(description, maxDescWidth);
+                for (let li = 0; li < descLines.length; li++) {
+                    doc.text(descLines[li], margin + 10, y + 14 + li * 12);
+                }
                 if (amount > 0) {
                     doc.text(`${formatNumber(amount)} Tsh`, pageWidth - margin - 10, y + 14, { align: 'right' });
                 }
-                y += 20;
+                y += Math.max(20, descLines.length * 12 + 6);
             });
 
             y += 10;
@@ -9906,12 +10446,15 @@
                     <div id="notesList">
                         ${renderNotesList()}
                     </div>
+                    ${(() => { const total = state.notes.length; const count = (state.listShowCount && state.listShowCount.notes) ? state.listShowCount.notes : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('notes')` : `collapseList('notes')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
                 </div>
             `;
         }
 
         function renderNotesList(searchPeriod = '') {
             let notes = state.notes.slice().reverse();
+            const count = (state.listShowCount && state.listShowCount.notes) ? state.listShowCount.notes : 3;
+            notes = notes.slice(0, count);
 
             if (searchPeriod) {
                 const Period = searchPeriod.toLowerCase();
@@ -10598,10 +11141,10 @@
                 const colCount = headers.length;
                 const colWidth = usableWidth / colCount;
                 let curY = startY;
-                const rowHeight = 22;
+                const headerH = 22;
 
                 doc.setFillColor(102, 126, 234);
-                doc.roundedRect(margin, curY, usableWidth, rowHeight, 3, 3, 'F');
+                doc.roundedRect(margin, curY, usableWidth, headerH, 3, 3, 'F');
 
                 doc.setTextColor(255, 255, 255);
                 doc.setFont(undefined, 'bold');
@@ -10610,28 +11153,41 @@
                     const txtX = margin + i * colWidth + 8;
                     doc.text(String(headers[i]), txtX, curY + 15);
                 }
-                curY += rowHeight + 2;
+                curY += headerH + 2;
 
                 doc.setFont(undefined, 'normal');
                 doc.setFontSize(9);
                 for (let r = 0; r < rows.length; r++) {
-                    if (curY + rowHeight > 750) {
+                    let maxLines = 1;
+                    const cellLines = [];
+                    for (let c = 0; c < colCount; c++) {
+                        const txt = rows[r][c] === null || rows[r][c] === undefined ? '' : String(rows[r][c]);
+                        const lines = doc.splitTextToSize(txt, colWidth - 16);
+                        cellLines.push(lines);
+                        if (lines.length > maxLines) maxLines = lines.length;
+                    }
+                    const lineH = 10;
+                    const rowH = maxLines * lineH + 8;
+
+                    if (curY + rowH > 750) {
                         doc.addPage();
                         curY = margin;
                     }
 
                     if (r % 2 === 0) {
                         doc.setFillColor(248, 249, 250);
-                        doc.roundedRect(margin, curY, usableWidth, rowHeight, 2, 2, 'F');
+                        doc.roundedRect(margin, curY, usableWidth, rowH, 2, 2, 'F');
                     }
 
                     doc.setTextColor(40, 40, 40);
                     for (let c = 0; c < colCount; c++) {
-                        const txt = rows[r][c] === null || rows[r][c] === undefined ? '' : String(rows[r][c]);
                         const txtX = margin + c * colWidth + 8;
-                        doc.text(txt, txtX, curY + 15, { maxWidth: colWidth - 16 });
+                        const lines = cellLines[c];
+                        for (let li = 0; li < lines.length; li++) {
+                            doc.text(lines[li], txtX, curY + 15 + li * lineH);
+                        }
                     }
-                    curY += rowHeight;
+                    curY += rowH;
                 }
                 return curY + 20;
             }
@@ -10669,10 +11225,25 @@
             }
 
             // Expenses
-            const expHeaders = ["Date", "Description", "Category", "Amount"];
-            const expRows = (state.expenses || []).map(e => [
+            // Group inventory purchases per period, keep other expenses as is
+            const groups = {};
+            (state.expenses || []).forEach(e => {
+                if (e.category === 'Inventory Purchase' && /^Period \d+/.test(e.comment || '')) {
+                    const key = e.comment;
+                    groups[key] = groups[key] || { amount: 0, date: e.date, time: e.time };
+                    groups[key].amount += (e.amount || 0);
+                }
+            });
+            const periodRows = Object.keys(groups).sort((a, b) => {
+                const na = parseInt(a.replace('Period ', ''), 10);
+                const nb = parseInt(b.replace('Period ', ''), 10);
+                return na - nb;
+            }).map(key => [groups[key].date, key, 'Inventory Purchase', formatNumber(groups[key].amount) + ' Tsh']);
+            const otherRows = (state.expenses || []).filter(e => e.category !== 'Inventory Purchase').map(e => [
                 e.date, e.description, e.category, formatNumber(e.amount || 0) + ' Tsh'
             ]);
+            const expHeaders = ["Date", "Description", "Category", "Amount"];
+            const expRows = [...otherRows, ...periodRows];
             if (expRows.length > 0) {
                 if (y > 650) { doc.addPage(); y = margin; }
                 doc.setFontSize(14);
@@ -11000,7 +11571,10 @@
                 showToast('You must be signed in to clean duplicates.', 'info');
                 return;
             }
-            document.getElementById('cleanupModal').classList.add('show');
+            const modal = document.getElementById('cleanupModal');
+            modal.classList.add('show');
+            const handleOutside = (e) => { if (e.target === modal) { closeCleanupModal(); } };
+            modal.addEventListener('click', handleOutside, { once: true });
         }
 
         function closeCleanupModal() {
@@ -11156,6 +11730,7 @@
 
         function render() {
             const app = document.getElementById('app');
+            try { processPlannedPurchases(); } catch { }
             switch (state.activeTab) {
                 case 'dashboard': app.innerHTML = renderDashboard(); break;
                 case 'account': app.innerHTML = renderAccount(); break;
@@ -11590,16 +12165,25 @@
                     <label>Product</label>
                     <select id="saleProduct" onchange="handleProductSelection()" required>
                         <option value="">-- Select Product --</option>
-                        ${state.products
-                    .map((p, i) => ({ p, i }))
-                    .sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)))
-                    .map(({ p, i }) => {
+                        ${(() => {
+                    const recentNames = [];
+                    const seen = new Set();
+                    (state.sales || []).slice().sort((a, b) => b.timestamp - a.timestamp).forEach(s => {
+                        if (!seen.has(s.productName)) { recentNames.push(s.productName); seen.add(s.productName); }
+                    });
+                    const prioritized = recentNames.slice(0, 3);
+                    const entries = state.products.map((p, i) => ({ p, i }));
+                    const prioritizedEntries = entries.filter(e => prioritized.includes(e.p.name));
+                    const restEntries = entries.filter(e => !prioritized.includes(e.p.name)).sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)));
+                    const merged = [...prioritizedEntries, ...restEntries];
+                    return merged.map(({ p, i }) => {
                         const stockVal = (state.inventory[p.name] || { stock: 0 }).stock;
                         const label = (p.hasStock === false)
                             ? `${p.name} - ${p.category}`
                             : `${p.name} - ${p.category} (Stock: ${stockVal})`;
                         return `<option value="${i}">${label}</option>`;
-                    }).join('')}
+                    }).join('');
+                })()}
                         <option value="new" style="background: #e3f2fd; font-weight: 600;">+ Add New Product</option>
                     </select>
                 </div>
@@ -11708,8 +12292,8 @@
                     <select onchange="updateFilterCustomer(this.value)">
                         <option value="">All Customers</option>
                         ${[...new Set(state.sales.map(s => s.customer))].map(c =>
-                        `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
-                    ).join('')}
+                    `<option value="${c}" ${state.filterCustomer === c ? 'selected' : ''}>${c}</option>`
+                ).join('')}
                     </select>
                 </div>
                 <button class="btn-small btn-secondary" onclick="clearFilters()">Clear</button>
