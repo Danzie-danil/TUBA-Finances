@@ -1142,7 +1142,7 @@
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 200;
+            z-index: 10001;
             padding: 16px;
             overflow-x: hidden;
         }
@@ -4060,6 +4060,7 @@
                 dateTo: ''
             },
             searchPeriod: '',
+            stockSearch: '',
             filterDateFrom: '',
             filterDateTo: '',
             filterCategory: '',
@@ -4572,6 +4573,8 @@
             if (tabId !== 'dashboard') {
                 state.dashboardPrivacyBlurred = true;
             }
+            state.listExpanded = {};
+            state.listShowCount = {};
             render();
         }
 
@@ -7461,6 +7464,9 @@
                 const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
                 return inv.stock <= inv.minAlert;
             });
+            const q = state.stockSearch || '';
+            const totalUnits = trackedProducts.reduce((sum, p) => sum + ((state.inventory[p.name] || { stock: 0 }).stock || 0), 0);
+            const totalValue = trackedProducts.reduce((sum, p) => sum + (((state.inventory[p.name] || { stock: 0 }).stock || 0) * (p.cost || 0)), 0);
 
             return `
                 ${lowStock.length > 0 ? `
@@ -7474,10 +7480,20 @@
                 <div class="flex-between">
                     <h2>Stock Levels</h2>
                     <div class="search-box" style="max-width:260px;">
-                        <input type="text" id="stockSearch" placeholder="🔍 Search stock..." oninput="searchStock(this.value)" />
+                        <input type="text" id="stockSearch" placeholder="🔍 Search stock..." oninput="searchStock(this.value)" value="${q}" />
                     </div>
                 </div>
-                <div id="stockList">${renderStockList('')}</div>
+                <div class="flex-gap" style="margin-top:8px;">
+                    <span class="badge">Items: ${trackedProducts.length}</span>
+                    <span class="badge ${lowStock.length > 0 ? 'badge-danger' : 'badge-success'}">Low Stock: ${lowStock.length}</span>
+                    <span class="badge">Units: ${formatNumber(totalUnits)}</span>
+                    <span class="badge">Value: ${formatNumber(totalValue)} Tsh</span>
+                </div>
+                <div id="stockList">${(state.listExpanded.inventory || q) ? renderStockList(q) : ''}</div>
+                <button class="collapse-btn" onclick="toggleListExpanded('inventory')">
+                    <span class="collapse-icon ${state.listExpanded.inventory ? 'expanded' : ''}">▼</span>
+                    <span>${state.listExpanded.inventory ? 'Hide' : 'Show'} All Stock</span>
+                </button>
             </div>
             `;
         }
@@ -7515,6 +7531,7 @@
         }
 
         function searchStock(q) {
+            state.stockSearch = q;
             const el = document.getElementById('stockList');
             if (el) el.innerHTML = renderStockList(q);
         }
