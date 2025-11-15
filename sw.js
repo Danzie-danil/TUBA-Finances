@@ -46,21 +46,30 @@ self.addEventListener('install', event => {
 // Activate event - clean old caches and claim clients
 self.addEventListener('activate', event => {
   console.log('[SW] Activating service worker...');
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
+  event.waitUntil((async () => {
+    try {
+      const staticCache = await caches.open(STATIC_CACHE);
+      const hasShell = (await staticCache.match(BASE_PATH + 'index.html'))
+        || (await staticCache.match('index.html'))
+        || (await staticCache.match(BASE_PATH));
+
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames.map(async (cacheName) => {
+          // Only delete old caches if essential shell is present in the new static cache
+          if (hasShell && cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
             console.log('[SW] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
+            await caches.delete(cacheName);
           }
         })
       );
-    }).then(() => {
       console.log('[SW] Service worker activated');
-      return self.clients.claim();
-    })
-  );
+      await self.clients.claim();
+    } catch (e) {
+      console.error('[SW] Activate error:', e);
+      await self.clients.claim();
+    }
+  })());
 });
 
 // Fetch event - implement cache-first strategy with network fallback

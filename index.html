@@ -5548,6 +5548,7 @@
             if (state.autoAuthDisabled) return false;
             if (!window.isSecureContext) return false;
             if (!navigator.credentials) return false;
+            if (!window.supabase || !supabase || !supabase.auth) return false;
             try {
                 const cred = await navigator.credentials.get({ password: true, mediation: 'silent' });
                 if (cred && cred.type === 'password' && cred.id && cred.password) {
@@ -12334,7 +12335,22 @@
         }
 
         // Initialize
-        initSupabase();
+        (function () {
+            function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+            async function ensureSupabaseThenInit() {
+                try {
+                    if (window.supabase && window.supabase.createClient) { initSupabase(); return; }
+                    let tries = 0;
+                    while (tries < 60) {
+                        await wait(50);
+                        if (window.supabase && window.supabase.createClient) { initSupabase(); return; }
+                        tries++;
+                    }
+                } catch { }
+            }
+            ensureSupabaseThenInit();
+            window.addEventListener('online', () => { try { if (!supabase && window.supabase && window.supabase.createClient) initSupabase(); } catch { } });
+        })();
 
         // ============================================
         // TUBA SWIPE NAVIGATION v2.0
