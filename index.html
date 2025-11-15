@@ -2131,13 +2131,13 @@
         }
     </style>
     <!-- Add this line -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 
     <!-- Your existing scripts -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 </head>
 
 <body>
@@ -3186,6 +3186,7 @@
                 currentUser = null;
                 syncEnabled = false;
                 updateSyncIndicator('offline');
+                try { state.autoAuthDisabled = true; saveData(); } catch { }
 
                 const { error } = await supabase.auth.signOut();
                 if (error) {
@@ -3792,9 +3793,7 @@
 
                 calculateFloatBalances();
                 saveData();
-                setTimeout(() => {
-                    render();
-                }, 100);
+                render();
             } catch (error) {
                 console.error('Pull error:', error);
             }
@@ -4091,6 +4090,7 @@
             backupReminder: { date: '', count: 0 }
             , soundEnabled: true
             , theme: 'light'
+            , autoAuthDisabled: false
         };
 
         let chartInstance = null;
@@ -5483,6 +5483,7 @@
 
         // Detect autofill and auto submit sign in
         function autoSubmitLoginIfAutofilled() {
+            if (state.autoAuthDisabled) return;
             const emailEl = document.getElementById('loginEmail');
             const passEl = document.getElementById('loginPassword');
             const btn = document.querySelector('#loginForm button[onclick="handleSignIn()"]');
@@ -5543,6 +5544,8 @@
             }
         });
         async function attemptSilentCredentialSignIn() {
+            if (!navigator.onLine) return false;
+            if (state.autoAuthDisabled) return false;
             if (!window.isSecureContext) return false;
             if (!navigator.credentials) return false;
             try {
@@ -5623,6 +5626,7 @@
         async function handleSignIn() {
             playTapSound();
             hapticShort();
+            try { state.autoAuthDisabled = false; saveData(); } catch { }
             const email = document.getElementById('loginEmail')?.value;
             const password = document.getElementById('loginPassword')?.value;
 
@@ -12514,6 +12518,7 @@
         console.log('📱 Loading local data...');
         loadData();
         try { applyTheme(); } catch (e) { }
+        try { render(); } catch (e) { }
         // Delay initial render until after session restore attempt
         (function setupBottomNavFastClick() {
             const nav = document.getElementById('bottomNav');
@@ -13930,6 +13935,7 @@
             // Enhanced handleSignIn with better error handling
             const originalHandleSignIn = window.handleSignIn;
             window.handleSignIn = async function () {
+                try { state.autoAuthDisabled = false; saveData(); } catch { }
                 const email = document.getElementById('loginEmail')?.value;
                 const password = document.getElementById('loginPassword')?.value;
 
