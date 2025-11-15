@@ -2457,6 +2457,7 @@
         let autoCloudPullDone = false;
         let autoLoginLocked = localStorage.getItem('tuba-auto-login-locked') === '1';
         let autoLoginDetectTimer = null;
+        let cloudPushBusy = false;
 
         // Your existing code continues below...
         const SHOP_NAME = "";
@@ -4451,6 +4452,16 @@
                 console.error('Error saving data:', e);
                 showToast('Error saving data!', 'error');
             }
+            try {
+                if (syncEnabled && currentUser && navigator.onLine) {
+                    if (!cloudPushBusy) {
+                        cloudPushBusy = true;
+                        try { clearAndPushAllData().finally(() => { cloudPushBusy = false; }); } catch (e) { cloudPushBusy = false; }
+                    }
+                    try { upsertQueue && upsertQueue.process && upsertQueue.process(); } catch (e) { }
+                    try { deleteQueue && deleteQueue.process && deleteQueue.process(); } catch (e) { }
+                }
+            } catch (e) { }
         }
 
         function calculateFloatBalances() {
