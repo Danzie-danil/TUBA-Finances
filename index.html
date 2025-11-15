@@ -2535,12 +2535,13 @@
                     // Load user profile
                     await loadUserProfile();
 
-                    // Always pull and merge cloud data after session restore
-                    // This is safe because pullDataFromSupabase merges and deduplicates
-                    try {
-                        await pullDataFromSupabase();
-                    } catch (e) {
-                        console.warn('Cloud pull after restore failed:', e);
+                    // Only pull cloud data when online; skip entirely offline
+                    if (navigator.onLine) {
+                        try {
+                            await pullDataFromSupabase();
+                        } catch (e) {
+                            console.warn('Cloud pull after restore failed:', e);
+                        }
                     }
 
                     console.log('✅ Session restored successfully (local data preserved)');
@@ -2579,6 +2580,7 @@
         async function maybeAutoPullCloudData() {
             if (!syncEnabled || !currentUser) return;
             if (autoCloudPullDone) return;
+            if (!navigator.onLine) return;
 
             const hasLocal = hasAnyLocalData();
             if (!hasLocal) {
@@ -4387,6 +4389,7 @@
         async function ensureLogoReady() {
             if (state.userLogoDataUrl) return true;
             if (state.userLogoPublicUrl) {
+                if (!navigator.onLine) return false;
                 try {
                     const res = await fetch(state.userLogoPublicUrl, { cache: 'no-cache' });
                     const blob = await res.blob();

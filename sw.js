@@ -85,13 +85,18 @@ self.addEventListener('fetch', event => {
         return new Response('', { status: 503, statusText: 'Offline' });
       }
     }
-    // App-shell navigation fallback
+    // App-shell navigation: offline-first
     if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
+      if (!self.navigator.onLine) {
+        const shellOffline = await caches.match(BASE_PATH + 'index.html')
+          || await caches.match(BASE_PATH)
+          || await caches.match('index.html');
+        if (shellOffline) return shellOffline;
+      }
       try {
         const fresh = await fetch(request);
         return fresh;
       } catch {
-        // Try multiple fallbacks for iOS A2HS launch paths
         const shell1 = await caches.match(BASE_PATH + 'index.html');
         if (shell1) return shell1;
         const shell2 = await caches.match(BASE_PATH);
