@@ -85,18 +85,13 @@ self.addEventListener('fetch', event => {
         return new Response('', { status: 503, statusText: 'Offline' });
       }
     }
-    // App-shell navigation: offline-first
+    // App-shell navigation fallback
     if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
-      if (!self.navigator.onLine) {
-        const shellOffline = await caches.match(BASE_PATH + 'index.html')
-          || await caches.match(BASE_PATH)
-          || await caches.match('index.html');
-        if (shellOffline) return shellOffline;
-      }
       try {
         const fresh = await fetch(request);
         return fresh;
       } catch {
+        // Try multiple fallbacks for iOS A2HS launch paths
         const shell1 = await caches.match(BASE_PATH + 'index.html');
         if (shell1) return shell1;
         const shell2 = await caches.match(BASE_PATH);
@@ -183,19 +178,6 @@ self.addEventListener('push', event => {
   event.waitUntil(
     self.registration.showNotification('TUBA', options)
   );
-});
-
-self.addEventListener('sync', event => {
-  const tag = event.tag || '';
-  if (tag === 'sync-queues' || tag === 'background-sync') {
-    event.waitUntil(
-      self.clients.matchAll().then(clients => {
-        clients.forEach(client => {
-          try { client.postMessage({ type: 'sync-queues' }); } catch (e) { /* no-op */ }
-        });
-      })
-    );
-  }
 });
 
 // Notification click handling
