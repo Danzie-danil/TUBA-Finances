@@ -2150,7 +2150,7 @@
         async function initPWA() {
             try {
                 if ('serviceWorker' in navigator) {
-                    const reg = await navigator.serviceWorker.register('service-worker.js');
+                    await navigator.serviceWorker.ready;
                     navigator.serviceWorker.addEventListener('message', function (event) {
                         if (event.data && event.data.type === 'sync-queues') {
                             try { upsertQueue.process(); } catch { }
@@ -2620,7 +2620,9 @@
                         businessName: data.business_name || "",
                         email: data.email || currentUser.email || "",
                         phone: data.phone || "",
-                        address: data.address || ""
+                        address: data.address || "",
+                        country: data.country || "",
+                        city: data.city || ""
                     };
                     if (data.logo_url) {
                         state.userLogoPublicUrl = data.logo_url;
@@ -2667,6 +2669,8 @@
                         email: state.userProfile.email || currentUser.email,
                         phone: state.userProfile.phone,
                         address: state.userProfile.address,
+                        country: state.userProfile.country || null,
+                        city: state.userProfile.city || null,
                         logo_url: state.userLogoPublicUrl || null
                     });
 
@@ -2696,7 +2700,9 @@
                         business_name: state.userProfile.businessName,
                         email: currentUser.email,
                         phone: state.userProfile.phone,
-                        address: state.userProfile.address
+                        address: state.userProfile.address,
+                        country: state.userProfile.country || null,
+                        city: state.userProfile.city || null
                     });
 
                 if (error) {

@@ -180,6 +180,19 @@ self.addEventListener('push', event => {
   );
 });
 
+self.addEventListener('sync', event => {
+  const tag = event.tag || '';
+  if (tag === 'sync-queues' || tag === 'background-sync') {
+    event.waitUntil(
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          try { client.postMessage({ type: 'sync-queues' }); } catch (e) { /* no-op */ }
+        });
+      })
+    );
+  }
+});
+
 // Notification click handling
 self.addEventListener('notificationclick', event => {
   console.log('[SW] Notification clicked:', event.action);
