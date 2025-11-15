@@ -1821,7 +1821,7 @@
 
         .app-container {
             opacity: 0;
-            animation: fadeIn 0.3s ease-in-out 0.8s forwards;
+            animation: fadeIn 0.3s ease-in-out 0.5s forwards;
         }
 
         @keyframes fadeIn {
@@ -12569,18 +12569,26 @@
         try { setupKeyboardDismiss(); } catch (e) { }
 
         // Restore session BEFORE showing UI to avoid sign-out flash on refresh
-        (async function () {
+        (function () {
+            try { window.setAuthRestoring(true); } catch { }
+            try { render(); } catch { }
             try {
-                try { window.setAuthRestoring(true); } catch { }
-                const sessionRestored = await restoreSession();
-                if (sessionRestored) {
-                    console.log('☁️ Session restored - syncing...');
-                }
-            } catch (error) {
-                console.error('Session restore failed:', error);
-            } finally {
+                restoreSession()
+                    .then((sessionRestored) => {
+                        if (sessionRestored) {
+                            console.log('☁️ Session restored - syncing...');
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('Session restore failed:', error);
+                    })
+                    .finally(() => {
+                        try { window.setAuthRestoring(false); } catch { }
+                        try { render(); } catch { }
+                    });
+            } catch (e) {
                 try { window.setAuthRestoring(false); } catch { }
-                render(); // SHOW UI NOW
+                try { render(); } catch { }
             }
         })();
 
