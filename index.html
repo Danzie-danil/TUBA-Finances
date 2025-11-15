@@ -5100,7 +5100,7 @@
                             <option value="__manual__">Manual entry…</option>
                             ${getCountryOptionsSelectHTML()}
                         </select>
-                        <input type="text" id="profileCountry" value="${profile.country}" placeholder="Type country" ${state.profileEditMode ? '' : 'readonly'} style="margin-top:6px; display:none;">
+                        <input type="text" id="profileCountry" value="${profile.country}" placeholder="Type country" ${state.profileEditMode ? '' : 'disabled readonly'} style="margin-top:6px; display:none;">
                     </div>
                     <div class="form-group">
                         <label>City</label>
@@ -5109,7 +5109,7 @@
                             <option value="__manual__">Manual entry…</option>
                             ${getCityOptionsSelectHTML(profile.country)}
                         </select>
-                        <input type="text" id="profileCity" value="${profile.city}" placeholder="Type city" ${state.profileEditMode ? '' : 'readonly'} style="margin-top:6px; display:none;">
+                        <input type="text" id="profileCity" value="${profile.city}" placeholder="Type city" ${state.profileEditMode ? '' : 'disabled readonly'} style="margin-top:6px; display:none;">
                     </div>
                     <div class="form-group">
                         <label>Address</label>
@@ -5323,7 +5323,7 @@
                         <option value="__manual__">Manual entry…</option>
                         ${getCountryOptionsSelectHTML()}
                     </select>
-                    <input type="text" id="profileCountry" value="${profile.country}" placeholder="Type country" ${state.profileEditMode ? '' : 'readonly'} style="margin-top:6px; display:none;">
+                    <input type="text" id="profileCountry" value="${profile.country}" placeholder="Type country" ${state.profileEditMode ? '' : 'disabled readonly'} style="margin-top:6px; display:none;">
                 </div>
                 <div class="form-group">
                     <label>City</label>
@@ -5332,7 +5332,7 @@
                         <option value="__manual__">Manual entry…</option>
                         ${getCityOptionsSelectHTML(profile.country)}
                     </select>
-                    <input type="text" id="profileCity" value="${profile.city}" placeholder="Type city" ${state.profileEditMode ? '' : 'readonly'} style="margin-top:6px; display:none;">
+                    <input type="text" id="profileCity" value="${profile.city}" placeholder="Type city" ${state.profileEditMode ? '' : 'disabled readonly'} style="margin-top:6px; display:none;">
                 </div>
                 <div class="form-group">
                     <label>Address</label>
