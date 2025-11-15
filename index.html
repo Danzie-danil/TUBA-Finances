@@ -2281,7 +2281,7 @@
                         Tap the top-right save button (💾) or click the “Consider Local Backup” toast to export a JSON
                         file.</p>
                     <p><strong>When back online:</strong><br>
-                        Click the sync indicator (“☁️ Synced → Click to 🔄”) to push data silently, or use Account →
+                        Click the sync indicator (“Synced ☁️ → Click to 🔄”) to push data silently, or use Account →
                         Push to Cloud.</p>
                     <p><strong>Tip:</strong> You can continue recording sales, products, expenses, etc., while offline —
                         they’ll sync later.</p>
@@ -2327,7 +2327,7 @@
     <div class="app-container">
         <div class="header">
             <button class="header-btn-left" onclick="toggleSideNav()">☰</button>
-            <div class="sync-indicator" id="syncIndicator">☁️ Synced</div>
+            <div class="sync-indicator" id="syncIndicator">Synced ☁️</div>
             <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
                 <h1 style="margin: 0;">💼 TUBA</h1>
                 <div id="headerDate" style="font-size: 9px; opacity: 0.8; font-weight: 400;"></div>
@@ -2887,7 +2887,7 @@
             if (status === 'synced' && syncEnabled) {
                 const upCount = (upsertQueue?.items || []).length;
                 const delCount = (deleteQueue?.items || []).length;
-                indicator.innerHTML = `☁️ Synced<br><span style="font-size:9px;opacity:0.9;">Click to 🔄</span><br><span style="font-size:9px;opacity:0.8;">Queued: ${upCount} ⬆︎ / ${delCount} ⬇︎</span>`;
+                indicator.innerHTML = `Synced ☁️<br><span style="font-size:9px;opacity:0.9;">Click to 🔄</span><br><span style="font-size:9px;opacity:0.8;">Queued: ${upCount} ⬆︎ / ${delCount} ⬇︎</span>`;
                 indicator.className = 'sync-indicator show clickable';
                 indicator.setAttribute('title', 'Push all data to cloud');
                 indicator.onclick = function () {
@@ -4061,6 +4061,9 @@
             },
             searchPeriod: '',
             stockSearch: '',
+            productSearch: '',
+            categorySearch: '',
+            customerSearch: '',
             filterDateFrom: '',
             filterDateTo: '',
             filterCategory: '',
@@ -6726,6 +6729,7 @@
         }
 
         function renderProducts() {
+            const q = state.productSearch || '';
             return `
                 <div class="card">
                     <h2>Add Product/Service</h2>
@@ -6775,7 +6779,7 @@
                 <div class="card">
                     <h2>All Items (${state.products.length})</h2>
     <div class="search-box">
-        <input type="text" placeholder="🔍 Search items..." oninput="searchProducts(this.value)" id="productSearch">
+        <input type="text" placeholder="🔍 Search items..." oninput="searchProducts(this.value)" id="productSearch" value="${q}">
     </div>
     
     ${state.products.length > 0 ? `
@@ -6792,9 +6796,9 @@
     ` : ''}
     
     <div id="productsList">
-        ${renderProductsList()}
+        ${(state.listExpanded.products || q) ? renderProductsList(q) : ''}
     </div>
-    ${(() => { const total = state.products.length; const count = (state.listShowCount && state.listShowCount.products) ? state.listShowCount.products : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('products')` : `collapseList('products')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
+    <button class="collapse-btn" onclick="toggleListExpanded('products')"><span class="collapse-icon ${state.listExpanded.products ? 'expanded' : ''}">▼</span><span>${state.listExpanded.products ? 'Hide' : 'Show'} All Products</span></button>
 </div>
             `;
         }
@@ -6824,8 +6828,6 @@
             if (products.length === 0) {
                 return '<p style="text-align: center; color: #666;">No items found</p>';
             }
-            const count = (state.listShowCount && state.listShowCount.products) ? state.listShowCount.products : 3;
-            products = products.slice(0, count);
             return products.map((p, i) => {
                 const actualIndex = state.products.indexOf(p);
                 const inv = state.inventory[p.name] || { stock: 0 };
@@ -6866,6 +6868,7 @@
         }
 
         function searchProducts(Period) {
+            state.productSearch = Period;
             document.getElementById('productsList').innerHTML = renderProductsList(Period);
         }
 
@@ -7008,6 +7011,7 @@
             });
         }
         function renderCategories() {
+            const q = state.categorySearch || '';
             return `
                 <div class="card">
                     <h2>Add Category</h2>
@@ -7025,7 +7029,7 @@
                <div class="card">
     <h2>All Categories (${state.categories.length})</h2>
     <div class="search-box" style="margin:8px 0;">
-        <input type="text" placeholder="🔍 Search categories..." oninput="searchCategories(this.value)" id="categorySearch">
+        <input type="text" placeholder="🔍 Search categories..." oninput="searchCategories(this.value)" id="categorySearch" value="${q}">
     </div>
     
     ${state.categories.length > 0 ? `
@@ -7040,8 +7044,8 @@
             </button>
         </div>
     ` : ''}
-    <div id="categoriesList">${renderCategoriesList('')}</div>
-    ${(() => { const total = state.categories.length; const count = (state.listShowCount && state.listShowCount.categories) ? state.listShowCount.categories : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('categories')` : `collapseList('categories')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
+    <div id="categoriesList">${(state.listExpanded.categories || q) ? renderCategoriesList(q) : ''}</div>
+    <button class="collapse-btn" onclick="toggleListExpanded('categories')"><span class="collapse-icon ${state.listExpanded.categories ? 'expanded' : ''}">▼</span><span>${state.listExpanded.categories ? 'Hide' : 'Show'} All Categories</span></button>
 </div>
             `;
         }
@@ -7050,8 +7054,6 @@
             const q = String(Period || '').toLowerCase();
             let cats = state.categories.map((cat, i) => ({ cat, i }))
                 .filter(({ cat }) => !q || String(cat).toLowerCase().includes(q))
-            const count = (state.listShowCount && state.listShowCount.categories) ? state.listShowCount.categories : 3;
-            cats = cats.slice(0, count);
             return cats.map(({ cat, i }) => `
             <div class="item">
                 <div style="display: flex; gap: 12px; align-items: center;">
@@ -7074,6 +7076,7 @@
         }
 
         function searchCategories(Period) {
+            state.categorySearch = Period;
             const el = document.getElementById('categoriesList');
             if (el) el.innerHTML = renderCategoriesList(Period);
         }
@@ -8197,6 +8200,8 @@
         }
 
         async function addInventoryRecord() {
+            playTapSound();
+            hapticShort();
             const productName = (document.getElementById('invProductSelect')?.value || '').trim();
             const quantity = parseMoney(document.getElementById('invQuantity')?.value || '0');
             const unitCost = parseMoney(document.getElementById('invUnitCost')?.value || '0');
@@ -8930,6 +8935,7 @@
         }
 
         function renderCustomers() {
+            const q = state.customerSearch || '';
             // Sort customers by total purchases
             const sortedCustomers = [...state.customers].sort((a, b) =>
                 (b.totalPurchases || 0) - (a.totalPurchases || 0)
@@ -8962,7 +8968,7 @@
                 <div class="card">
                     <h2>All Customers (${state.customers.length})</h2>
                     <div class="search-box">
-                        <input type="text" placeholder="🔍 Search customers..." oninput="searchCustomers(this.value)" id="customerSearch">
+                        <input type="text" placeholder="🔍 Search customers..." oninput="searchCustomers(this.value)" id="customerSearch" value="${q}">
                     </div>
 
                     ${state.customers.length > 0 ? `
@@ -8979,9 +8985,9 @@
     ` : ''}
 
                     <div id="customersList">
-                        ${renderCustomersList()}
+                        ${(state.listExpanded.customers || q) ? renderCustomersList(q) : ''}
                     </div>
-                    ${(() => { const total = state.customers.length; const count = (state.listShowCount && state.listShowCount.customers) ? state.listShowCount.customers : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('customers')` : `collapseList('customers')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
+                    <button class="collapse-btn" onclick="toggleListExpanded('customers')"><span class="collapse-icon ${state.listExpanded.customers ? 'expanded' : ''}">▼</span><span>${state.listExpanded.customers ? 'Hide' : 'Show'} All Customers</span></button>
                 </div>
             `;
         }
@@ -9000,9 +9006,6 @@
             if (customers.length === 0) {
                 return '<p style="text-align: center; color: #666;">No customers found</p>';
             }
-
-            const count = (state.listShowCount && state.listShowCount.customers) ? state.listShowCount.customers : 3;
-            customers = customers.slice(0, count);
             return customers.map((c, i) => {
                 const actualIndex = state.customers.indexOf(c);
                 const purchaseCount = state.sales.filter(s => s.customer === c.name).length;
@@ -9036,6 +9039,7 @@
         }
 
         function searchCustomers(Period) {
+            state.customerSearch = Period;
             document.getElementById('customersList').innerHTML = renderCustomersList(Period);
         }
 
