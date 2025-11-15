@@ -2455,6 +2455,8 @@
         let currentUser = null;
         let syncEnabled = false;
         let autoCloudPullDone = false;
+        let autoLoginLocked = localStorage.getItem('tuba-auto-login-locked') === '1';
+        let autoLoginDetectTimer = null;
 
         // Your existing code continues below...
         const SHOP_NAME = "";
@@ -3186,6 +3188,9 @@
                 currentUser = null;
                 syncEnabled = false;
                 updateSyncIndicator('offline');
+                autoLoginLocked = true;
+                try { localStorage.setItem('tuba-auto-login-locked', '1'); } catch (e) { }
+                if (autoLoginDetectTimer) { try { clearInterval(autoLoginDetectTimer); } catch (e) { } autoLoginDetectTimer = null; }
 
                 const { error } = await supabase.auth.signOut();
                 if (error) {
@@ -4584,6 +4589,13 @@
             state.listExpanded = {};
             state.listShowCount = {};
             render();
+            try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { try { window.scrollTo(0, 0); } catch (e2) { } }
+            try {
+                const app = document.getElementById('app');
+                if (app && typeof app.scrollTo === 'function') {
+                    app.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            } catch (e) { }
             setTimeout(() => { state.navBusy = false; }, 250);
         }
 
@@ -5182,7 +5194,7 @@
                         <label>Password</label>
                         <input type="password" id="loginPassword" placeholder="••••••••" name="current-password" autocomplete="current-password">
                     </div>
-                    <button onclick="handleSignIn()">Sign In</button>
+                    <button onclick="handleManualSignIn()">Sign In</button>
                 </div>
 
                 <div id="signupForm" style="display: none;">
@@ -5483,34 +5495,37 @@
 
         // Detect autofill and auto submit sign in
         function autoSubmitLoginIfAutofilled() {
+            if (autoLoginLocked) return;
             const emailEl = document.getElementById('loginEmail');
             const passEl = document.getElementById('loginPassword');
-            const btn = document.querySelector('#loginForm button[onclick="handleSignIn()"]');
+            const btn = document.querySelector('#loginForm button');
             if (!emailEl || !passEl || !btn) return;
 
-            // On iOS Safari, rely on autofill animation/visibility triggers and avoid polling
             try {
                 if (typeof isIOSSafari === 'function' && isIOSSafari()) {
                     const email = (emailEl.value || '').trim();
                     const pwd = (passEl.value || '').trim();
                     if (email && pwd) {
-                        try { handleSignIn(); } catch (e) { /* no-op */ }
+                        try { handleSignIn(); } catch (e) { }
                     }
-                    return; // Skip polling on iOS Safari
+                    return;
                 }
-            } catch (e) { /* no-op */ }
+            } catch (e) { }
 
+            if (autoLoginDetectTimer) { try { clearInterval(autoLoginDetectTimer); } catch (e) { } autoLoginDetectTimer = null; }
             let attempts = 0;
-            const maxAttempts = 10; // ~1 second
-            const timer = setInterval(() => {
+            const maxAttempts = 10;
+            autoLoginDetectTimer = setInterval(() => {
                 attempts++;
                 const email = (emailEl.value || '').trim();
                 const pwd = (passEl.value || '').trim();
                 if (email && pwd) {
-                    clearInterval(timer);
-                    try { handleSignIn(); } catch (e) { /* no-op */ }
+                    try { clearInterval(autoLoginDetectTimer); } catch (e) { }
+                    autoLoginDetectTimer = null;
+                    try { handleSignIn(); } catch (e) { }
                 } else if (attempts >= maxAttempts) {
-                    clearInterval(timer);
+                    try { clearInterval(autoLoginDetectTimer); } catch (e) { }
+                    autoLoginDetectTimer = null;
                 }
             }, 200);
         }
@@ -5525,6 +5540,7 @@
         if (isIOSSafari()) {
             document.addEventListener('animationstart', function (e) {
                 if (e.animationName === 'autofillDetection') {
+                    if (autoLoginLocked) return;
                     try { autoSubmitLoginIfAutofilled(); } catch (err) { }
                 }
             }, true);
@@ -5543,6 +5559,7 @@
             }
         });
         async function attemptSilentCredentialSignIn() {
+            if (autoLoginLocked) return false;
             if (!window.isSecureContext) return false;
             if (!navigator.credentials) return false;
             try {
@@ -5619,6 +5636,12 @@
         }
         // Removed in-app forceRefresh function
 
+
+        function handleManualSignIn() {
+            autoLoginLocked = false;
+            try { localStorage.removeItem('tuba-auto-login-locked'); } catch (e) { }
+            try { handleSignIn(); } catch (e) { }
+        }
 
         async function handleSignIn() {
             playTapSound();
@@ -12514,7 +12537,7 @@
         console.log('📱 Loading local data...');
         loadData();
         try { applyTheme(); } catch (e) { }
-        render(); // SHOW UI NOW
+        // Delay initial render until after session restore attempt
         (function setupBottomNavFastClick() {
             const nav = document.getElementById('bottomNav');
             if (!nav || nav.__fastSetup) return;
@@ -12532,16 +12555,19 @@
         })();
         try { setupKeyboardDismiss(); } catch (e) { }
 
-        // Restore session in BACKGROUND
+        // Restore session BEFORE showing UI to avoid sign-out flash on refresh
         (async function () {
             try {
+                try { window.setAuthRestoring(true); } catch { }
                 const sessionRestored = await restoreSession();
                 if (sessionRestored) {
                     console.log('☁️ Session restored - syncing...');
-                    render(); // Update UI with cloud data
                 }
             } catch (error) {
                 console.error('Session restore failed:', error);
+            } finally {
+                try { window.setAuthRestoring(false); } catch { }
+                render(); // SHOW UI NOW
             }
         })();
 
