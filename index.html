@@ -4279,18 +4279,10 @@
 
                     // Calculate current float balances
                     calculateFloatBalances();
-
-                    // Ensure all items have IDs
-                    ensureIDs();
-                    // Normalize any legacy bulk purchase timestamps to ensure uniqueness
-                    normalizeLegacyBulkTimestamps();
                 } catch (e) {
                     console.error('Error loading data:', e);
                 }
             }
-
-            // Always ensure IDs exist
-            if (state.sales) ensureIDs();
         }
 
         // Logo helpers
@@ -12538,6 +12530,7 @@
         loadData();
         try { applyTheme(); } catch (e) { }
         try { render(); } catch (e) { }
+        setTimeout(() => { try { ensureIDs(); normalizeLegacyBulkTimestamps(); saveData(); } catch { } }, 0);
         // Delay initial render until after session restore attempt
         (function setupBottomNavFastClick() {
             const nav = document.getElementById('bottomNav');
