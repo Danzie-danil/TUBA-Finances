@@ -5485,6 +5485,7 @@
 
         // Detect autofill and auto submit sign in
         function autoSubmitLoginIfAutofilled() {
+            if (!navigator.onLine) return;
             if (state.autoAuthDisabled) return;
             const emailEl = document.getElementById('loginEmail');
             const passEl = document.getElementById('loginPassword');
