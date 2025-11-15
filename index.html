@@ -12268,6 +12268,8 @@
                 if (state.activeTab === 'notes') { setupWindowVirtualList('notes'); }
             } catch { }
             try { adjustContentPadding(); } catch { }
+            try { window.updateOfflineBanner && window.updateOfflineBanner(); } catch { }
+            try { window.updateAuthBanner && window.updateAuthBanner(); } catch { }
         }
 
         function adjustContentPadding() {
