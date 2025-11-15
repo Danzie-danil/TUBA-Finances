@@ -598,6 +598,9 @@
         .content {
             padding: 16px;
             padding-top: calc(70px + env(safe-area-inset-top));
+            padding-bottom: calc(90px + env(safe-area-inset-bottom));
+            scroll-padding-top: calc(70px + env(safe-area-inset-top));
+            scroll-padding-bottom: calc(90px + env(safe-area-inset-bottom));
         }
 
         .stat-grid {
@@ -1028,6 +1031,7 @@
             border-radius: 12px;
             transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
             border: 2px solid rgba(102, 126, 234, 0.25);
+            touch-action: manipulation;
         }
 
         .nav-item span:last-child {
@@ -1139,7 +1143,7 @@
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 200;
+            z-index: 10001;
             padding: 16px;
             overflow-x: hidden;
         }
@@ -2147,6 +2151,30 @@
                 }
             }
         } catch (e) { }
+        async function initPWA() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    await navigator.serviceWorker.ready;
+                    navigator.serviceWorker.addEventListener('message', function (event) {
+                        if (event.data && event.data.type === 'sync-queues') {
+                            try { upsertQueue.process(); } catch { }
+                            try { deleteQueue.process(); } catch { }
+                        }
+                    });
+                }
+            } catch { }
+        }
+
+        function requestBackgroundSync() {
+            try {
+                navigator.serviceWorker.ready.then(function (reg) {
+                    reg.sync.register('sync-queues');
+                });
+            } catch { }
+        }
+
+        window.addEventListener('load', function () { try { initPWA(); } catch { } });
+
     </script>
     <div id="hiddenFocusTarget" tabindex="-1"
         style="position:fixed;top:-10000px;left:-10000px;width:1px;height:1px;opacity:0;"></div>
@@ -2254,7 +2282,7 @@
                         Tap the top-right save button (💾) or click the “Consider Local Backup” toast to export a JSON
                         file.</p>
                     <p><strong>When back online:</strong><br>
-                        Click the sync indicator (“☁️ Synced → Click to 🔄”) to push data silently, or use Account →
+                        Click the sync indicator (“Synced ☁️ → Click to 🔄”) to push data silently, or use Account →
                         Push to Cloud.</p>
                     <p><strong>Tip:</strong> You can continue recording sales, products, expenses, etc., while offline —
                         they’ll sync later.</p>
@@ -2300,7 +2328,7 @@
     <div class="app-container">
         <div class="header">
             <button class="header-btn-left" onclick="toggleSideNav()">☰</button>
-            <div class="sync-indicator" id="syncIndicator">☁️ Synced</div>
+            <div class="sync-indicator" id="syncIndicator">Synced ☁️</div>
             <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
                 <h1 style="margin: 0;">💼 TUBA</h1>
                 <div id="headerDate" style="font-size: 9px; opacity: 0.8; font-weight: 400;"></div>
@@ -2596,7 +2624,9 @@
                         businessName: data.business_name || "",
                         email: data.email || currentUser.email || "",
                         phone: data.phone || "",
-                        address: data.address || ""
+                        address: data.address || "",
+                        country: data.country || "",
+                        city: data.city || ""
                     };
                     if (data.logo_url) {
                         state.userLogoPublicUrl = data.logo_url;
@@ -2643,6 +2673,8 @@
                         email: state.userProfile.email || currentUser.email,
                         phone: state.userProfile.phone,
                         address: state.userProfile.address,
+                        country: state.userProfile.country || null,
+                        city: state.userProfile.city || null,
                         logo_url: state.userLogoPublicUrl || null
                     });
 
@@ -2672,7 +2704,9 @@
                         business_name: state.userProfile.businessName,
                         email: currentUser.email,
                         phone: state.userProfile.phone,
-                        address: state.userProfile.address
+                        address: state.userProfile.address,
+                        country: state.userProfile.country || null,
+                        city: state.userProfile.city || null
                     });
 
                 if (error) {
@@ -2702,6 +2736,8 @@
                             email: profileData.email,
                             phone: profileData.phone,
                             address: profileData.address,
+                            country: profileData.country || null,
+                            city: profileData.city || null,
                             logo_url: state.userLogoPublicUrl || null,
                             updated_at: new Date().toISOString()
                         }, {
@@ -2715,7 +2751,7 @@
                     try {
                         const { data: verifyData, error: verifyErr } = await supabase
                             .from('user_profiles')
-                            .select('business_name,email,phone,address,logo_url')
+                            .select('business_name,email,phone,address,country,city,logo_url')
                             .eq('user_id', currentUser.id)
                             .single();
                         if (!verifyErr && verifyData) {
@@ -2724,7 +2760,9 @@
                                 String(v.business_name || '') === profileData.businessName &&
                                 String(v.email || '') === profileData.email &&
                                 String(v.phone || '') === profileData.phone &&
-                                String(v.address || '') === profileData.address
+                                String(v.address || '') === profileData.address &&
+                                String(v.country || '') === (profileData.country || '') &&
+                                String(v.city || '') === (profileData.city || '')
                             );
                         }
                     } catch { }
@@ -2777,6 +2815,49 @@
             return cities.sort((a, b) => String(a).localeCompare(String(b))).map(city => `<option value="${city}"></option>`).join("");
         }
 
+        function getCountryOptionsSelectHTML() {
+            const source = state.countriesCities ? Object.keys(state.countriesCities) : Object.keys(COUNTRY_CITY_DATA);
+            return source.sort((a, b) => String(a).localeCompare(String(b))).map(c => `<option value="${c}">${c}</option>`).join("");
+        }
+
+        function getCityOptionsSelectHTML(country) {
+            const map = state.countriesCities || COUNTRY_CITY_DATA;
+            const cities = map[country] || [];
+            return cities.sort((a, b) => String(a).localeCompare(String(b))).map(city => `<option value="${city}">${city}</option>`).join("");
+        }
+
+        function onProfileCountrySelect(val) {
+            const input = document.getElementById('profileCountry');
+            const sel = document.getElementById('profileCountrySelect');
+            const citySel = document.getElementById('profileCitySelect');
+            const cityInput = document.getElementById('profileCity');
+            if (!input || !sel) return;
+            if (val === '__manual__') {
+                input.style.display = 'block';
+                input.value = '';
+            } else {
+                input.style.display = 'none';
+                input.value = val;
+            }
+            if (citySel) {
+                citySel.innerHTML = `<option value="">-- Select City --</option><option value="__manual__">Manual entry…</option>` + getCityOptionsSelectHTML(val);
+                citySel.disabled = !state.profileEditMode;
+                if (cityInput) { cityInput.style.display = 'none'; }
+            }
+        }
+
+        function onProfileCitySelect(val) {
+            const input = document.getElementById('profileCity');
+            const sel = document.getElementById('profileCitySelect');
+            if (!input || !sel) return;
+            if (val === '__manual__' && state.profileEditMode) {
+                input.style.display = 'block';
+            } else {
+                input.style.display = 'none';
+                if (val !== '__manual__') input.value = val;
+            }
+        }
+
         async function initCountryCityData() {
             if (state.countriesCities) return;
             try {
@@ -2805,11 +2886,17 @@
             if (!indicator) return;
 
             if (status === 'synced' && syncEnabled) {
-                indicator.innerHTML = '☁️ Synced<br><span style="font-size:9px;opacity:0.9;">Click to 🔄</span>';
+                const upCount = (upsertQueue?.items || []).length;
+                const delCount = (deleteQueue?.items || []).length;
+                indicator.innerHTML = `Synced ☁️<br><span style="font-size:9px;opacity:0.9;">Click to 🔄</span><br><span style="font-size:9px;opacity:0.8;">Queued: ${upCount} ⬆︎ / ${delCount} ⬇︎</span>`;
                 indicator.className = 'sync-indicator show clickable';
                 indicator.setAttribute('title', 'Push all data to cloud');
                 indicator.onclick = function () {
-                    try { pushToCloudSilent(); } catch (e) { /* no-op */ }
+                    try {
+                        pushToCloudSilent();
+                        upsertQueue.process();
+                        deleteQueue.process();
+                    } catch (e) { /* no-op */ }
                 };
             } else if (status === 'syncing') {
                 indicator.textContent = '🔄 Syncing...';
@@ -2842,7 +2929,7 @@
 
         async function signUp(email, password) {
             try {
-                const { data, error } = await supabase.auth.signUp({ email, password });
+                const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: APP_BASE_URL + '#signup-confirmed' } });
                 if (error) throw error;
                 showToast('Account created! Check your email to confirm.', 'success');
                 return data;
@@ -3730,6 +3817,8 @@
             invoices: 'user_id,number',
             receipts: 'user_id,timestamp',
             inventory: 'user_id,product_name',
+            inventory_purchases: 'user_id,timestamp',
+            inventory_purchase_periods: 'user_id,period_number',
             notes: 'user_id,timestamp',
             transactions: 'user_id,timestamp',
             unpaid_entries: 'user_id,timestamp',
@@ -3789,6 +3878,12 @@
                         break;
                     case 'categories':
                         k.name = typeof src === 'string' ? src : (src.name || src);
+                        break;
+                    case 'inventory_purchases':
+                        k.timestamp = src.timestamp;
+                        break;
+                    case 'inventory_purchase_periods':
+                        k.period_number = src.period_number || src.cycleNumber || src.number;
                         break;
                     default:
                         if (src.timestamp) k.timestamp = src.timestamp;
@@ -3951,6 +4046,7 @@
             collapsedSections: {},
             listExpanded: {},
             selectedItems: {},
+            navBusy: false,
             transactionFloats: {
                 mpesa: { initial: 0, current: 0 },
                 crdb: { initial: 0, current: 0 },
@@ -3966,6 +4062,10 @@
                 dateTo: ''
             },
             searchPeriod: '',
+            stockSearch: '',
+            productSearch: '',
+            categorySearch: '',
+            customerSearch: '',
             filterDateFrom: '',
             filterDateTo: '',
             filterCategory: '',
@@ -4072,14 +4172,56 @@
             state.notes.forEach(n => { if (!n.id) n.id = generateID('notes'); });
         }
 
+        function normalizeLegacyBulkTimestamps() {
+            try {
+                const items = Array.isArray(state.inventoryPurchases) ? state.inventoryPurchases : [];
+                const tsGroups = items.reduce((acc, p) => {
+                    const key = String(p.timestamp || '');
+                    if (!acc[key]) acc[key] = [];
+                    acc[key].push(p);
+                    return acc;
+                }, {});
+                Object.keys(tsGroups).forEach(ts => {
+                    const group = tsGroups[ts];
+                    if (group.length > 1) {
+                        group.forEach((p, idx) => {
+                            const newTs = Number(ts) + idx;
+                            if (p.timestamp !== newTs) {
+                                p.timestamp = newTs;
+                                try { upsertOne('inventory_purchases', p); } catch { }
+                            }
+                        });
+                    }
+                });
+                saveData();
+            } catch { }
+        }
+
         function formatNumber(num) {
-            if (num === null || num === undefined || isNaN(num)) return '0';
-            const n = Math.round(parseFloat(num));
-            const sign = n < 0 ? '-' : '';
-            const abs = Math.abs(n);
-            return sign + String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            try {
+                if (num === null || num === undefined || isNaN(num)) return '0';
+                const n = Math.round(parseFloat(num));
+                const fmt = new Intl.NumberFormat(navigator.language || 'en-US');
+                return fmt.format(n);
+            } catch {
+                if (num === null || num === undefined || isNaN(num)) return '0';
+                const n = Math.round(parseFloat(num));
+                const sign = n < 0 ? '-' : '';
+                const abs = Math.abs(n);
+                return sign + String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
         }
         function formatMoney(num) { return formatNumber(num); }
+        function escapeHTML(str) {
+            try {
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            } catch { return String(str || ''); }
+        }
         function parseMoney(str) {
             if (typeof str === 'number') return str;
             if (!str) return 0;
@@ -4138,6 +4280,8 @@
 
                     // Ensure all items have IDs
                     ensureIDs();
+                    // Normalize any legacy bulk purchase timestamps to ensure uniqueness
+                    normalizeLegacyBulkTimestamps();
                 } catch (e) {
                     console.error('Error loading data:', e);
                 }
@@ -4403,14 +4547,32 @@
         function renderNav() {
             const nav = document.getElementById('bottomNav');
             nav.innerHTML = tabs.map(tab => `
-                <button class="nav-item ${state.activeTab === tab.id ? 'active' : ''}" onclick="switchTab('${tab.id}')">
+                <button class="nav-item ${state.activeTab === tab.id ? 'active' : ''}" data-tab="${tab.id}" onclick="switchTab('${tab.id}')">
                     <span class="nav-icon">${tab.icon}</span>
                     <span>${tab.label}</span>
                 </button>
             `).join('');
         }
 
+        (function setupGlobalModalAccessibility() {
+            try {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        try { closeNoteModal(); } catch { }
+                        try { closeInventoryModal(); } catch { }
+                        try { closeCleanupModal(); } catch { }
+                        try { closePdfViewer(); } catch { }
+                        try { closeOfflineInfoModal && closeOfflineInfoModal(); } catch { }
+                        try { closeFloatModal(); } catch { }
+                    }
+                });
+            } catch { }
+        })();
+
         function switchTab(tabId) {
+            if (state.navBusy) return;
+            state.navBusy = true;
+            try { hapticShort(); } catch { }
             state.activeTab = tabId;
             // Reset privacy blur when switching away from sales
             if (tabId !== 'sales') {
@@ -4419,7 +4581,10 @@
             if (tabId !== 'dashboard') {
                 state.dashboardPrivacyBlurred = true;
             }
+            state.listExpanded = {};
+            state.listShowCount = {};
             render();
+            setTimeout(() => { state.navBusy = false; }, 250);
         }
 
         function refreshApp() {
@@ -4630,6 +4795,7 @@
             const titleEl = document.getElementById('pdfViewerTitle');
             iframe.src = url;
             modal.classList.add('show');
+            modal.setAttribute('aria-modal', 'true');
             const handleOutside = (e) => { if (e.target === modal) { closePdfViewer(); } };
             modal.addEventListener('click', handleOutside, { once: true });
             if (titleEl) {
@@ -4943,13 +5109,21 @@
                     </div>
                     <div class="form-group">
                         <label>Country</label>
-                        <input type="text" id="profileCountry" list="profileCountryList" value="${profile.country}" placeholder="Select or type country" ${state.profileEditMode ? '' : 'readonly'} oninput="onProfileCountryChange(this.value)">
-                        <datalist id="profileCountryList">${getCountryOptionsHTML()}</datalist>
+                        <select id="profileCountrySelect" onchange="onProfileCountrySelect(this.value)" ${state.profileEditMode ? '' : 'disabled'}>
+                            <option value="">-- Select Country --</option>
+                            <option value="__manual__">Manual entry…</option>
+                            ${getCountryOptionsSelectHTML()}
+                        </select>
+                        <input type="text" id="profileCountry" value="${profile.country}" placeholder="Type country" ${state.profileEditMode ? '' : 'disabled readonly'} style="margin-top:6px; display:none;">
                     </div>
                     <div class="form-group">
                         <label>City</label>
-                        <input type="text" id="profileCity" list="profileCityList" value="${profile.city}" placeholder="Select or type city" ${state.profileEditMode ? '' : 'readonly'}>
-                        <datalist id="profileCityList">${getCityOptionsHTML(profile.country)}</datalist>
+                        <select id="profileCitySelect" onchange="onProfileCitySelect(this.value)" ${state.profileEditMode ? '' : 'disabled'}>
+                            <option value="">-- Select City --</option>
+                            <option value="__manual__">Manual entry…</option>
+                            ${getCityOptionsSelectHTML(profile.country)}
+                        </select>
+                        <input type="text" id="profileCity" value="${profile.city}" placeholder="Type city" ${state.profileEditMode ? '' : 'disabled readonly'} style="margin-top:6px; display:none;">
                     </div>
                     <div class="form-group">
                         <label>Address</label>
@@ -5158,13 +5332,21 @@
                 </div>
                 <div class="form-group">
                     <label>Country</label>
-                    <input type="text" id="profileCountry" list="profileCountryList" value="${profile.country}" placeholder="Select or type country" ${state.profileEditMode ? '' : 'readonly'} oninput="onProfileCountryChange(this.value)">
-                    <datalist id="profileCountryList">${getCountryOptionsHTML()}</datalist>
+                    <select id="profileCountrySelect" onchange="onProfileCountrySelect(this.value)" ${state.profileEditMode ? '' : 'disabled'}>
+                        <option value="">-- Select Country --</option>
+                        <option value="__manual__">Manual entry…</option>
+                        ${getCountryOptionsSelectHTML()}
+                    </select>
+                    <input type="text" id="profileCountry" value="${profile.country}" placeholder="Type country" ${state.profileEditMode ? '' : 'disabled readonly'} style="margin-top:6px; display:none;">
                 </div>
                 <div class="form-group">
                     <label>City</label>
-                    <input type="text" id="profileCity" list="profileCityList" value="${profile.city}" placeholder="Select or type city" ${state.profileEditMode ? '' : 'readonly'}>
-                    <datalist id="profileCityList">${getCityOptionsHTML(profile.country)}</datalist>
+                    <select id="profileCitySelect" onchange="onProfileCitySelect(this.value)" ${state.profileEditMode ? '' : 'disabled'}>
+                        <option value="">-- Select City --</option>
+                        <option value="__manual__">Manual entry…</option>
+                        ${getCityOptionsSelectHTML(profile.country)}
+                    </select>
+                    <input type="text" id="profileCity" value="${profile.city}" placeholder="Type city" ${state.profileEditMode ? '' : 'disabled readonly'} style="margin-top:6px; display:none;">
                 </div>
                 <div class="form-group">
                     <label>Address</label>
@@ -5277,29 +5459,6 @@
         }
         */
 
-        async function updateUserProfile(e) {
-            e.preventDefault();
-            playTapSound();
-            hapticShort();
-
-            const profileData = {
-                businessName: document.getElementById('profileBusinessName').value.trim(),
-                email: document.getElementById('profileEmail').value.trim(),
-                phone: document.getElementById('profilePhone').value.trim(),
-                address: document.getElementById('profileAddress').value.trim(),
-                country: (document.getElementById('profileCountry')?.value || '').trim(),
-                city: (document.getElementById('profileCity')?.value || '').trim()
-            };
-
-            const success = await saveUserProfile(profileData);
-
-            if (success) {
-                state.profileEditMode = false; // Disable edit mode after saving
-                saveData();
-                showToast('Profile updated successfully!', 'success');
-                render();
-            }
-        }
 
         function switchAuthTab(tab) {
             if (tab === 'login') {
@@ -5842,8 +6001,10 @@
 
         function showMoreList(key) {
             if (!state.listShowCount) state.listShowCount = {};
+            if (!state.listWindowIncrement) state.listWindowIncrement = {};
+            const inc = state.listWindowIncrement[key] || 5;
             const current = state.listShowCount[key] || 3;
-            state.listShowCount[key] = current + 5;
+            state.listShowCount[key] = current + inc;
             saveData();
             render();
         }
@@ -6574,6 +6735,7 @@
         }
 
         function renderProducts() {
+            const q = state.productSearch || '';
             return `
                 <div class="card">
                     <h2>Add Product/Service</h2>
@@ -6623,7 +6785,7 @@
                 <div class="card">
                     <h2>All Items (${state.products.length})</h2>
     <div class="search-box">
-        <input type="text" placeholder="🔍 Search items..." oninput="searchProducts(this.value)" id="productSearch">
+        <input type="text" placeholder="🔍 Search items..." oninput="searchProducts(this.value)" id="productSearch" value="${q}">
     </div>
     
     ${state.products.length > 0 ? `
@@ -6640,9 +6802,9 @@
     ` : ''}
     
     <div id="productsList">
-        ${renderProductsList()}
+        ${(state.listExpanded.products || q) ? renderProductsList(q) : ''}
     </div>
-    ${(() => { const total = state.products.length; const count = (state.listShowCount && state.listShowCount.products) ? state.listShowCount.products : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('products')` : `collapseList('products')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
+    <button class="collapse-btn" onclick="toggleListExpanded('products')"><span class="collapse-icon ${state.listExpanded.products ? 'expanded' : ''}">▼</span><span>${state.listExpanded.products ? 'Hide' : 'Show'} All Products</span></button>
 </div>
             `;
         }
@@ -6672,8 +6834,6 @@
             if (products.length === 0) {
                 return '<p style="text-align: center; color: #666;">No items found</p>';
             }
-            const count = (state.listShowCount && state.listShowCount.products) ? state.listShowCount.products : 3;
-            products = products.slice(0, count);
             return products.map((p, i) => {
                 const actualIndex = state.products.indexOf(p);
                 const inv = state.inventory[p.name] || { stock: 0 };
@@ -6714,6 +6874,7 @@
         }
 
         function searchProducts(Period) {
+            state.productSearch = Period;
             document.getElementById('productsList').innerHTML = renderProductsList(Period);
         }
 
@@ -6856,6 +7017,7 @@
             });
         }
         function renderCategories() {
+            const q = state.categorySearch || '';
             return `
                 <div class="card">
                     <h2>Add Category</h2>
@@ -6873,7 +7035,7 @@
                <div class="card">
     <h2>All Categories (${state.categories.length})</h2>
     <div class="search-box" style="margin:8px 0;">
-        <input type="text" placeholder="🔍 Search categories..." oninput="searchCategories(this.value)" id="categorySearch">
+        <input type="text" placeholder="🔍 Search categories..." oninput="searchCategories(this.value)" id="categorySearch" value="${q}">
     </div>
     
     ${state.categories.length > 0 ? `
@@ -6888,8 +7050,8 @@
             </button>
         </div>
     ` : ''}
-    <div id="categoriesList">${renderCategoriesList('')}</div>
-    ${(() => { const total = state.categories.length; const count = (state.listShowCount && state.listShowCount.categories) ? state.listShowCount.categories : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('categories')` : `collapseList('categories')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
+    <div id="categoriesList">${(state.listExpanded.categories || q) ? renderCategoriesList(q) : ''}</div>
+    <button class="collapse-btn" onclick="toggleListExpanded('categories')"><span class="collapse-icon ${state.listExpanded.categories ? 'expanded' : ''}">▼</span><span>${state.listExpanded.categories ? 'Hide' : 'Show'} All Categories</span></button>
 </div>
             `;
         }
@@ -6898,8 +7060,6 @@
             const q = String(Period || '').toLowerCase();
             let cats = state.categories.map((cat, i) => ({ cat, i }))
                 .filter(({ cat }) => !q || String(cat).toLowerCase().includes(q))
-            const count = (state.listShowCount && state.listShowCount.categories) ? state.listShowCount.categories : 3;
-            cats = cats.slice(0, count);
             return cats.map(({ cat, i }) => `
             <div class="item">
                 <div style="display: flex; gap: 12px; align-items: center;">
@@ -6922,6 +7082,7 @@
         }
 
         function searchCategories(Period) {
+            state.categorySearch = Period;
             const el = document.getElementById('categoriesList');
             if (el) el.innerHTML = renderCategoriesList(Period);
         }
@@ -7162,6 +7323,7 @@
         </div>
     ` : ''}
 
+                    <div id="expensesList">
                     ${(() => {
                     const arr = filteredExpenses.slice().reverse(); const count = (state.listShowCount && state.listShowCount.expenses) ? state.listShowCount.expenses : 3; return arr.slice(0, count).map((e, idx) => `
     <div class="item">
@@ -7195,9 +7357,10 @@
     </div>
                     `).join('') || '<p style="text-align: center; color: #666;">No expenses yet</p>'
                 })()}
+                    </div>
                     ${(() => { const total = filteredExpenses.length; const count = (state.listShowCount && state.listShowCount.expenses) ? state.listShowCount.expenses : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('expenses')` : `collapseList('expenses')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
                 </div>
-                `;
+            `;
         }
 
         function updateFilterCategory(value) {
@@ -7310,6 +7473,9 @@
                 const inv = state.inventory[p.name] || { stock: 0, minAlert: 5 };
                 return inv.stock <= inv.minAlert;
             });
+            const q = state.stockSearch || '';
+            const totalUnits = trackedProducts.reduce((sum, p) => sum + ((state.inventory[p.name] || { stock: 0 }).stock || 0), 0);
+            const totalValue = trackedProducts.reduce((sum, p) => sum + (((state.inventory[p.name] || { stock: 0 }).stock || 0) * (p.cost || 0)), 0);
 
             return `
                 ${lowStock.length > 0 ? `
@@ -7323,10 +7489,20 @@
                 <div class="flex-between">
                     <h2>Stock Levels</h2>
                     <div class="search-box" style="max-width:260px;">
-                        <input type="text" id="stockSearch" placeholder="🔍 Search stock..." oninput="searchStock(this.value)" />
+                        <input type="text" id="stockSearch" placeholder="🔍 Search stock..." oninput="searchStock(this.value)" value="${q}" />
                     </div>
                 </div>
-                <div id="stockList">${renderStockList('')}</div>
+                <div class="flex-gap" style="margin-top:8px;">
+                    <span class="badge">Items: ${trackedProducts.length}</span>
+                    <span class="badge ${lowStock.length > 0 ? 'badge-danger' : 'badge-success'}">Low Stock: ${lowStock.length}</span>
+                    <span class="badge">Units: ${formatNumber(totalUnits)}</span>
+                    <span class="badge">Value: ${formatNumber(totalValue)} Tsh</span>
+                </div>
+                <div id="stockList">${(state.listExpanded.inventory || q) ? renderStockList(q) : ''}</div>
+                <button class="collapse-btn" onclick="toggleListExpanded('inventory')">
+                    <span class="collapse-icon ${state.listExpanded.inventory ? 'expanded' : ''}">▼</span>
+                    <span>${state.listExpanded.inventory ? 'Hide' : 'Show'} All Stock</span>
+                </button>
             </div>
             `;
         }
@@ -7364,6 +7540,7 @@
         }
 
         function searchStock(q) {
+            state.stockSearch = q;
             const el = document.getElementById('stockList');
             if (el) el.innerHTML = renderStockList(q);
         }
@@ -7429,9 +7606,9 @@
                                 <div class="item-subtitle">
                                     Unit: ${formatNumber(p.unitCost || p.buyingPrice)} Tsh | Total: ${formatNumber(p.totalCost || (p.buyingPrice || 0))} Tsh<br>
                                     ${p.discount ? `Discount: ${formatNumber(p.discount)} Tsh<br>` : ''}
-                                    Supplier: ${p.supplierName || ''} ${p.supplierPhone ? '(' + p.supplierPhone + ')' : ''}<br>
-                                    ${p.supplierAddress || ''}
-                                    ${p.notes ? `<br>Notes: ${p.notes}` : ''}
+                                    Supplier: ${escapeHTML(p.supplierName || '')} ${p.supplierPhone ? '(' + escapeHTML(p.supplierPhone) + ')' : ''}<br>
+                                    ${escapeHTML(p.supplierAddress || '')}
+                                    ${p.notes ? `<br>Notes: ${escapeHTML(p.notes)}` : ''}
                                 </div>
                                 <div class="flex-gap" style="margin-top:8px;">
                                     <button class="btn-small" onclick="openUpdateInventoryForPurchase(${p.timestamp})">Update Stock Info</button>
@@ -8029,6 +8206,8 @@
         }
 
         async function addInventoryRecord() {
+            playTapSound();
+            hapticShort();
             const productName = (document.getElementById('invProductSelect')?.value || '').trim();
             const quantity = parseMoney(document.getElementById('invQuantity')?.value || '0');
             const unitCost = parseMoney(document.getElementById('invUnitCost')?.value || '0');
@@ -8762,6 +8941,7 @@
         }
 
         function renderCustomers() {
+            const q = state.customerSearch || '';
             // Sort customers by total purchases
             const sortedCustomers = [...state.customers].sort((a, b) =>
                 (b.totalPurchases || 0) - (a.totalPurchases || 0)
@@ -8794,7 +8974,7 @@
                 <div class="card">
                     <h2>All Customers (${state.customers.length})</h2>
                     <div class="search-box">
-                        <input type="text" placeholder="🔍 Search customers..." oninput="searchCustomers(this.value)" id="customerSearch">
+                        <input type="text" placeholder="🔍 Search customers..." oninput="searchCustomers(this.value)" id="customerSearch" value="${q}">
                     </div>
 
                     ${state.customers.length > 0 ? `
@@ -8811,9 +8991,9 @@
     ` : ''}
 
                     <div id="customersList">
-                        ${renderCustomersList()}
+                        ${(state.listExpanded.customers || q) ? renderCustomersList(q) : ''}
                     </div>
-                    ${(() => { const total = state.customers.length; const count = (state.listShowCount && state.listShowCount.customers) ? state.listShowCount.customers : 3; const hasMore = count < total; return `<button class=\"collapse-btn\" onclick=\"${hasMore ? `showMoreList('customers')` : `collapseList('customers')`}\"><span class=\"collapse-icon ${hasMore ? '' : 'expanded'}\">▼</span><span>${hasMore ? 'See more' : 'Hide'}</span></button>`; })()}
+                    <button class="collapse-btn" onclick="toggleListExpanded('customers')"><span class="collapse-icon ${state.listExpanded.customers ? 'expanded' : ''}">▼</span><span>${state.listExpanded.customers ? 'Hide' : 'Show'} All Customers</span></button>
                 </div>
             `;
         }
@@ -8832,9 +9012,6 @@
             if (customers.length === 0) {
                 return '<p style="text-align: center; color: #666;">No customers found</p>';
             }
-
-            const count = (state.listShowCount && state.listShowCount.customers) ? state.listShowCount.customers : 3;
-            customers = customers.slice(0, count);
             return customers.map((c, i) => {
                 const actualIndex = state.customers.indexOf(c);
                 const purchaseCount = state.sales.filter(s => s.customer === c.name).length;
@@ -8868,6 +9045,7 @@
         }
 
         function searchCustomers(Period) {
+            state.customerSearch = Period;
             document.getElementById('customersList').innerHTML = renderCustomersList(Period);
         }
 
@@ -10741,9 +10919,9 @@
                 return `
             <div class="item">
                 <div class="note-preview" onclick="openNoteModal(${actualIndex})" style="cursor: pointer;">
-                    ${note.title ? `<div class="item-title" style="margin-bottom: 8px;">${note.title}</div>` : ''}
-                    <div class="item-subtitle" style="margin-bottom: 8px;">${note.date} ${note.time}</div>
-                    <div style="white-space: pre-wrap;">${note.content}</div>
+                    ${note.title ? `<div class="item-title" style="margin-bottom: 8px;">${escapeHTML(note.title)}</div>` : ''}
+                    <div class="item-subtitle" style="margin-bottom: 8px;">${escapeHTML(note.date)} ${escapeHTML(note.time)}</div>
+                    <div style="white-space: pre-wrap;">${escapeHTML(note.content)}</div>
                 </div>
                 <div style="display: flex; gap: 6px; margin-top: 8px;">
                     <button class="btn-small" onclick="startEditingNote(${actualIndex})">✏️ Edit</button>
@@ -10846,11 +11024,12 @@
             const modal = document.getElementById('noteModal');
             const content = document.getElementById('noteModalContent');
             content.innerHTML = `
-                ${note.title ? `<h3 class="modal-title" style="margin-bottom: 12px;">${note.title}</h3>` : ''}
-                <div style="margin-bottom: 12px; color: #666; font-size: 13px;">${note.date} ${note.time}</div>
-                <div style="white-space: pre-wrap; line-height: 1.6;">${note.content}</div>
+                ${note.title ? `<h3 class="modal-title" style="margin-bottom: 12px;">${escapeHTML(note.title)}</h3>` : ''}
+                <div style="margin-bottom: 12px; color: #666; font-size: 13px;">${escapeHTML(note.date)} ${escapeHTML(note.time)}</div>
+                <div style="white-space: pre-wrap; line-height: 1.6;">${escapeHTML(note.content)}</div>
             `;
             modal.classList.add('show');
+            modal.setAttribute('aria-modal', 'true');
             const handleOutside = (e) => {
                 if (e.target === modal) {
                     closeNoteModal();
@@ -11967,7 +12146,7 @@
             hours = hours % 12;
             hours = hours ? hours : 12; // Convert 0 to 12
 
-            dateElement.textContent = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${ampm}`;
+            dateElement.innerHTML = `${year}-${month}-${day}<br>${hours}:${minutes}:${seconds} ${ampm}`;
         }
 
         function render() {
@@ -12017,15 +12196,60 @@
                     setTimeout(async () => {
                         try { await initCountryCityData(); } catch { }
                         try {
-                            const countryList = document.getElementById('profileCountryList');
-                            const cityList = document.getElementById('profileCityList');
+                            const countrySelect = document.getElementById('profileCountrySelect');
+                            const citySelect = document.getElementById('profileCitySelect');
                             const countryInput = document.getElementById('profileCountry');
-                            if (countryList) countryList.innerHTML = getCountryOptionsHTML();
-                            if (cityList) cityList.innerHTML = getCityOptionsHTML(countryInput?.value || '');
+                            const cityInput = document.getElementById('profileCity');
+                            const currentCountry = (countryInput?.value || state.userProfile?.country || '').trim();
+                            const currentCity = (cityInput?.value || state.userProfile?.city || '').trim();
+                            if (countrySelect) {
+                                countrySelect.innerHTML = `<option value="">-- Select Country --</option><option value="__manual__">Manual entry…</option>` + getCountryOptionsSelectHTML();
+                                if (currentCountry) {
+                                    const src = state.countriesCities ? Object.keys(state.countriesCities) : Object.keys(COUNTRY_CITY_DATA);
+                                    countrySelect.value = src.includes(currentCountry) ? currentCountry : '__manual__';
+                                    onProfileCountrySelect(countrySelect.value);
+                                }
+                            }
+                            if (citySelect) {
+                                const baseCountry = currentCountry || (countrySelect?.value || '');
+                                citySelect.innerHTML = `<option value="">-- Select City --</option><option value="__manual__">Manual entry…</option>` + getCityOptionsSelectHTML(baseCountry);
+                                if (currentCity) {
+                                    const cities = (state.countriesCities || COUNTRY_CITY_DATA)[baseCountry] || [];
+                                    citySelect.value = cities.includes(currentCity) ? currentCity : '__manual__';
+                                    onProfileCitySelect(citySelect.value);
+                                }
+                            }
                         } catch { }
                     }, 0);
                 }
+                if (state.activeTab === 'expenses') { setupWindowVirtualList('expenses'); }
+                if (state.activeTab === 'products') { setupWindowVirtualList('products'); }
+                if (state.activeTab === 'categories') { setupWindowVirtualList('categories'); }
+                if (state.activeTab === 'customers') { setupWindowVirtualList('customers'); }
+                if (state.activeTab === 'notes') { setupWindowVirtualList('notes'); }
             } catch { }
+            try { adjustContentPadding(); } catch { }
+        }
+
+        function adjustContentPadding() {
+            const content = document.getElementById('app');
+            const header = document.querySelector('.header');
+            const bottom = document.getElementById('bottomNav');
+            const banner = document.getElementById('offlineBanner');
+            const auth = document.getElementById('authBanner');
+            if (!content) return;
+            const bannerH = (banner && banner.style.display !== 'none') ? banner.offsetHeight : 0;
+            const authH = (auth && auth.style.display !== 'none') ? auth.offsetHeight : 0;
+            const gap = 8;
+            const topH = (header ? header.offsetHeight : 70) + bannerH + authH + gap;
+            const bottomGap = 8;
+            const bottomH = (bottom ? bottom.offsetHeight : 90) + bottomGap;
+            content.style.paddingTop = topH + 'px';
+            content.style.scrollPaddingTop = topH + 'px';
+            content.style.paddingBottom = bottomH + 'px';
+            content.style.scrollPaddingBottom = bottomH + 'px';
+            if (banner && header) banner.style.top = header.offsetHeight + 'px';
+            if (auth && header) auth.style.top = (header.offsetHeight + (bannerH || 0)) + 'px';
         }
 
         function positionDashboardPrivacyButton() {
@@ -12290,19 +12514,37 @@
         console.log('📱 Loading local data...');
         loadData();
         try { applyTheme(); } catch (e) { }
-        render(); // SHOW UI NOW
+        // Delay initial render until after session restore attempt
+        (function setupBottomNavFastClick() {
+            const nav = document.getElementById('bottomNav');
+            if (!nav || nav.__fastSetup) return;
+            nav.__fastSetup = true;
+            const handler = (e) => {
+                const btn = e.target && e.target.closest && e.target.closest('.nav-item');
+                if (!btn) return;
+                e.preventDefault();
+                const tabId = btn.getAttribute('data-tab');
+                if (!tabId) return;
+                try { switchTab(tabId); } catch { }
+            };
+            nav.addEventListener('touchstart', handler, { passive: false });
+            nav.addEventListener('pointerdown', handler, true);
+        })();
         try { setupKeyboardDismiss(); } catch (e) { }
 
-        // Restore session in BACKGROUND
+        // Restore session BEFORE showing UI to avoid sign-out flash on refresh
         (async function () {
             try {
+                try { window.setAuthRestoring(true); } catch { }
                 const sessionRestored = await restoreSession();
                 if (sessionRestored) {
                     console.log('☁️ Session restored - syncing...');
-                    render(); // Update UI with cloud data
                 }
             } catch (error) {
                 console.error('Session restore failed:', error);
+            } finally {
+                try { window.setAuthRestoring(false); } catch { }
+                render(); // SHOW UI NOW
             }
         })();
 
@@ -13574,7 +13816,7 @@
                         email: email.trim(),
                         password: password,
                         options: {
-                            emailRedirectTo: window.location.origin,
+                            emailRedirectTo: APP_BASE_URL + '#signup-confirmed',
                             data: {
                                 created_at: new Date().toISOString(),
                                 app_version: '2.0'
@@ -13992,6 +14234,7 @@
                         offlineBannerEl.onclick = () => { try { openOfflineInfoModal(); } catch (e) { } };
                         offlineBannerEl.classList.add('clickable');
                     }
+                    try { adjustContentPadding(); } catch { }
                 };
 
                 updateOfflineBanner();
@@ -14050,6 +14293,7 @@
                             } catch (e) { }
                         };
                     }
+                    try { adjustContentPadding(); } catch { }
                 };
                 window.updateAuthBanner();
                 window.addEventListener('online', () => {
@@ -14216,6 +14460,7 @@
                 window.addEventListener('orientationchange', function () {
                     setTimeout(() => {
                         window.scrollTo(0, 1);
+                        try { adjustContentPadding(); } catch { }
                     }, 500);
                 });
 
